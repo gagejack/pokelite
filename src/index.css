@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@font-face {
+  font-family: 'Pixeled';
+  src: url('./assets/Pixeled.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Pokemon Classic';
+  src: url('./assets/Pokemon Classic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Orange Kid';
+  src: url('./assets/Orange Kid.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Upheaval';
+  src: url('./assets/upheavtt.ttf') format('truetype');
+}
+
+* {
+  font-family: 'Orange Kid', sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}
+
+html, body {
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+  overflow: hidden;
+}
+
+#root {
+  overflow: hidden;
+  height: 100dvh;
+}

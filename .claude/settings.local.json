@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(cd /Users/gagejack/Desktop && npm create vite@latest PokeLike-tmp -- --template react 2>&1)",
+      "Read(//Users/gagejack/Desktop/**)",
+      "Bash(cp -r /Users/gagejack/Desktop/PokeLike-tmp/. /Users/gagejack/Desktop/PokeLike/)",
+      "Bash(rm -rf /Users/gagejack/Desktop/PokeLike-tmp)",
+      "Bash(npm install *)",
+      "Bash(ls ~/Library/Fonts/ | grep -i pixel)",
+      "Read(//Users/gagejack/Library/Fonts/**)",
+      "Bash(cp ~/Library/Fonts/Pixeled.ttf /Users/gagejack/Desktop/PokeLike/src/assets/Pixeled.ttf)",
+      "Bash(mv \"015fw2o5.webp\" \"Ace Trainer F.webp\")",
+      "Bash(mv \"01s2w2yh.webp\" \"Ace Trainer M.webp\")",
+      "Bash(mv \"01w42z89.webp\" \"Artist.webp\")",
+      "Bash(mv \"01em86pi.webp\" \"Backers M.webp\")",
+      "Bash(mv \"01ysioj1.webp\" \"Backers F.webp\")",
+      "Bash(mv \"01jiiiei.webp\" \"Alder.webp\")",
+      "Bash(mv \"016ul4yr.webp\" \"Anthea 1.webp\")",
+      "Bash(mv \"018lwvlk.webp\" \"Anthea 2.webp\")",
+      "Bash(mv \"019hrqkz.webp\" \"Aurea Juniper.webp\")",
+      "Bash(mv \"01tdgg89.webp\" \"Benga.webp\")",
+      "Bash(python3 -c ' *)",
+      "Bash(npx vitest *)",
+      "Bash(npm run *)",
+      "Bash(mv \"015fw2o5.webp\" \"Ace Trainer 1.webp\")",
+      "Bash(mv \"01s2w2yh.webp\" \"Ace Trainer 2.webp\")",
+      "Bash(mv \"01em86pi.webp\" \"Backers 1.webp\")",
+      "Bash(mv \"01ysioj1.webp\" \"Backers 2.webp\")",
+      "Bash(python3 -c \"from PIL import Image; img = Image.open\\('/Users/gagejack/Desktop/PokeLike/src/assets/battleGrass.png'\\); print\\(img.size\\)\")",
+      "Bash(python3 -)",
+      "Bash(gh auth *)",
+      "Bash(git --version)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "/Users/gagejack/Library/Fonts"
+    ]
+  }
+}
