@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ThemeProvider } from './lib/theme'
 import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
@@ -9,6 +9,7 @@ import NodeMap from './components/NodeMap'
 import { fetchPokemonBase, buildPokemonInstance, buildMoveCache, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
 import { TRAINER_POKEMON_POOLS, BOSS_TEAMS } from './game/enemyTeams.js'
+import { supabase } from './lib/supabase.js'
 
 export default function App() {
   const [screen, setScreen] = useState('menu')
@@ -20,6 +21,18 @@ export default function App() {
   const [roster, setRoster] = useState([])
   const [bag, setBag] = useState([])
   const [mapIndex, setMapIndex] = useState(0)
+  const [user, setUser] = useState(null)
+  const mapsCleared = useRef(0)
+  const pokemonCaught = useRef(0)
+  const pokemonCaughtIds = useRef([])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function initRoster(starter) {
     const base = await fetchPokemonBase(starter.id)
@@ -30,9 +43,36 @@ export default function App() {
 
   function startRun(starter) {
     setSelectedStarter(starter)
-    setRoster([]) // clear while loading
+    setRoster([])
+    resetRunStats()
     initRoster(starter)
     setScreen('nodemap')
+  }
+
+  async function recordRunEnd(result) {
+    if (!user) return
+    await supabase.from('runs').insert({
+      user_id: user.id,
+      result,
+      maps_cleared: mapsCleared.current,
+      pokemon_caught: pokemonCaught.current,
+      pokemon_caught_ids: pokemonCaughtIds.current,
+    })
+  }
+
+  function handlePokemonCaught(pokemonId) {
+    pokemonCaught.current += 1
+    pokemonCaughtIds.current = [...pokemonCaughtIds.current, pokemonId]
+  }
+
+  function handleMapCleared() {
+    mapsCleared.current += 1
+  }
+
+  function resetRunStats() {
+    mapsCleared.current = 0
+    pokemonCaught.current = 0
+    pokemonCaughtIds.current = []
   }
 
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
@@ -60,6 +100,7 @@ export default function App() {
     setRoster([])
     setBag([])
     setMapIndex(0)
+    resetRunStats()
     initRoster(selectedStarter)
     setScreen('restarting')
     setTimeout(() => setScreen('nodemap'), 0)
@@ -129,6 +170,9 @@ export default function App() {
           onBack={resetRun}
           onRestart={restartRun}
           onAdvanceMap={advanceMap}
+          onPokemonCaught={handlePokemonCaught}
+          onMapCleared={handleMapCleared}
+          onRunEnd={recordRunEnd}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />

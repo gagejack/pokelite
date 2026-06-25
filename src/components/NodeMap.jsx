@@ -217,7 +217,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onPokemonCaught, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
@@ -405,13 +405,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       setPendingBattle(null)
 
       if (isBoss && config.maps[mapIndex + 1]) {
+        onMapCleared?.()
         onAdvanceMap()
+      } else if (isBoss) {
+        onMapCleared?.()
+        onRunEnd?.('win')
+        setClearedNodes(prev => new Set([...prev, node.id]))
+        setCurrentNode(node.id)
       } else {
         setClearedNodes(prev => new Set([...prev, node.id]))
         setCurrentNode(node.id)
       }
     } else {
       setRoster(prev => prev.map((p, i) => ({ ...p, ...finalPlayerTeam[i] })))
+      onRunEnd?.('loss')
       setPendingBattle(null)
     }
   }
@@ -424,6 +431,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     } else {
       setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
     }
+    onPokemonCaught?.(pokemon.pokeId)
     setClearedNodes(prev => new Set([...prev, node.id]))
     setCurrentNode(node.id)
     setPendingPokeball(null)

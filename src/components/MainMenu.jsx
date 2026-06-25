@@ -2,18 +2,31 @@ import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import Layout from './Layout'
 import MainPlayButton from '../assets/MainPlayButton.png'
+import { supabase } from '../lib/supabase'
 
 export default function MainMenu({ onPlay, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState(null)
+  const [authLoading, setAuthLoading] = useState(false)
 
-  function handleLogin() {
-    console.log('login', username)
+  async function handleLogin() {
+    setAuthError(null)
+    setAuthLoading(true)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setAuthLoading(false)
+    if (error) { setAuthError(error.message); return }
+    onPlay()
   }
 
-  function handleRegister() {
-    console.log('register', username)
+  async function handleRegister() {
+    setAuthError(null)
+    setAuthLoading(true)
+    const { error } = await supabase.auth.signUp({ email, password })
+    setAuthLoading(false)
+    if (error) { setAuthError(error.message); return }
+    onPlay()
   }
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
@@ -67,10 +80,10 @@ export default function MainMenu({ onPlay, pokedexOpen, setPokedexOpen }) {
           }}
         >
           <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
             className="w-full px-2 py-1 rounded-none outline-none
               bg-white dark:bg-[#1a1a1a] text-black dark:text-white
               placeholder-[#999] border border-[#bbb] dark:border-[#444]
@@ -82,26 +95,34 @@ export default function MainMenu({ onPlay, pokedexOpen, setPokedexOpen }) {
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
             className="w-full px-2 py-1 rounded-none outline-none
               bg-white dark:bg-[#1a1a1a] text-black dark:text-white
               placeholder-[#999] border border-[#bbb] dark:border-[#444]
               focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
             style={{ fontSize: '8px' }}
           />
+          {authError && (
+            <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#ef4444', textAlign: 'center' }}>
+              {authError}
+            </span>
+          )}
           <div className="flex gap-3 mt-1">
             <button
               onClick={handleLogin}
-              className="flex-1 py-1 font-semibold bg-[#555] hover:bg-[#444] text-white transition-colors"
+              disabled={authLoading}
+              className="flex-1 py-1 font-semibold bg-[#555] hover:bg-[#444] text-white transition-colors disabled:opacity-50"
               style={{ fontSize: '8px' }}
             >
-              Login
+              {authLoading ? '...' : 'Login'}
             </button>
             <button
               onClick={handleRegister}
-              className="flex-1 py-1 font-semibold bg-[#888] hover:bg-[#777] text-white transition-colors"
+              disabled={authLoading}
+              className="flex-1 py-1 font-semibold bg-[#888] hover:bg-[#777] text-white transition-colors disabled:opacity-50"
               style={{ fontSize: '8px' }}
             >
-              Register
+              {authLoading ? '...' : 'Register'}
             </button>
           </div>
         </div>
