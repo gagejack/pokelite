@@ -49,7 +49,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose }) {
         boxShadow: shadowStyle,
         padding: '24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
-        maxWidth: '420px', width: '90vw',
+        maxWidth: '560px', width: '94vw',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
 
@@ -64,7 +64,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose }) {
         </div>
 
         {/* Offered Pokémon */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'center' }}>
           {offered.map((poke, i) => {
             const isSelected = selected === i
             const isHovered = hoveredOffer === i
@@ -84,21 +84,22 @@ export default function PokeballNode({ offered, roster, onPick, onClose }) {
                       : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666'),
                   transform: isHovered && !isSelected ? 'translateY(-2px)' : 'none',
                   transition: 'transform 0.1s, box-shadow 0.1s',
-                  padding: '12px 10px',
+                  padding: 'clamp(6px, 2vw, 12px) clamp(4px, 1.5vw, 10px)',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  width: '110px',
+                  flex: '1 1 0',
+                  minWidth: 0,
                   cursor: 'pointer',
                 }}
               >
                 <img
                   src={poke.sprite}
                   alt={poke.name}
-                  style={{ width: '80px', height: '80px', objectFit: 'contain', imageRendering: 'pixelated' }}
+                  style={{ width: '100%', height: 'auto', aspectRatio: '1', objectFit: 'contain', imageRendering: 'pixelated' }}
                 />
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: textColor, textTransform: 'capitalize' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(9px, 3vw, 12px)', color: textColor, textTransform: 'capitalize' }}>
                   {poke.name}
                 </span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(8px, 2.5vw, 10px)', color: mutedColor }}>
                   Lv. {poke.level}
                 </span>
                 <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -124,14 +125,14 @@ export default function PokeballNode({ offered, roster, onPick, onClose }) {
                     ['SP.DEF', poke.stats.spDef,   20],
                   ]
                   return (
-                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      {rows.map(([label, val, max]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontFamily: 'Orange Kid', fontSize: '9px', color: dark ? '#888' : '#777', width: '36px', flexShrink: 0 }}>{label}</span>
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0px' }}>
+                      {rows.map(([label, val, max], i) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0px' }}>
+                          <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 9px)', color: dark ? '#888' : '#999', width: '22px', flexShrink: 0, textAlign: 'left', lineHeight: 1 }}>{label}</span>
                           <div style={{ flex: 1, height: '4px', backgroundColor: dark ? '#444' : '#bbb', borderRadius: '1px' }}>
-                            <div style={{ height: '100%', borderRadius: '1px', width: `${Math.min(100, (val / max) * 100)}%`, backgroundColor: '#6890F0' }} />
+                            <div style={{ height: '100%', borderRadius: '1px', width: `${Math.min(100, (val / max) * 100)}%`, backgroundColor: i === 0 ? '#4ade80' : '#aaaaaa' }} />
                           </div>
-                          <span style={{ fontFamily: 'Orange Kid', fontSize: '9px', color: dark ? '#DBDBDB' : '#333', width: '18px', textAlign: 'right', flexShrink: 0 }}>{val}</span>
+                          <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 9px)', color: dark ? '#888' : '#999', width: '18px', textAlign: 'right', flexShrink: 0, lineHeight: 1 }}>{val}</span>
                         </div>
                       ))}
                     </div>

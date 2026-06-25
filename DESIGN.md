@@ -41,7 +41,8 @@ State lives entirely in `App.jsx`: `screen`, `selectedRegion`, `selectedCharacte
 ## Responsive Layout
 - **Breakpoint:** `DESKTOP_BP = 768px` (`src/lib/useIsDesktop.js`)
 - **Mobile (<768px):** top nav bar, horizontal roster strip at top, map fills remaining height, 2-column battle card
-- **Desktop (≥768px):** top nav bar, left vertical roster sidebar (90px wide), center map (340px wide), right BAG panel (90px wide), 3-column battle card with center arena
+- **Desktop (≥768px):** top nav bar, left vertical roster sidebar (90px, content height), center map (400px, 91vh), right BAG panel (90px, content height), 3-column battle card with center arena
+- Roster and BAG sidebars grow downward with content — no fixed height
 
 ### Safari/Mobile HTML button overlay fix
 The map SVG uses `pointerEvents: 'none'` on the SVG layer. Invisible `<button>` elements are absolutely positioned over each node in DOM space (coordinates converted from SVG viewBox to container pixels via `mapScale`/`mapOffsetX`/`mapOffsetY`). This is required because Safari does not reliably fire click events on SVG elements.
@@ -129,14 +130,21 @@ Cleared edges render as solid green; uncleared edges render as dashed dark.
 
 ### Map Rendering (`NodeMap.jsx`)
 - SVG viewBox: `(-svgWidth/2) 0 svgWidth svgHeight` — centered horizontally
-- `NODE_SIZE = 44`, `ROW_HEIGHT = 80`, `COL_WIDTH = 70`, `PADDING_TOP = 20`
-- `mapScale` computed to fit the SVG into its container div
+- `NODE_SIZE = 100`, `ROW_HEIGHT = 200`, `COL_WIDTH = 200`, `PADDING_TOP = 40`
+- `svgWidth = 4 * COL_WIDTH + NODE_SIZE * 2`, `svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 60`
+- `mapScale` computed to fit the SVG into its container div; container size tracked via `ResizeObserver` (not one-shot `getBoundingClientRect`) so scale stays accurate after layout changes
+- **Desktop map container:** `400px` wide, `91vh` tall
+- **Desktop layout:** roster sidebar (90px, height = content) | map (400px, 91vh) | bag panel (90px, height = content) — all `alignItems: flex-start` so sidebars don't stretch to map height
 - Trainer/Boss nodes render as clipped full-body overworld sprites (tall aspect ratio)
 - Grass nodes render at 70% node size
 - Current node renders the player's selected character sprite
-- Hovered reachable node: SVG `hover-outline` filter (white dilate + yellow glow)
-- **Touch-hold tooltip:** 400ms `setTimeout` on `onTouchStart` → shows node label popup; cleared on `onTouchEnd`/`onTouchMove`
+- Hovered node: SVG `hover-outline` filter (white dilate + yellow glow) — shown on any node, not just reachable ones
+- **Tooltip:** inline inside the hit button, positioned `bottom: 110%` relative to the button — no separate coordinate math needed
+- **Desktop hover:** `onMouseEnter`/`onMouseLeave` — suppressed when `isTouchDevice` is true (set permanently on first `touchstart`)
+- **Touch-hold tooltip:** 400ms `setTimeout` on `onTouchStart` → shows node label; `holdActivatedRef` prevents the subsequent `onClick` from also firing
+- **Tap on mobile:** fires `onClick` directly with no tooltip shown
 - Locked nodes (not reachable from current path) render at 20% opacity
+- All nodes show tooltip on hover/hold (not just adjacent reachable ones)
 
 ---
 
@@ -347,8 +355,76 @@ No overlay or animation — instant full heal on click.
 
 ---
 
-## Item / Power Upgrade Nodes
-Both node types mark themselves cleared when clicked but have no implemented effect. They are placeholders.
+## Item Node
+
+### Overview
+Two-stage popup flow when an Item node is activated:
+1. **Item offer** — 3 items drawn by weighted random, player picks one (or declines)
+2. **Roster assignment** — player gives the item to a Pokémon, keeps it in the bag, or declines
+
+### Item Pool (`src/game/items.js`)
+```js
+{ id, name, icon, description, weight }
+```
+- `weight` is out of 1000 (e.g. 200 = 20%, 10 = 1%)
+- 3 items drawn via weighted random with replacement (duplicates possible)
+- Items are never consumed — permanently held by a Pokémon or stored in the bag
+
+| id | Name | Effect | Weight |
+|----|------|--------|--------|
+| `leftovers` | Leftovers | Restore 10% max HP each turn | 200 |
+| `shell-bell` | Shell Bell | Restore HP = 20% of damage dealt | 180 |
+| `expert-belt` | Expert Belt | +20% damage on all moves | 160 |
+| `choice-band` | Choice Band | +50% Attack | 120 |
+| `choice-scarf` | Choice Scarf | +50% Speed | 120 |
+| `scope-lens` | Scope Lens | +30% crit rate | 100 |
+| `rocky-helmet` | Rocky Helmet | Attacker takes 1/3 max HP on every hit | 80 |
+| `life-orb` | Life Orb | +30% damage on all moves | 30 |
+| `focus-sash` | Focus Sash | Survive any KO hit at full HP | 10 |
+
+### Stage 1 — Item Offer Popup
+- Same modal style as PokeballNode
+- Header: "Found Items!" / subheader: "Choose one to keep"
+- 3 item cards side by side (same 3-column flex layout as PokeballNode/StarterSelect)
+- Each card: item icon (pixelated), item name, rarity % (`weight / 10`)
+- Clicking a card advances to Stage 2
+- **Decline** at the bottom closes popup, clears node, item lost
+
+### Stage 2 — Roster Assignment (hamburger list)
+Replaces the offer popup. One row per Pokémon:
+- **Left:** pixelated sprite (~40px)
+- **Center:** name on top, `Lv. X` below — both centered together and vertically centered with the sprite
+- **Right of center:** held item icon + name, or "— empty —"
+- **Far right:** "Give" button (slot empty) or "Swap" button (slot occupied)
+  - Give: assigns item → closes, node clears
+  - Swap: assigns new item, returns old item to bag → closes, node clears
+
+Bottom of the list, two buttons side by side:
+- **Keep in Bag** — stores item in bag, closes popup, node clears
+- **Decline** — item lost, closes popup, node clears
+
+### Bag
+- Persistent array in `App.jsx` state: `bag = []`, shape `{ id, name, icon }`
+- Displayed in the BAG panel (desktop right sidebar, currently a placeholder)
+- **Desktop:** drag item from bag onto roster slot to assign; if Pokémon already holds one, old item returns to bag
+- **Mobile:** tap item in bag → tap Pokémon in roster (two-tap flow, TBD)
+
+### Data Shape
+```js
+// Item definition
+{ id: 'leftovers', name: 'Leftovers', icon: 'https://...', description: '...', weight: 50 }
+
+// On a Pokémon instance
+pokemon.heldItem = { id, name, icon } | null
+
+// Bag entry
+{ id, name, icon }
+```
+
+---
+
+## Power Upgrade Node
+Currently a placeholder — marks itself cleared when clicked, no effect implemented.
 
 ---
 
@@ -365,7 +441,7 @@ Single top bar across all screens. Icons:
 
 ## Deferred / Not Yet Implemented
 - Supabase auth (login/register UI exists but handlers are stubs)
-- Item node effect
+- Item node effect (spec complete in DESIGN.md and PokeLite_Design_Doc.md — not yet built)
 - Power upgrade node effect
 - Wild Pokémon pool for grass nodes (hardcoded Patrat lv4)
 - Game over screen (loss state calls `onBattleEnd({ won: false })` but no dedicated screen)

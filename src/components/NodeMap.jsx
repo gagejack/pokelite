@@ -5,10 +5,15 @@ import Layout from './Layout'
 import Roster from './Roster'
 import BattleCard from './BattleCard'
 import PokeballNode from './PokeballNode'
+import ItemNode from './ItemNode'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
+import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, buildMoveCache, levelUp, checkEvolution } from '../game/pokemon.js'
-import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS } from '../game/enemyTeams.js'
+import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES } from '../game/enemyTeams.js'
+
+let isTouchDevice = false
+window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
 
 const ITEM_ICONS = {
   [NODE_TYPES.POKEBALL]:      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
@@ -18,24 +23,28 @@ const ITEM_ICONS = {
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
 }
 
-const NODE_SIZE = 44
-const ROW_HEIGHT = 80
-const COL_WIDTH = 70
-const PADDING_TOP = 20
+const NODE_SIZE = 100
+const ROW_HEIGHT = 200
+const COL_WIDTH = 200
+const PADDING_TOP = 40
 
 function MapSvg({
   dark, borderStyle, shadowStyle,
   nodePositions, edges, svgWidth, svgHeight,
-  clearedNodes, currentNode, loadingNode, hoveredNode, tooltipPos,
-  mapContainerRef, holdTimerRef,
-  setContainerSize, setHoveredNode, setTooltipPos,
+  clearedNodes, currentNode, loadingNode, hoveredNode,
+  mapContainerRef, holdTimerRef, holdActivatedRef,
+  setContainerSize, setHoveredNode,
   handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
   mapScale, mapOffsetX, mapOffsetY, background,
 }) {
   useEffect(() => {
     if (!mapContainerRef.current) return
-    const { width, height } = mapContainerRef.current.getBoundingClientRect()
-    if (width > 0 && height > 0) setContainerSize({ w: width, h: height })
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) setContainerSize({ w: width, h: height })
+    })
+    ro.observe(mapContainerRef.current)
+    return () => ro.disconnect()
   }, [])
 
   const toPixel = (svgX, svgY) => ({
@@ -149,29 +158,25 @@ function MapSvg({
         const reachable = !cleared && isReachable(node.id)
         const { px, py } = toPixel(x, y)
         const size = NODE_SIZE * mapScale
+        const isHovered = hoveredNode?.id === node.id
+        const { title, sub } = getNodeLabel(node)
         return (
           <button
             key={node.id}
-            onClick={() => handleNodeClick(node)}
-            onMouseEnter={() => {
-              if (!reachable) return
-              setHoveredNode(node)
-              setTooltipPos({ x: px, y: py })
+            onClick={(e) => {
+              if (holdActivatedRef.current) { holdActivatedRef.current = false; return }
+              handleNodeClick(node)
             }}
-            onMouseLeave={() => { setHoveredNode(null); setTooltipPos(null) }}
+            onMouseEnter={() => { if (!isTouchDevice) setHoveredNode(node) }}
+            onMouseLeave={() => { if (!isTouchDevice) setHoveredNode(null) }}
             onTouchStart={() => {
-              if (!reachable) return
               holdTimerRef.current = setTimeout(() => {
+                holdActivatedRef.current = true
                 setHoveredNode(node)
-                setTooltipPos({ x: px, y: py })
               }, 400)
             }}
-            onTouchEnd={() => {
-              clearTimeout(holdTimerRef.current)
-              setHoveredNode(null)
-              setTooltipPos(null)
-            }}
-            onTouchMove={() => { clearTimeout(holdTimerRef.current) }}
+            onTouchEnd={() => { clearTimeout(holdTimerRef.current); setHoveredNode(null) }}
+            onTouchMove={() => clearTimeout(holdTimerRef.current)}
             style={{
               position: 'absolute',
               left: px - size / 2,
@@ -184,35 +189,35 @@ function MapSvg({
               cursor: loadingNode === node.id ? 'wait' : reachable ? 'pointer' : 'default',
               WebkitTapHighlightColor: 'transparent',
             }}
-          />
+          >
+            {isHovered && (
+              <div style={{
+                position: 'absolute',
+                bottom: '110%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: dark ? 'rgba(30,30,30,0.92)' : 'rgba(220,220,220,0.95)',
+                border: dark ? '1px solid #444' : '1px solid #999',
+                padding: '4px 8px',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+              }}>
+                <div style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize' }}>{title}</div>
+                {Array.isArray(sub)
+                  ? sub.map((line, i) => <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', lineHeight: '1.4' }}>{line}</div>)
+                  : <div style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', marginTop: '1px' }}>{sub}</div>
+                }
+              </div>
+            )}
+          </button>
         )
       })}
-
-      {hoveredNode && tooltipPos && (() => {
-        const { title, sub } = getNodeLabel(hoveredNode)
-        return (
-          <div style={{
-            position: 'absolute',
-            left: tooltipPos.x,
-            top: tooltipPos.y - 48,
-            transform: 'translateX(-50%)',
-            backgroundColor: dark ? 'rgba(30,30,30,0.92)' : 'rgba(220,220,220,0.95)',
-            border: dark ? '1px solid #444' : '1px solid #999',
-            padding: '4px 8px',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            zIndex: 10,
-          }}>
-            <div style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize' }}>{title}</div>
-            <div style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', marginTop: '1px' }}>{sub}</div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, mapIndex = 0, onBack, onRestart, onAdvanceMap, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
@@ -225,13 +230,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [currentNode, setCurrentNode] = useState(0)
   const [pendingBattle, setPendingBattle] = useState(null)
   const [pendingPokeball, setPendingPokeball] = useState(null)
+  const [pendingItem, setPendingItem] = useState(null)
   const [loadingNode, setLoadingNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
-  const [tooltipPos, setTooltipPos] = useState(null)
   const [evolutionNotices, setEvolutionNotices] = useState([])
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
   const mapContainerRef = useRef(null)
   const holdTimerRef = useRef(null)
+  const holdActivatedRef = useRef(false)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
@@ -247,7 +253,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   })
 
   const totalRows = mapData.rows.length
-  const svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 54
+  const svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 60
   const svgWidth = 4 * COL_WIDTH + NODE_SIZE * 2
 
   const isReachable = (nodeId) =>
@@ -355,6 +361,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setClearedNodes(prev => new Set([...prev, node.id]))
         setCurrentNode(node.id)
       }
+    } else if (node.type === NODE_TYPES.ITEM) {
+      const offered = pickThreeItems()
+      setPendingItem({ node, offered })
     } else if (node.type === NODE_TYPES.POKECENTER) {
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
@@ -430,10 +439,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   function getNodeLabel(node) {
+    if (node.type === NODE_TYPES.TRAINER) {
+      const pool = TRAINER_POKEMON_POOLS[node.trainer] ?? []
+      const types = [...new Set(pool.map(p => POKEMON_TYPES[p.id]).filter(Boolean))]
+      const sub = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : '+2 LVL'
+      return { title: node.trainer ?? 'Trainer', sub }
+    }
+    if (node.type === NODE_TYPES.BOSS) {
+      const team = BOSS_TEAMS[node.trainer] ?? []
+      const sub = team.map(p => `${POKEMON_NAMES[p.id] ?? '???'} lv.${p.level}`)
+      return { title: node.trainer ?? 'Gym Leader', sub }
+    }
     switch (node.type) {
       case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: '+1 LVL' }
-      case NODE_TYPES.TRAINER:       return { title: node.trainer ?? 'Trainer', sub: '+2 LVL' }
-      case NODE_TYPES.BOSS:          return { title: node.trainer ?? 'Gym Leader', sub: '+2 LVL' }
       case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: 'Catch a Pokémon' }
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: 'Select an item' }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: 'Upgrade a move' }
@@ -451,9 +469,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const mapSvgProps = {
     dark, borderStyle, shadowStyle,
     nodePositions, edges, svgWidth, svgHeight,
-    clearedNodes, currentNode, loadingNode, hoveredNode, tooltipPos,
-    mapContainerRef, holdTimerRef,
-    setContainerSize, setHoveredNode, setTooltipPos,
+    clearedNodes, currentNode, loadingNode, hoveredNode,
+    mapContainerRef, holdTimerRef, holdActivatedRef,
+    setContainerSize, setHoveredNode,
     handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
     mapScale, mapOffsetX, mapOffsetY,
     background: mapConfig.background,
@@ -465,19 +483,33 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         <div className="flex flex-col items-center gap-2 w-full py-4">
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px' }}>
             <Roster roster={roster} onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })} />
-            <div style={{ width: '340px', height: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '400px', height: '91vh', display: 'flex', flexDirection: 'column' }}>
               <MapSvg {...mapSvgProps} />
             </div>
             <div style={{
-              width: '90px', height: '85vh',
+              width: '90px',
               border: dark ? '2px solid #121212' : '2px solid #666666',
               boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666',
               backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', flexShrink: 0,
             }}>
               <div style={{ backgroundColor: '#facc15', padding: '3px 10px', width: '100%', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a' }}>BAG</span>
               </div>
+              {bag && bag.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '4px' }}>
+                  {bag.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px' }}>
+                      <img src={itemIconUrl(item)} alt={item.name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated', flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: dark ? '#DBDBDB' : '#333', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: dark ? '#555' : '#aaa', padding: '6px 4px', textAlign: 'center' }}>— empty —</span>
+              )}
             </div>
           </div>
         </div>
@@ -509,6 +541,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           character={character}
           damageMultiplier={config.damageMultiplier ?? 2}
           onBattleEnd={handleBattleEnd}
+          onRestart={onRestart}
         />
       )}
 
@@ -549,6 +582,30 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setClearedNodes(prev => new Set([...prev, pendingPokeball.node.id]))
             setCurrentNode(pendingPokeball.node.id)
             setPendingPokeball(null)
+          }}
+        />
+      )}
+
+      {pendingItem && (
+        <ItemNode
+          offered={pendingItem.offered}
+          roster={roster}
+          onAssign={(item, pokemonIndex, swapBackItem) => {
+            onItemAssign(item, pokemonIndex, swapBackItem)
+            setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))
+            setCurrentNode(pendingItem.node.id)
+            setPendingItem(null)
+          }}
+          onKeepInBag={(item) => {
+            onItemKeepInBag(item)
+            setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))
+            setCurrentNode(pendingItem.node.id)
+            setPendingItem(null)
+          }}
+          onClose={() => {
+            setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))
+            setCurrentNode(pendingItem.node.id)
+            setPendingItem(null)
           }}
         />
       )}

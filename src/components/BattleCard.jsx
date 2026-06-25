@@ -20,7 +20,7 @@ const PROJECTILE_MS = 400
 const PAUSE_AFTER_HIT = 350
 const PROJECTILE_DURATION = PROJECTILE_MS / 1000
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onRestart }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed } = useSettings()
@@ -169,16 +169,30 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           <span style={{ fontFamily: 'Upheaval', fontSize: '20px', color: battleResult === 'win' ? '#22c55e' : '#ef4444' }}>
             {battleResult === 'win' ? 'Victory!' : 'Defeated...'}
           </span>
-          <button
-            onClick={handleContinue}
-            style={{
-              fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
-              border: borderStyle, backgroundColor: innerBg,
-              padding: '6px 20px', cursor: 'pointer',
-            }}
-          >
-            Continue
-          </button>
+          {battleResult === 'loss' && onRestart ? (
+            <button
+              onClick={onRestart}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '12px', color: '#1a1a1a',
+                border: 'none', backgroundColor: '#facc15',
+                padding: '6px 20px', cursor: 'pointer',
+                boxShadow: '-2px 3px 0 0 #b89d0a',
+              }}
+            >
+              Play Again
+            </button>
+          ) : (
+            <button
+              onClick={handleContinue}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+                border: borderStyle, backgroundColor: innerBg,
+                padding: '6px 20px', cursor: 'pointer',
+              }}
+            >
+              Continue
+            </button>
+          )}
         </div>
       )}
     </div>

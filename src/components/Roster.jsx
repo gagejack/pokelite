@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
+import { itemIconUrl } from '../game/items'
 
 const TYPE_COLORS = {
   fire: '#F08030', water: '#6890F0', grass: '#78C850',
@@ -151,7 +152,6 @@ export default function Roster({ roster, horizontal = false, onSwap }) {
         // Desktop: vertical sidebar
         <div style={{
           width: '90px',
-          height: '85vh',
           border: borderStyle,
           boxShadow: shadowStyle,
           backgroundColor: cardBg,
@@ -159,7 +159,6 @@ export default function Roster({ roster, horizontal = false, onSwap }) {
           flexDirection: 'column',
           alignItems: 'center',
           gap: '6px',
-          overflowY: 'auto',
           flexShrink: 0,
         }}>
           <div style={{
@@ -252,6 +251,14 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         LVL {pokemon.level}
       </span>
       <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width={barW} height="3px" />
+      {pokemon.heldItem && (
+        <img
+          src={itemIconUrl(pokemon.heldItem)}
+          alt={pokemon.heldItem.name}
+          title={pokemon.heldItem.name}
+          style={{ width: '16px', height: '16px', imageRendering: 'pixelated', pointerEvents: 'none', flexShrink: 0 }}
+        />
+      )}
       {isFainted && (
         <span style={{ fontFamily: 'Upheaval', fontSize: '6px', color: '#ef4444', position: 'absolute', top: '2px', right: '2px', pointerEvents: 'none' }}>
           FNT

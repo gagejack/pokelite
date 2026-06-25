@@ -6,7 +6,9 @@ import RegionSelect from './components/RegionSelect'
 import CharacterSelect from './components/CharacterSelect'
 import StarterSelect from './components/StarterSelect'
 import NodeMap from './components/NodeMap'
-import { fetchPokemonBase, buildPokemonInstance, buildMoveCache } from './game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, buildMoveCache, prewarmCache } from './game/pokemon.js'
+import { getRegionConfig } from './game/regionRegistry.js'
+import { TRAINER_POKEMON_POOLS, BOSS_TEAMS } from './game/enemyTeams.js'
 
 export default function App() {
   const [screen, setScreen] = useState('menu')
@@ -16,6 +18,7 @@ export default function App() {
   const [selectedCharacter, setSelectedCharacter] = useState(null)
   const [selectedStarter, setSelectedStarter] = useState(null)
   const [roster, setRoster] = useState([])
+  const [bag, setBag] = useState([])
   const [mapIndex, setMapIndex] = useState(0)
 
   async function initRoster(starter) {
@@ -32,11 +35,21 @@ export default function App() {
     setScreen('nodemap')
   }
 
+  function handleItemAssign(item, pokemonIndex, swapBackItem) {
+    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? { ...p, heldItem: item } : p))
+    if (swapBackItem) setBag(prev => [...prev, swapBackItem])
+  }
+
+  function handleItemKeepInBag(item) {
+    setBag(prev => [...prev, item])
+  }
+
   function resetRun() {
     setSelectedRegion(null)
     setSelectedCharacter(null)
     setSelectedStarter(null)
     setRoster([])
+    setBag([])
     setMapIndex(0)
     setScreen('menu')
   }
@@ -45,6 +58,7 @@ export default function App() {
     if (!selectedStarter) return
     setResetting(true)
     setRoster([])
+    setBag([])
     setMapIndex(0)
     initRoster(selectedStarter)
     setScreen('restarting')
@@ -72,7 +86,12 @@ export default function App() {
       {screen === 'region' && (
         <RegionSelect
           onBack={() => setScreen('menu')}
-          onSelectRegion={region => { setSelectedRegion(region); setScreen('character') }}
+          onSelectRegion={region => {
+            setSelectedRegion(region)
+            const config = getRegionConfig(region.name)
+            if (config) prewarmCache(config, TRAINER_POKEMON_POOLS, BOSS_TEAMS)
+            setScreen('character')
+          }}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -103,6 +122,9 @@ export default function App() {
           character={selectedCharacter}
           roster={roster}
           setRoster={setRoster}
+          bag={bag}
+          onItemAssign={handleItemAssign}
+          onItemKeepInBag={handleItemKeepInBag}
           mapIndex={mapIndex}
           onBack={resetRun}
           onRestart={restartRun}

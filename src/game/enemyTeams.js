@@ -1,5 +1,26 @@
 import { pick } from './nodeMap.js'
 
+// Static type + name lookup for all Pokémon used in trainer/boss pools
+export const POKEMON_TYPES = {
+  504:'normal',506:'normal',507:'normal',509:'dark',511:'grass',513:'fire',515:'water',
+  519:'normal',520:'normal',522:'electric',527:'psychic',529:'ground',530:'ground',
+  531:'normal',540:'bug',543:'bug',544:'bug',551:'ground',552:'ground',559:'dark',
+  561:'psychic',568:'poison',574:'psychic',580:'water',581:'water',582:'ice',583:'ice',
+  587:'electric',595:'bug',602:'electric',603:'electric',604:'electric',610:'dragon',
+  611:'dragon',612:'dragon',613:'ice',614:'ice',615:'ice',621:'dragon',633:'dragon',
+  634:'dragon',635:'dragon',
+}
+
+export const POKEMON_NAMES = {
+  504:'patrat',506:'lillipup',507:'herdier',509:'purrloin',511:'pansage',513:'pansear',
+  515:'panpour',519:'pidove',520:'tranquill',522:'blitzle',527:'woobat',529:'drilbur',
+  530:'excadrill',531:'audino',540:'sewaddle',543:'venipede',544:'whirlipede',551:'sandile',
+  552:'krokorok',559:'scraggy',561:'sigilyph',568:'trubbish',574:'gothita',580:'ducklett',
+  581:'swanna',582:'vanillite',583:'vanillish',587:'emolga',595:'joltik',602:'tynamo',
+  603:'eelektrik',604:'eelektross',610:'axew',611:'fraxure',612:'haxorus',613:'cubchoo',
+  614:'beartic',615:'cryogonal',621:'druddigon',633:'deino',634:'zweilous',635:'hydreigon',
+}
+
 // Pokémon pools per trainer type.
 // Each entry: { id: pokeApiId, levelRange: [min, max] }
 // levelRange is the base range; positionWeight scales within it.

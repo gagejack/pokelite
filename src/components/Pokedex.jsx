@@ -141,7 +141,7 @@ export default function Pokedex({ onClose }) {
               <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: dark ? '#DBDBDB' : '#333333' }}>Loading...</span>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(6, 1fr)' : 'repeat(5, 1fr)', gap: isDesktop ? '10px' : '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(6, 1fr)' : 'repeat(3, 1fr)', gap: isDesktop ? '10px' : '6px' }}>
               {pokemon.map(p => (
                 <div
                   key={p.id}
@@ -152,24 +152,24 @@ export default function Pokedex({ onClose }) {
                     boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
                   }}
                 >
-                  <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: dark ? '#888' : '#777' }}>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '13px' : '10px', color: dark ? '#888' : '#777' }}>
                     #{String(p.id).padStart(3, '0')}
                   </span>
                   <img
                     src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
                     alt={p.name}
-                    style={{ width: isDesktop ? '72px' : '48px', height: isDesktop ? '72px' : '48px', imageRendering: 'pixelated' }}
+                    style={{ width: isDesktop ? '72px' : '52px', height: isDesktop ? '72px' : '52px', imageRendering: 'pixelated' }}
                   />
-                  <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '14px' : '13px', color: dark ? '#DBDBDB' : '#333333', textAlign: 'center', marginTop: '2px' }}>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '14px' : '11px', color: dark ? '#DBDBDB' : '#333333', textAlign: 'center', marginTop: '2px' }}>
                     {p.name}
                   </span>
                   {p.types && (
-                    <div style={{ display: 'flex', gap: '3px', marginTop: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: '2px', marginTop: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {p.types.map(type => (
                         <span key={type} style={{
-                          fontFamily: 'Orange Kid', fontSize: '12px', color: '#1a1a1a',
+                          fontFamily: 'Orange Kid', fontSize: isDesktop ? '12px' : '9px', color: '#1a1a1a',
                           backgroundColor: TYPE_COLORS[type] || '#888',
-                          padding: '1px 4px', textTransform: 'capitalize',
+                          padding: isDesktop ? '1px 4px' : '1px 3px', textTransform: 'capitalize',
                         }}>
                           {type}
                         </span>

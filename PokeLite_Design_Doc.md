@@ -230,6 +230,11 @@ Stats are pulled from PokéAPI at runtime. Each Pokémon has:
 
 The user starts by picking the region. The region will have 8 maps, each with a diagonal grid structure with nodes in between similar to Slay the Spire. Nodes will have different types.
 
+Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a tooltip above the node:
+* **Trainer:** trainer name + type of their Pokémon pool ("fire type" / "various types")
+* **Gym Leader/Boss:** trainer name + each Pokémon listed by name and level (one per line)
+* **All other nodes:** node name + short description (e.g. "+1 LVL", "Full heal")
+
 ## **Node Types**
 
 ### **Trainer**
@@ -258,7 +263,21 @@ The user starts by picking the region. The region will have 8 maps, each with a 
 
 ### **Item**
 
-* Contains 3 random items from the pool of items for that map level
+* Presents **3 random items** drawn by weighted random from the global item pool (weights out of 1000 — higher weight = more common)
+
+* Each item card shows: item icon (pixelated sprite), item name, rarity percentage
+
+* Player picks **one** item to keep, or declines (item is lost, node clears)
+
+* After picking, a **roster assignment panel** appears (hamburger list):
+  * One row per Pokémon — sprite on the left, name + level centered to its right, held item slot to the right of that
+  * If the slot is empty: shows "— empty —" and a **Give** button
+  * If the Pokémon already holds an item: shows that item and a **Swap** button (old item returns to bag)
+  * At the bottom: **Keep in Bag** button (stores item in bag without assigning) and **Decline** button (item is lost)
+
+* Items are never consumed — they are permanently held by a Pokémon or stored in the bag
+
+* Items can appear as offers even if a Pokémon in the roster already holds the same item
 
 ### **Power Upgrade**
 
@@ -482,9 +501,32 @@ For Unova Map 1 (Striaton City gym), the boss is determined by the player's chos
 
 # **Items**
 
-(To be defined)
+Items are held by Pokémon or stored in the player's bag. No items are one-time use in the current version — all effects are passive and tied to the holder.
 
-# **Pokémon Roster**
+## **Bag**
+
+* The player has a persistent bag displayed in the right sidebar on desktop (currently a placeholder panel)
+* Items in the bag can be dragged onto a Pokémon in the roster to assign them
+  * **Desktop:** drag item icon from bag onto a roster slot
+  * **Mobile:** tap item in bag → tap Pokémon in roster (two-tap assignment)
+* If the target Pokémon already holds an item, the old item is returned to the bag
+* Bag has no size limit in the current version
+
+## **Item Pool**
+
+Each item has a `weight` out of 1000. The displayed rarity % = `weight / 10`.
+
+| Item | Effect | Weight | Rarity |
+|------|--------|--------|--------|
+| Leftovers | Restores 10% max HP each turn | 200 | 20% |
+| Shell Bell | Restores HP equal to 20% of damage dealt | 180 | 18% |
+| Expert Belt | +20% damage on all moves | 160 | 16% |
+| Choice Band | +50% Attack | 120 | 12% |
+| Choice Scarf | +50% Speed | 120 | 12% |
+| Scope Lens | Raises crit rate by 30% | 100 | 10% |
+| Rocky Helmet | Deals 1/3 HP damage to attackers on contact | 80 | 8% |
+| Life Orb | +30% damage on all moves | 30 | 3% |
+| Focus Sash | Survive any KO hit at full HP | 10 | 1% |
 
 ## **Unova**
 

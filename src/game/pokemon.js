@@ -1,3 +1,30 @@
+const baseCache = new Map()
+const moveCacheStore = new Map()
+
+// Pre-fetch base + move data for every Pokémon ID in a region config so all
+// subsequent node activations are served from cache with no network delay.
+export async function prewarmCache(regionConfig, trainerPokemonPools, bossTeams) {
+  const ids = new Set()
+
+  // Catch pools (array of arrays)
+  regionConfig.catchPools?.forEach(pool => pool.forEach(id => ids.add(id)))
+
+  // Trainer pools
+  Object.values(trainerPokemonPools).forEach(pool => pool.forEach(({ id }) => ids.add(id)))
+
+  // Boss teams
+  Object.values(bossTeams).forEach(team => team.forEach(({ id }) => ids.add(id)))
+
+  await Promise.all([...ids].map(async id => {
+    try {
+      const base = await fetchPokemonBase(id)
+      await buildMoveCache(base)
+    } catch {
+      // Non-fatal — node will fall back to live fetch
+    }
+  }))
+}
+
 // Pure stat formula (Gen 5, 31 IVs, neutral nature, 0 EVs)
 export function calcHP(base, level) {
   return Math.floor(((2 * base + 31) * level) / 100) + level + 10
@@ -33,11 +60,12 @@ export function resolveMove(primaryType, learnset, level, moveCache) {
 // Fetch base data for a Pokémon by id or name from PokéAPI.
 // Returns a plain object with everything needed to build a battle-ready instance.
 export async function fetchPokemonBase(idOrName) {
+  if (baseCache.has(idOrName)) return baseCache.get(idOrName)
   const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${idOrName}`)
   if (!res.ok) throw new Error(`PokéAPI error for ${idOrName}`)
   const data = await res.json()
 
-  return {
+  const result = {
     pokeId: data.id,
     name: data.name,
     types: data.types.map(t => t.type.name),
@@ -53,6 +81,9 @@ export async function fetchPokemonBase(idOrName) {
     sprite: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.front_default,
     spriteBack: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.back_default,
   }
+  baseCache.set(idOrName, result)
+  baseCache.set(result.pokeId, result)
+  return result
 }
 
 // Fetch move data from PokéAPI by move name.
@@ -72,6 +103,7 @@ export async function fetchMoveData(moveName) {
 // Build a move cache for a Pokémon — only fetches level-up moves of its primary type.
 // This is the correct way to populate moveCache before calling buildPokemonInstance.
 export async function buildMoveCache(base) {
+  if (moveCacheStore.has(base.pokeId)) return moveCacheStore.get(base.pokeId)
   const primaryType = base.types[0]
 
   // Deduplicate move names that are level-up moves
@@ -97,6 +129,7 @@ export async function buildMoveCache(base) {
     }
   })
 
+  moveCacheStore.set(base.pokeId, moveCache)
   return moveCache
 }
 
