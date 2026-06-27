@@ -10,8 +10,9 @@ import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
 const RESET_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fluffy-tail.png'
 const SETTINGS_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/town-map.png'
+const SKIP_MAP_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png'
 
-export default function Layout({ children, onHome, onRestart, pokedexOpen, setPokedexOpen }) {
+export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen }) {
   const { dark, toggle } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -55,6 +56,11 @@ export default function Layout({ children, onHome, onRestart, pokedexOpen, setPo
         >
           Auto
         </button>
+        {onSkipMap && (
+          <button onClick={onSkipMap} className="hover:opacity-60 transition-opacity" title="Skip to next map">
+            <img src={SKIP_MAP_ICON} alt="Next map" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+          </button>
+        )}
         {onRestart && (
           <button onClick={onRestart} className="hover:opacity-60 transition-opacity" title="Restart run">
             <img src={RESET_ICON} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />

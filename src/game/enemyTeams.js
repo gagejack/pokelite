@@ -26,48 +26,48 @@ export const POKEMON_NAMES = {
 // levelRange is the base range; positionWeight scales within it.
 export const TRAINER_POKEMON_POOLS = {
   // --- Map 1 (Routes 1–2, lv 1–5) ---
-  'Youngster':      [{ id: 504, levelRange: [6, 9] }, { id: 506, levelRange: [6, 9] }, { id: 509, levelRange: [6, 9] }],
-  'Lass':           [{ id: 509, levelRange: [6, 9] }, { id: 506, levelRange: [6, 9] }, { id: 519, levelRange: [6, 9] }],
-  'Preschooler M':  [{ id: 504, levelRange: [6, 9] }, { id: 506, levelRange: [6, 9] }],
-  'Preschooler F':  [{ id: 504, levelRange: [6, 9] }, { id: 506, levelRange: [6, 9] }],
-  'Schoolkid M':    [{ id: 504, levelRange: [6, 9] }, { id: 519, levelRange: [6, 9] }, { id: 522, levelRange: [6, 9] }],
-  'Schoolkid F':    [{ id: 504, levelRange: [6, 9] }, { id: 519, levelRange: [6, 9] }, { id: 522, levelRange: [6, 9] }],
-  'Backpacker M':   [{ id: 506, levelRange: [6, 9] }, { id: 504, levelRange: [6, 9] }, { id: 509, levelRange: [6, 9] }],
-  'Backpacker F':   [{ id: 506, levelRange: [6, 9] }, { id: 504, levelRange: [6, 9] }, { id: 509, levelRange: [6, 9] }],
-  'Janitor':        [{ id: 506, levelRange: [6, 9] }, { id: 504, levelRange: [6, 9] }],
+  'Youngster':      [{ id: 504, levelRange: [3, 10] }, { id: 506, levelRange: [3, 10] }, { id: 509, levelRange: [3, 10] }],
+  'Lass':           [{ id: 509, levelRange: [3, 10] }, { id: 506, levelRange: [3, 10] }, { id: 519, levelRange: [3, 10] }],
+  'Preschooler M':  [{ id: 504, levelRange: [3, 10] }, { id: 506, levelRange: [3, 10] }],
+  'Preschooler F':  [{ id: 504, levelRange: [3, 10] }, { id: 506, levelRange: [3, 10] }],
+  'Schoolkid M':    [{ id: 504, levelRange: [3, 10] }, { id: 519, levelRange: [3, 10] }, { id: 522, levelRange: [3, 10] }],
+  'Schoolkid F':    [{ id: 504, levelRange: [3, 10] }, { id: 519, levelRange: [3, 10] }, { id: 522, levelRange: [3, 10] }],
+  'Backpacker M':   [{ id: 506, levelRange: [3, 10] }, { id: 504, levelRange: [3, 10] }, { id: 509, levelRange: [3, 10] }],
+  'Backpacker F':   [{ id: 506, levelRange: [3, 10] }, { id: 504, levelRange: [3, 10] }, { id: 509, levelRange: [3, 10] }],
+  'Janitor':        [{ id: 506, levelRange: [3, 10] }, { id: 504, levelRange: [3, 10] }],
 
   // --- Map 2 (Route 3, lv 10–15) ---
-  'Nursery Aide':   [{ id: 531, levelRange: [13, 16] }, { id: 506, levelRange: [13, 16] }, { id: 519, levelRange: [13, 16] }],
-  'Twins':          [{ id: 519, levelRange: [13, 16] }, { id: 522, levelRange: [13, 16] }],
+  'Nursery Aide':   [{ id: 531, levelRange: [10, 19] }, { id: 506, levelRange: [10, 19] }, { id: 519, levelRange: [10, 19] }],
+  'Twins':          [{ id: 519, levelRange: [10, 19] }, { id: 522, levelRange: [10, 19] }],
 
   // --- Map 3 (Route 4, lv 20–25) ---
-  'Hiker':          [{ id: 551, levelRange: [20, 24] }, { id: 529, levelRange: [20, 24] }, { id: 559, levelRange: [20, 24] }],
-  'Worker M':       [{ id: 529, levelRange: [20, 24] }, { id: 551, levelRange: [20, 24] }],
-  'Worker F':       [{ id: 529, levelRange: [20, 24] }, { id: 559, levelRange: [20, 24] }],
-  'Roughneck':      [{ id: 559, levelRange: [20, 24] }, { id: 551, levelRange: [20, 24] }, { id: 568, levelRange: [20, 24] }],
+  'Hiker':          [{ id: 551, levelRange: [18, 28] }, { id: 529, levelRange: [18, 28] }, { id: 559, levelRange: [18, 28] }],
+  'Worker M':       [{ id: 529, levelRange: [18, 28] }, { id: 551, levelRange: [18, 28] }],
+  'Worker F':       [{ id: 529, levelRange: [18, 28] }, { id: 559, levelRange: [18, 28] }],
+  'Roughneck':      [{ id: 559, levelRange: [18, 28] }, { id: 551, levelRange: [18, 28] }, { id: 568, levelRange: [18, 28] }],
 
   // --- Map 4 (Route 6, lv 30–35) ---
-  'Cyclist M':      [{ id: 587, levelRange: [26, 31] }, { id: 522, levelRange: [26, 31] }, { id: 595, levelRange: [26, 31] }],
-  'Cyclist F':      [{ id: 587, levelRange: [26, 31] }, { id: 595, levelRange: [26, 31] }, { id: 522, levelRange: [26, 31] }],
-  'Biker':          [{ id: 522, levelRange: [26, 31] }, { id: 602, levelRange: [26, 31] }, { id: 587, levelRange: [26, 31] }],
-  'Depot Agent':    [{ id: 602, levelRange: [26, 31] }, { id: 595, levelRange: [26, 31] }],
+  'Cyclist M':      [{ id: 587, levelRange: [26, 37] }, { id: 522, levelRange: [26, 37] }, { id: 595, levelRange: [26, 37] }],
+  'Cyclist F':      [{ id: 587, levelRange: [26, 37] }, { id: 595, levelRange: [26, 37] }, { id: 522, levelRange: [26, 37] }],
+  'Biker':          [{ id: 522, levelRange: [26, 37] }, { id: 602, levelRange: [26, 37] }, { id: 587, levelRange: [26, 37] }],
+  'Depot Agent':    [{ id: 602, levelRange: [26, 37] }, { id: 595, levelRange: [26, 37] }],
 
   // --- Map 5 (Route 7, lv 35–40) ---
-  'Pokemon Ranger M': [{ id: 529, levelRange: [32, 39] }, { id: 551, levelRange: [32, 39] }, { id: 574, levelRange: [32, 39] }],
-  'Pokemon Ranger F': [{ id: 574, levelRange: [32, 39] }, { id: 582, levelRange: [32, 39] }, { id: 529, levelRange: [32, 39] }],
+  'Pokemon Ranger M': [{ id: 529, levelRange: [34, 46] }, { id: 551, levelRange: [34, 46] }, { id: 574, levelRange: [34, 46] }],
+  'Pokemon Ranger F': [{ id: 574, levelRange: [34, 46] }, { id: 582, levelRange: [34, 46] }, { id: 529, levelRange: [34, 46] }],
 
   // --- Map 6 (Route 8, lv 40–45) ---
-  'Pilot':          [{ id: 519, levelRange: [39, 47] }, { id: 580, levelRange: [39, 47] }, { id: 561, levelRange: [39, 47] }],
-  'Ace Trainer M':  [{ id: 561, levelRange: [39, 47] }, { id: 580, levelRange: [39, 47] }, { id: 527, levelRange: [39, 47] }],
-  'Ace Trainer F':  [{ id: 527, levelRange: [39, 47] }, { id: 561, levelRange: [39, 47] }, { id: 580, levelRange: [39, 47] }],
+  'Pilot':          [{ id: 519, levelRange: [42, 55] }, { id: 580, levelRange: [42, 55] }, { id: 561, levelRange: [42, 55] }],
+  'Ace Trainer M':  [{ id: 561, levelRange: [42, 55] }, { id: 580, levelRange: [42, 55] }, { id: 527, levelRange: [42, 55] }],
+  'Ace Trainer F':  [{ id: 527, levelRange: [42, 55] }, { id: 561, levelRange: [42, 55] }, { id: 580, levelRange: [42, 55] }],
 
   // --- Map 7 (Route 9, lv 45–50) ---
-  'Black Belt':     [{ id: 613, levelRange: [45, 54] }, { id: 614, levelRange: [45, 54] }, { id: 559, levelRange: [45, 54] }],
-  'Battle Girl':    [{ id: 615, levelRange: [45, 54] }, { id: 613, levelRange: [45, 54] }, { id: 582, levelRange: [45, 54] }],
+  'Black Belt':     [{ id: 613, levelRange: [50, 64] }, { id: 614, levelRange: [50, 64] }, { id: 559, levelRange: [50, 64] }],
+  'Battle Girl':    [{ id: 615, levelRange: [50, 64] }, { id: 613, levelRange: [50, 64] }, { id: 582, levelRange: [50, 64] }],
 
   // --- Map 8 (Route 16, lv 50–60) ---
-  'Veteran M':      [{ id: 633, levelRange: [51, 62] }, { id: 610, levelRange: [51, 62] }, { id: 621, levelRange: [51, 62] }],
-  'Veteran F':      [{ id: 634, levelRange: [51, 62] }, { id: 610, levelRange: [51, 62] }, { id: 621, levelRange: [51, 62] }],
+  'Veteran M':      [{ id: 633, levelRange: [58, 73] }, { id: 610, levelRange: [58, 73] }, { id: 621, levelRange: [58, 73] }],
+  'Veteran F':      [{ id: 634, levelRange: [58, 73] }, { id: 610, levelRange: [58, 73] }, { id: 621, levelRange: [58, 73] }],
 }
 
 // Fixed boss teams — indexed by boss trainer name
@@ -101,7 +101,7 @@ export const BOSS_TEAMS = {
 
 // Per-map level ranges (indexed by mapIndex). Mirrors the trainer pools above.
 export const MAP_LEVEL_RANGES = [
-  [6, 9], [13, 16], [20, 24], [26, 31], [32, 39], [39, 47], [45, 54], [51, 62],
+  [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
 ]
 
 // Level range for a map, clamped to the last entry for out-of-bounds indices.
@@ -109,23 +109,31 @@ export function mapLevelRange(mapIndex = 0) {
   return MAP_LEVEL_RANGES[Math.min(mapIndex, MAP_LEVEL_RANGES.length - 1)]
 }
 
-// Pick a weighted level from a range — later in the map weights toward higher levels
-// positionWeight 0.0 = early node, 1.0 = late node
+// Pick a level from a band, scaled by position down the map.
+// positionWeight 0.0 = early node (near the band floor) → 1.0 = late node (near
+// the band ceiling, approaching the map's gym leader). Position dominates, with
+// a loose random spread so nodes still vary.
 export function pickLevel([min, max], positionWeight = 0.5) {
-  const weighted = min + Math.floor((max - min) * (positionWeight + Math.random() * (1 - positionWeight)))
-  return Math.min(max, Math.max(min, weighted))
+  const span = max - min
+  const t = Math.max(0, Math.min(1, positionWeight * 0.75 + Math.random() * 0.35 - 0.05))
+  return Math.round(min + span * t)
 }
 
-// Build raw team spec (id + level) for a trainer node
-export function buildTrainerTeamSpec(trainerName, count, positionWeight = 0.5) {
+// Build raw team spec (id + level) for a trainer node.
+// Level uses the CURRENT MAP's band (not the trainer's own band) — the same
+// trainer type appears on multiple maps, so its level must track the map it's
+// on, not where its pool happened to be defined. Only the species comes from
+// the trainer's pool.
+export function buildTrainerTeamSpec(trainerName, count, positionWeight = 0.5, mapIndex = 0) {
   const pool = TRAINER_POKEMON_POOLS[trainerName] ?? TRAINER_POKEMON_POOLS['Youngster']
+  const band = mapLevelRange(mapIndex)
   const specs = []
   const usedIds = new Set()
   for (let i = 0; i < count; i++) {
     const available = pool.filter(p => !usedIds.has(p.id))
     const entry = available.length > 0 ? pick(available) : pick(pool)
     usedIds.add(entry.id)
-    specs.push({ id: entry.id, level: pickLevel(entry.levelRange, positionWeight) })
+    specs.push({ id: entry.id, level: pickLevel(band, positionWeight) })
   }
   return specs
 }

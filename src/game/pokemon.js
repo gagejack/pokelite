@@ -66,7 +66,7 @@ export async function fetchPokemonBase(idOrName) {
 // Build a full battle-ready Pokémon instance from base data + level.
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
 export function buildPokemonInstance(base, level, isStarter = false) {
-  const boost = isStarter ? 1.25 : 1
+  const boost = isStarter ? 1.3 : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
   const move = getTypeMove(base.types[0], tierForLevel(level))
   return {
@@ -156,7 +156,8 @@ export function levelUp(instance, base, levels) {
     stats: {
       ...instance.stats,
       maxHp:   newHp,
-      hp:      Math.min(instance.stats.hp + hpDiff, newHp),
+      // Leveling raises max HP but must not revive a fainted Pokémon.
+      hp:      instance.fainted ? 0 : Math.min(instance.stats.hp + hpDiff, newHp),
       attack:  calcStat(base.baseStats.attack,  newLevel),
       defense: calcStat(base.baseStats.defense, newLevel),
       spAtk:   calcStat(base.baseStats.spAtk,   newLevel),

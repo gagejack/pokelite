@@ -63,13 +63,13 @@ function MapSvg({
       <img
         src={background}
         alt="map background"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(2)', transformOrigin: '0% 100%' }}
+        style={{ position: 'absolute', top: -40, left: 0, width: '400px', height: '800px', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated' }}
       />
       <svg
         width="100%"
         height="100%"
         viewBox={`${-svgWidth / 2} 0 ${svgWidth} ${svgHeight}`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMin slice"
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
       >
         <defs>
@@ -299,7 +299,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       specs = BOSS_TEAMS[node.trainer] ?? []
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
-      specs = buildTrainerTeamSpec(node.trainer, count, positionWeight)
+      specs = buildTrainerTeamSpec(node.trainer, count, positionWeight, mapIndex)
     } else {
       // Grass: one wild Pokémon from this map's catch pool, a few levels below
       // the map's trainers, scaled by node position.
@@ -481,11 +481,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     }
   }
 
-  const mapScale = containerSize.w && containerSize.h
-    ? Math.min(containerSize.w / svgWidth, containerSize.h / svgHeight)
-    : 0
-  const mapOffsetX = containerSize.w ? (containerSize.w - svgWidth * mapScale) / 2 : 0
-  const mapOffsetY = containerSize.h ? (containerSize.h - svgHeight * mapScale) / 2 : 0
+  // Scale by width only so nodes stay a constant size regardless of viewport
+  // height (the card has fixed width; height changes must not shrink the map).
+  const mapScale = containerSize.w ? containerSize.w / svgWidth : 0
+  const mapOffsetX = 0
+  const mapOffsetY = 0
 
   const mapSvgProps = {
     dark, borderStyle, shadowStyle,
@@ -498,13 +498,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     background: mapConfig.background,
   }
 
+  // Skip directly to the next map (mirrors the boss-clear advance), only when a
+  // next map exists.
+  const handleSkipMap = config.maps[mapIndex + 1]
+    ? () => { onMapCleared?.(); onAdvanceMap() }
+    : null
+
   return (
-    <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+    <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
       {isDesktop ? (
         <div className="flex flex-col items-center gap-2 w-full py-4" style={{ visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px' }}>
             <Roster roster={roster} onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })} />
-            <div style={{ width: '400px', height: '91vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '400px', height: '750px', display: 'flex', flexDirection: 'column' }}>
               <MapSvg {...mapSvgProps} />
             </div>
             <div style={{

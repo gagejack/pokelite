@@ -72,16 +72,26 @@ export function simulateBattle(playerTeam, enemyTeam, damageMultiplier = 2) {
   const MAX_ROUNDS = 10000
   let rounds = 0
 
+  // Tie-break order is decided ONCE per active pairing, not re-rolled every
+  // round — otherwise a tied pair could flip order between rounds and the same
+  // Pokémon would appear to attack twice in a row.
+  let tieFirst = Math.random() < 0.5
+  let tiePair = `${pi}-${ei}`
+
   while (alivePlayers().length > 0 && aliveEnemies().length > 0 && pi !== -1 && ei !== -1) {
     if (++rounds > MAX_ROUNDS) break
     const pPoke = player[pi]
     const ePoke = enemy[ei]
 
+    // Re-roll the tie-break only when the active pairing changes (a faint/swap).
+    if (`${pi}-${ei}` !== tiePair) {
+      tiePair = `${pi}-${ei}`
+      tieFirst = Math.random() < 0.5
+    }
+
     // Determine order by effective speed (Choice Scarf applies here)
     const pSpd = effSpeed(pPoke), eSpd = effSpeed(ePoke)
-    const playerFirst = pSpd >= eSpd
-      ? (pSpd > eSpd ? true : Math.random() < 0.5)
-      : false
+    const playerFirst = pSpd === eSpd ? tieFirst : pSpd > eSpd
 
     const attacks = playerFirst
       ? [{ aSide: 'player', aIdx: pi, dSide: 'enemy', dIdx: ei }, { aSide: 'enemy', aIdx: ei, dSide: 'player', dIdx: pi }]

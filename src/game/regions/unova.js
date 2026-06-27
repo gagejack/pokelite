@@ -1,8 +1,8 @@
 import { buildRows, NODE_TYPES } from '../nodeMap.js'
 
 // --- Assets ---
-import routeBg1 from '../../assets/regions/Unova/MapAssets/Route1.png'
-import routeBg2 from '../../assets/regions/Unova/MapAssets/Route3.png'
+import routeBg1 from '../../assets/regions/Unova/MapAssets/Map1.png'
+import routeBg2 from '../../assets/regions/Unova/MapAssets/Map2.png'
 import routeBg3 from '../../assets/regions/Unova/MapAssets/Route4.png'
 import routeBg4 from '../../assets/regions/Unova/MapAssets/Route6.png'
 import routeBg5 from '../../assets/regions/Unova/MapAssets/Route7.png'
