@@ -3,20 +3,23 @@ import { ThemeProvider } from './lib/theme'
 import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
 import RegionSelect from './components/RegionSelect'
-import CharacterSelect from './components/CharacterSelect'
 import StarterSelect from './components/StarterSelect'
 import NodeMap from './components/NodeMap'
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
 import { TRAINER_POKEMON_POOLS, BOSS_TEAMS } from './game/enemyTeams.js'
 import { supabase } from './lib/supabase.js'
+import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
+
+// Character select is skipped for now — every run uses this default protagonist.
+const DEFAULT_CHARACTER = { id: 'Hilbert', name: 'Hilbert', sprite: defaultCharacterSprite }
 
 export default function App() {
   const [screen, setScreen] = useState('menu')
   const [resetting, setResetting] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
-  const [selectedCharacter, setSelectedCharacter] = useState(null)
+  const [selectedCharacter, setSelectedCharacter] = useState(DEFAULT_CHARACTER)
   const [selectedStarter, setSelectedStarter] = useState(null)
   const [roster, setRoster] = useState([])
   const [bag, setBag] = useState([])
@@ -85,7 +88,7 @@ export default function App() {
 
   function resetRun() {
     setSelectedRegion(null)
-    setSelectedCharacter(null)
+    setSelectedCharacter(DEFAULT_CHARACTER)
     setSelectedStarter(null)
     setRoster([])
     setBag([])
@@ -130,17 +133,8 @@ export default function App() {
             setSelectedRegion(region)
             const config = getRegionConfig(region.name)
             if (config) prewarmCache(config, TRAINER_POKEMON_POOLS, BOSS_TEAMS)
-            setScreen('character')
+            setScreen('starter')
           }}
-          pokedexOpen={pokedexOpen}
-          setPokedexOpen={setPokedexOpen}
-        />
-      )}
-      {screen === 'character' && (
-        <CharacterSelect
-          region={selectedRegion}
-          onBack={() => setScreen('region')}
-          onSelectCharacter={char => { setSelectedCharacter(char); setScreen('starter') }}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -148,7 +142,7 @@ export default function App() {
       {screen === 'starter' && (
         <StarterSelect
           region={selectedRegion}
-          onBack={() => setScreen('character')}
+          onBack={() => setScreen('region')}
           onSelectStarter={startRun}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}

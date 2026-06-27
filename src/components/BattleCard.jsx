@@ -377,6 +377,28 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 />
               </div>
             )}
+
+            {/* Held-item effect popup — over the player (left) or enemy (right) half */}
+            <AnimatePresence>
+              {itemFx && (
+                <motion.span
+                  key={`mfx-${itemFx.label}-${itemFx.color}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: -6 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  style={{
+                    position: 'absolute', top: '40px', zIndex: 11, pointerEvents: 'none',
+                    left: itemFx.side === 'player' ? '25%' : '75%', transform: 'translateX(-50%)',
+                    whiteSpace: 'nowrap', fontFamily: 'Upheaval', fontSize: '13px',
+                    color: itemFx.color, filter: `drop-shadow(0 0 4px ${itemFx.color})`,
+                    textShadow: '1px 1px 0 #000',
+                  }}
+                >
+                  {itemFx.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
           <BattleLog />
         </div>
