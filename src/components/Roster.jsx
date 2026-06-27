@@ -2,15 +2,7 @@ import { useState, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
-
-const TYPE_COLORS = {
-  fire: '#F08030', water: '#6890F0', grass: '#78C850',
-  normal: '#A8A878', fighting: '#C03028', flying: '#98D8D8',
-  poison: '#A040A0', ground: '#E0C068', rock: '#B8A038',
-  bug: '#A8B820', ghost: '#705898', steel: '#B8B8D0',
-  electric: '#F8D030', psychic: '#F85888', ice: '#98D8D8',
-  dragon: '#7038F8', dark: '#705848', fairy: '#EE99AC',
-}
+import { TYPE_COLORS } from '../game/types.js'
 
 export default function Roster({ roster, horizontal = false, onSwap }) {
   const { dark } = useTheme()
@@ -198,6 +190,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   const isFainted = pokemon.fainted
   const spriteSize = horizontal ? '34px' : '40px'
   const barW = '50px'
+  const typeColor = TYPE_COLORS[pokemon.types?.[0]] || '#888'
 
   return (
     <div
@@ -219,7 +212,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #666666') : undefined,
         border: isDropTarget
           ? '2px solid #facc15'
-          : horizontal ? undefined : borderStyle,
+          : horizontal ? undefined : `2px solid ${typeColor}`,
         outline: isDropTarget ? '1px solid #facc15' : undefined,
         backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
         display: 'flex',

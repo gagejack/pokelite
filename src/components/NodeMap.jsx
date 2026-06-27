@@ -6,11 +6,13 @@ import Roster from './Roster'
 import BattleCard from './BattleCard'
 import PokeballNode from './PokeballNode'
 import ItemNode from './ItemNode'
+import PowerUpgradeNode from './PowerUpgradeNode'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, buildMoveCache, levelUp, checkEvolution } from '../game/pokemon.js'
-import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES } from '../game/enemyTeams.js'
+import { fetchPokemonBase, buildPokemonInstance, levelUp, checkEvolution } from '../game/pokemon.js'
+import { getTypeMove } from '../game/typeMoves.js'
+import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES, mapLevelRange, pickLevel } from '../game/enemyTeams.js'
 
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
@@ -231,6 +233,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingBattle, setPendingBattle] = useState(null)
   const [pendingPokeball, setPendingPokeball] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
+  const [pendingPower, setPendingPower] = useState(null)
   const [loadingNode, setLoadingNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
   const [evolutionNotices, setEvolutionNotices] = useState([])
@@ -298,15 +301,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const count = pickTrainerCount(mapIndex)
       specs = buildTrainerTeamSpec(node.trainer, count, positionWeight)
     } else {
-      specs = [{ id: 504, level: 4 }]
+      // Grass: one wild Pokémon from this map's catch pool, a few levels below
+      // the map's trainers, scaled by node position.
+      const pool = config.catchPools?.[mapIndex] ?? []
+      const id = pool.length > 0 ? pick(pool) : 504
+      const [min, max] = mapLevelRange(mapIndex)
+      const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
     }
 
     console.log('[fetchEnemyTeam] type:', node.type, '| trainer:', node.trainer, '| specs:', specs)
 
     const team = await Promise.all(specs.map(async ({ id, level }) => {
       const base = await fetchPokemonBase(id)
-      const moveCache = await buildMoveCache(base)
-      return buildPokemonInstance(base, level, moveCache)
+      return buildPokemonInstance(base, level)
     }))
 
     const trainerSprite = config.trainerFullSprites?.[node.trainer]
@@ -323,18 +331,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
-    console.log('[PokeballNode] totalNodes:', totalNodes, '| nodeId:', node.id, '| positionWeight:', positionWeight.toFixed(3))
-    const baseLevel = Math.round(5 + positionWeight * 10)
-    const variance = Math.floor(Math.random() * 10) - 2
-    const level = Math.max(5, baseLevel + variance)
+    // Catch levels scale per map (same range as that map's trainers), weighted
+    // by node position.
+    const level = pickLevel(mapLevelRange(mapIndex), positionWeight)
 
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
     const chosen = shuffled.slice(0, 3)
 
     return Promise.all(chosen.map(async (id) => {
       const base = await fetchPokemonBase(id)
-      const moveCache = await buildMoveCache(base)
-      const instance = buildPokemonInstance(base, level, moveCache)
+      const instance = buildPokemonInstance(base, level)
       return { ...instance, level }
     }))
   }
@@ -368,6 +374,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
       setCurrentNode(node.id)
+    } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
+      setPendingPower({ node })
     } else {
       setClearedNodes(prev => new Set([...prev, node.id]))
       setCurrentNode(node.id)
@@ -383,9 +391,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (won) {
       let updatedRoster = roster.map((p, i) => {
         const fp = finalPlayerTeam[i]
-        if (!fp._base || !fp._moveCache) return fp
-        return levelUp(fp, fp._base, levelsGained, fp._moveCache)
+        if (!fp._base) return fp
+        return levelUp(fp, fp._base, levelsGained)
       })
+      // Victory heal: every surviving Pokémon recovers 5% of max HP (capped).
+      updatedRoster = updatedRoster.map(p =>
+        p.fainted ? p
+          : { ...p, stats: { ...p.stats, hp: Math.min(p.stats.maxHp, p.stats.hp + Math.round(p.stats.maxHp * 0.05)) } }
+      )
       if (isBoss) {
         updatedRoster = updatedRoster.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } }))
       }
@@ -488,7 +501,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
       {isDesktop ? (
-        <div className="flex flex-col items-center gap-2 w-full py-4">
+        <div className="flex flex-col items-center gap-2 w-full py-4" style={{ visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px' }}>
             <Roster roster={roster} onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })} />
             <div style={{ width: '400px', height: '91vh', display: 'flex', flexDirection: 'column' }}>
@@ -541,16 +554,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       )}
 
       {pendingBattle && (
-        <BattleCard
-          node={pendingBattle.node}
-          enemyTeam={pendingBattle.enemyTeam}
-          trainerSprite={pendingBattle.trainerSprite}
-          playerRoster={roster}
-          character={character}
-          damageMultiplier={config.damageMultiplier ?? 2}
-          onBattleEnd={handleBattleEnd}
-          onRestart={onRestart}
-        />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <BattleCard
+            node={pendingBattle.node}
+            enemyTeam={pendingBattle.enemyTeam}
+            trainerSprite={pendingBattle.trainerSprite}
+            playerRoster={roster}
+            character={character}
+            damageMultiplier={config.damageMultiplier ?? 2}
+            onBattleEnd={handleBattleEnd}
+            onRestart={onRestart}
+          />
+        </div>
       )}
 
       {evolutionNotices.length > 0 && (
@@ -614,6 +629,27 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))
             setCurrentNode(pendingItem.node.id)
             setPendingItem(null)
+          }}
+        />
+      )}
+
+      {pendingPower && (
+        <PowerUpgradeNode
+          roster={roster}
+          onUpgrade={(pokemonIndex) => {
+            setRoster(prev => prev.map((p, i) => {
+              if (i !== pokemonIndex) return p
+              const nextTier = Math.min(4, (p.move?.tier ?? 1) + 1)
+              return { ...p, move: getTypeMove(p.types[0], nextTier) }
+            }))
+            setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
+            setCurrentNode(pendingPower.node.id)
+            setPendingPower(null)
+          }}
+          onClose={() => {
+            setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
+            setCurrentNode(pendingPower.node.id)
+            setPendingPower(null)
           }}
         />
       )}

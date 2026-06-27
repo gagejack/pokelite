@@ -13,10 +13,14 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
   const config = getRegionConfig(region.name)
   const characters = config?.characters ?? []
 
+  // Match the PokemonCard color scheme (dark surface in dark mode, white in light)
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
-  const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
-  const textColor = dark ? '#DBDBDB' : '#333333'
+  const panelBg = dark ? '#1a1a1a' : '#ffffff'
+  const tileBg = dark ? '#1a1a1a' : '#ffffff'
+  const tileShadow = dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666'
+  const textColor = dark ? '#fff' : '#1a1a1a'
+  const mutedColor = dark ? '#aaa' : '#666'
 
   return (
     <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
@@ -26,7 +30,7 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
           <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: textColor }}>
             Choose your Character
           </span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: dark ? '#aaaaaa' : '#555555', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: mutedColor, textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
             Your chosen character will represent you throughout your run
           </span>
         </div>
@@ -39,7 +43,7 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
             overflowY: 'auto',
             border: borderStyle,
             boxShadow: shadowStyle,
-            backgroundColor: cardBg,
+            backgroundColor: panelBg,
             padding: isDesktop ? '16px' : '12px',
           }}
         >
@@ -59,8 +63,8 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
                     border: isSelected ? '2px solid #facc15' : borderStyle,
                     boxShadow: isSelected
                       ? '0 0 8px 2px rgba(250,204,21,0.5)'
-                      : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666'),
-                    backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
+                      : tileShadow,
+                    backgroundColor: tileBg,
                     transform: isHovered && !isSelected ? 'translateY(-2px)' : 'none',
                   }}
                 >
@@ -99,7 +103,7 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
             color: selected ? textColor : (dark ? '#555' : '#aaa'),
             border: selected ? borderStyle : (dark ? '2px solid #333' : '2px solid #aaa'),
             boxShadow: selected ? shadowStyle : 'none',
-            backgroundColor: selected ? (dark ? '#2e2e2e' : '#DBDBDB') : 'transparent',
+            backgroundColor: selected ? panelBg : 'transparent',
             padding: '10px 32px',
             cursor: selected ? 'pointer' : 'not-allowed',
             opacity: selected ? 1 : 0.5,
@@ -117,7 +121,7 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
             color: textColor,
             border: borderStyle,
             boxShadow: shadowStyle,
-            backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+            backgroundColor: panelBg,
             padding: '8px 20px',
           }}
         >

@@ -6,7 +6,7 @@ import RegionSelect from './components/RegionSelect'
 import CharacterSelect from './components/CharacterSelect'
 import StarterSelect from './components/StarterSelect'
 import NodeMap from './components/NodeMap'
-import { fetchPokemonBase, buildPokemonInstance, buildMoveCache, prewarmCache } from './game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
 import { TRAINER_POKEMON_POOLS, BOSS_TEAMS } from './game/enemyTeams.js'
 import { supabase } from './lib/supabase.js'
@@ -36,8 +36,7 @@ export default function App() {
 
   async function initRoster(starter) {
     const base = await fetchPokemonBase(starter.id)
-    const moveCache = await buildMoveCache(base)
-    const instance = buildPokemonInstance(base, 5, moveCache, true)
+    const instance = buildPokemonInstance(base, 5, true)
     setRoster([instance])
   }
 

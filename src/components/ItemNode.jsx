@@ -205,10 +205,10 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                   alt={item.name}
                   style={{ width: '56px', height: '56px', imageRendering: 'pixelated' }}
                 />
-                <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(9px, 3vw, 13px)', color: textColor, textAlign: 'center' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(9px, 3vw, 15px)', color: textColor, textAlign: 'center' }}>
                   {item.name}
                 </span>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(8px, 2vw, 10px)', color: mutedColor, textAlign: 'center', lineHeight: 1.3 }}>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(8px, 2vw, 14px)', color: mutedColor, textAlign: 'center', lineHeight: 1.3 }}>
                   {item.description}
                 </span>
               </button>

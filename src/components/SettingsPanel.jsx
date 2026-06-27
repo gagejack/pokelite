@@ -4,15 +4,15 @@ import { useSettings } from '../lib/settings'
 const SPEEDS = [1, 1.5, 2, 2.5, 3]
 
 export default function SettingsPanel({ onClose }) {
-  const { dark } = useTheme()
+  const { dark, cards } = useTheme()
   const { battleSpeed, setSpeed } = useSettings()
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
-  const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
-  const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
-  const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const borderStyle = cards ? '2px solid #121212' : '2px solid #666666'
+  const shadowStyle = cards ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  const cardBg = cards ? '#2e2e2e' : '#DBDBDB'
+  const innerBg = cards ? '#1a1a1a' : '#c8c8c8'
+  const textColor = cards ? '#DBDBDB' : '#333333'
+  const mutedColor = cards ? '#888' : '#777'
 
   return (
     <div

@@ -546,7 +546,7 @@ const MAP_BACKGROUNDS = [routeBg1, routeBg2, routeBg3, routeBg4, routeBg5, route
 // --- Region config ---
 export const unovaConfig = {
   name: 'Unova',
-  damageMultiplier: 5,
+  damageMultiplier: 2.5,
   trainerSprites: TRAINER_SPRITES,
   trainerFullSprites: TRAINER_FULL_SPRITES,
   characters: CHARACTERS,

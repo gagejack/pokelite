@@ -19,19 +19,19 @@ const REGIONS = [
 ]
 
 export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
-  const { dark } = useTheme()
+  const { dark, cards } = useTheme()
   const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(null)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-2.5px 4px 0 0 #121212' : '-2.5px 4px 0 0 #666666'
+  const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
+  const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
 
   const RegionCard = ({ region }) => {
     const isHovered = hovered === region.name
     if (isDesktop) {
       const cardH = 'min(60vh, 460px)'
-      const textColor = dark ? '#DBDBDB' : '#333333'
-      const mutedColor = dark ? '#888' : '#777'
+      const textColor = cards ? '#DBDBDB' : '#333333'
+      const mutedColor = cards ? '#888' : '#777'
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', flexShrink: 0 }}>
           {/* Card */}
@@ -41,10 +41,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             style={{
               height: cardH,
               aspectRatio: '9 / 21',
-              border: borderStyle,
+              border: cards ? '3px solid #000000' : borderStyle,
               boxShadow: isHovered
-                ? (dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #444444')
-                : (dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'),
+                ? (cards ? '-9px 13px 0 0 #000000' : '-6px 8px 0 0 #444444')
+                : (cards ? '-7px 10px 0 0 #000000' : '-4px 6px 0 0 #666666'),
               transform: isHovered ? 'scale(1.03) translateY(-4px)' : 'scale(1)',
               transition: 'transform 0.15s, box-shadow 0.15s',
             }}
@@ -116,10 +116,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         className="relative overflow-hidden active:scale-95"
         style={{
           width: '320px', height: '100px',
-          border: borderStyle,
+          border: cards ? '3px solid #000000' : borderStyle,
           boxShadow: isHovered
-            ? (dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #444444')
-            : (dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'),
+            ? (cards ? '-9px 13px 0 0 #000000' : '-6px 8px 0 0 #444444')
+            : (cards ? '-7px 10px 0 0 #000000' : '-4px 6px 0 0 #666666'),
           transform: isHovered ? 'scale(1.02)' : 'scale(1)',
           transition: 'transform 0.15s, box-shadow 0.15s',
         }}
@@ -173,10 +173,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         minHeight: 0,
       }}>
         <div className="flex flex-col items-center gap-2">
-          <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: dark ? '#DBDBDB' : '#333333' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: '#ffffff', textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}>
             Select a Region
           </span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: dark ? '#aaaaaa' : '#555555', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15', textAlign: 'center', maxWidth: '220px', lineHeight: 1.6, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
             Choose one region to start, once the region is complete, unlock a region token to continue your journey
           </span>
         </div>
@@ -196,9 +196,9 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           className="hover:opacity-70 transition-opacity"
           style={{
             fontFamily: 'Upheaval', fontSize: '12px',
-            color: dark ? '#DBDBDB' : '#333333',
+            color: cards ? '#DBDBDB' : '#333333',
             border: borderStyle, boxShadow: shadowStyle,
-            backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+            backgroundColor: cards ? '#2e2e2e' : '#DBDBDB',
             padding: '8px 20px',
           }}
         >

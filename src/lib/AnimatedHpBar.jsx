@@ -10,6 +10,16 @@ export function hpColor(hp, maxHp) {
 export function AnimatedHpBar({ hp, maxHp, width, height = '4px', barWidth = '80%' }) {
   const [displayed, setDisplayed] = useState(hp)
   const prevHp = useRef(hp)
+  const prevMaxHp = useRef(maxHp)
+  // When maxHp changes a different Pokémon is now shown — snap instantly (no
+  // refill animation) instead of animating up from the previous Pokémon's HP.
+  const snap = maxHp !== prevMaxHp.current
+
+  if (snap) {
+    prevMaxHp.current = maxHp
+    prevHp.current = hp
+    if (displayed !== hp) setDisplayed(hp)
+  }
 
   useEffect(() => {
     if (hp === prevHp.current) return
@@ -30,7 +40,7 @@ export function AnimatedHpBar({ hp, maxHp, width, height = '4px', barWidth = '80
         height: '100%', borderRadius: '1px',
         width: `${pct}%`,
         backgroundColor: hpColor(displayed, maxHp),
-        transition: 'width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.6s ease',
+        transition: snap ? 'none' : 'width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.6s ease',
       }} />
     </div>
   )

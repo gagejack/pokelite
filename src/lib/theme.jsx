@@ -13,8 +13,10 @@ export function ThemeProvider({ children }) {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
 
+  // `cards` is always true: cards/panels use the dark color scheme in both
+  // light and dark mode, since the app sits over a background image.
   return (
-    <ThemeContext.Provider value={{ dark, toggle: () => setDark(d => !d) }}>
+    <ThemeContext.Provider value={{ dark, cards: true, toggle: () => setDark(d => !d) }}>
       {children}
     </ThemeContext.Provider>
   )

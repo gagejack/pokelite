@@ -2,7 +2,7 @@ export const ITEMS = [
   { id: 'leftovers',    name: 'Leftovers',    description: 'Restores 10% max HP each turn',     weight: 200, icon: 'leftovers' },
   { id: 'shell_bell',   name: 'Shell Bell',   description: 'Restores HP = 20% of damage dealt', weight: 180, icon: 'shell-bell' },
   { id: 'expert_belt',  name: 'Expert Belt',  description: '+20% damage on all moves',           weight: 160, icon: 'expert-belt' },
-  { id: 'choice_band',  name: 'Choice Band',  description: '+50% Sp. Atk',                       weight: 120, icon: 'choice-band' },
+  { id: 'choice_band',  name: 'Choice Band',  description: '+50% Attack',                        weight: 120, icon: 'choice-band' },
   { id: 'choice_scarf', name: 'Choice Scarf', description: '+50% Speed',                         weight: 120, icon: 'choice-scarf' },
   { id: 'scope_lens',   name: 'Scope Lens',   description: '+30% crit rate',                     weight: 100, icon: 'scope-lens' },
   { id: 'rocky_helmet', name: 'Rocky Helmet', description: 'Deals 1/3 HP damage to attackers',  weight: 80,  icon: 'rocky-helmet' },

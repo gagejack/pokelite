@@ -7,14 +7,20 @@ export function SettingsProvider({ children }) {
     const saved = parseFloat(localStorage.getItem('battleSpeed'))
     return isNaN(saved) ? 1 : saved
   })
+  const [autoClose, setAutoCloseState] = useState(() => localStorage.getItem('autoClose') === 'true')
 
   function setSpeed(v) {
     setBattleSpeed(v)
     localStorage.setItem('battleSpeed', v)
   }
 
+  function setAutoClose(v) {
+    setAutoCloseState(v)
+    localStorage.setItem('autoClose', v ? 'true' : 'false')
+  }
+
   return (
-    <SettingsContext.Provider value={{ battleSpeed, setSpeed }}>
+    <SettingsContext.Provider value={{ battleSpeed, setSpeed, autoClose, setAutoClose }}>
       {children}
     </SettingsContext.Provider>
   )

@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { useSettings } from '../lib/settings'
 import Pokedex from './Pokedex'
 import SettingsPanel from './SettingsPanel'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
+import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
 const RESET_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fluffy-tail.png'
 const SETTINGS_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/town-map.png'
 
 export default function Layout({ children, onHome, onRestart, pokedexOpen, setPokedexOpen }) {
   const { dark, toggle } = useTheme()
+  const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -39,6 +42,19 @@ export default function Layout({ children, onHome, onRestart, pokedexOpen, setPo
         {dark ? 'Light' : 'Dark'}
       </button>
       <div style={{ marginLeft: row ? 'auto' : undefined, display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <button
+          onClick={() => setAutoClose(!autoClose)}
+          title={autoClose ? 'Auto-close battle: ON' : 'Auto-close battle: OFF'}
+          style={{
+            fontFamily: 'Upheaval', fontSize: '9px',
+            color: autoClose ? '#1a1a1a' : textColor,
+            border: borderStyle, padding: '4px 6px',
+            backgroundColor: autoClose ? '#facc15' : bg,
+            cursor: 'pointer',
+          }}
+        >
+          Auto
+        </button>
         {onRestart && (
           <button onClick={onRestart} className="hover:opacity-60 transition-opacity" title="Restart run">
             <img src={RESET_ICON} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
@@ -52,7 +68,14 @@ export default function Layout({ children, onHome, onRestart, pokedexOpen, setPo
   )
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: bg }}>
+    <div style={{
+      height: '100dvh', display: 'flex', flexDirection: 'column',
+      backgroundColor: bg,
+      backgroundImage: `url(${lightModeBackground})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: '16px',
         padding: '8px 12px',

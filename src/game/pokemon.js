@@ -1,5 +1,6 @@
+import { getTypeMove, tierForLevel } from './typeMoves.js'
+
 const baseCache = new Map()
-const moveCacheStore = new Map()
 
 // Pre-fetch base + move data for every Pokémon ID in a region config so all
 // subsequent node activations are served from cache with no network delay.
@@ -17,8 +18,7 @@ export async function prewarmCache(regionConfig, trainerPokemonPools, bossTeams)
 
   await Promise.all([...ids].map(async id => {
     try {
-      const base = await fetchPokemonBase(id)
-      await buildMoveCache(base)
+      await fetchPokemonBase(id)
     } catch {
       // Non-fatal — node will fall back to live fetch
     }
@@ -32,29 +32,6 @@ export function calcHP(base, level) {
 
 export function calcStat(base, level) {
   return Math.floor(((2 * base + 31) * level) / 100) + 5
-}
-
-// Given a Pokémon's primary type and its full learnset from PokéAPI,
-// returns the strongest same-type move it knows at the given level.
-// PokéAPI learnset entry shape: { move: { name, url }, version_group_details: [{ level_learned_at, move_learn_method: { name } }] }
-export function resolveMove(primaryType, learnset, level, moveCache) {
-  // All same-type level-up moves the Pokémon will ever learn
-  const allTypeMoves = learnset
-    .flatMap(entry =>
-      entry.version_group_details
-        .filter(d => d.move_learn_method.name === 'level-up' && d.level_learned_at > 0)
-        .map(d => ({ name: entry.move.name, learnLevel: d.level_learned_at }))
-    )
-    .filter(m => moveCache[m.name]?.type === primaryType && moveCache[m.name]?.power > 0)
-    .sort((a, b) => a.learnLevel - b.learnLevel)
-
-  if (allTypeMoves.length === 0) return null
-
-  // Find the strongest move learned at or before current level
-  const known = allTypeMoves.filter(m => m.learnLevel <= level)
-
-  // If none learned yet, give the first same-type move (starter always has a move)
-  return known.length > 0 ? known[known.length - 1] : allTypeMoves[0]
 }
 
 // Fetch base data for a Pokémon by id or name from PokéAPI.
@@ -78,67 +55,20 @@ export async function fetchPokemonBase(idOrName) {
       speed:   data.stats.find(s => s.stat.name === 'speed').base_stat,
     },
     learnset: data.moves,
-    sprite: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.front_default,
-    spriteBack: data.sprites.other?.['official-artwork']?.front_default ?? data.sprites.back_default,
+    sprite: data.sprites.front_default,
+    spriteBack: data.sprites.back_default ?? data.sprites.front_default,
   }
   baseCache.set(idOrName, result)
   baseCache.set(result.pokeId, result)
   return result
 }
 
-// Fetch move data from PokéAPI by move name.
-export async function fetchMoveData(moveName) {
-  const res = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`)
-  if (!res.ok) throw new Error(`PokéAPI move error for ${moveName}`)
-  const data = await res.json()
-  return {
-    name: data.name,
-    type: data.type.name,
-    power: data.power,
-    accuracy: data.accuracy,
-    damageClass: data.damage_class.name, // 'physical' | 'special' | 'status'
-  }
-}
-
-// Build a move cache for a Pokémon — only fetches level-up moves of its primary type.
-// This is the correct way to populate moveCache before calling buildPokemonInstance.
-export async function buildMoveCache(base) {
-  if (moveCacheStore.has(base.pokeId)) return moveCacheStore.get(base.pokeId)
-  const primaryType = base.types[0]
-
-  // Deduplicate move names that are level-up moves
-  const levelUpMoveNames = [
-    ...new Set(
-      base.learnset
-        .filter(entry =>
-          entry.version_group_details.some(d => d.move_learn_method.name === 'level-up' && d.level_learned_at > 0)
-        )
-        .map(entry => entry.move.name)
-    )
-  ]
-
-  // Fetch all of them in parallel, filter to same-type with power > 0 after
-  const results = await Promise.all(
-    levelUpMoveNames.map(name => fetchMoveData(name).catch(() => null))
-  )
-
-  const moveCache = {}
-  results.forEach(m => {
-    if (m && m.type === primaryType && m.power > 0) {
-      moveCache[m.name] = m
-    }
-  })
-
-  moveCacheStore.set(base.pokeId, moveCache)
-  return moveCache
-}
-
 // Build a full battle-ready Pokémon instance from base data + level.
-// moveCache: { [moveName]: moveData } — pre-fetched move objects
-export function buildPokemonInstance(base, level, moveCache, isStarter = false) {
-  const boost = isStarter ? 1.05 : 1
+// The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
+export function buildPokemonInstance(base, level, isStarter = false) {
+  const boost = isStarter ? 1.25 : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
-  const move = resolveMove(base.types[0], base.learnset, level, moveCache)
+  const move = getTypeMove(base.types[0], tierForLevel(level))
   return {
     pokeId:     base.pokeId,
     name:       base.name,
@@ -155,10 +85,9 @@ export function buildPokemonInstance(base, level, moveCache, isStarter = false) 
       spDef:   Math.floor(calcStat(base.baseStats.spDef,   level) * boost),
       speed:   Math.floor(calcStat(base.baseStats.speed,   level) * boost),
     },
-    move: move ? moveCache[move.name] : null,
+    move,
     fainted: false,
     _base: base,
-    _moveCache: moveCache,
   }
 }
 
@@ -197,14 +126,17 @@ export async function checkEvolution(instance, newLevel) {
 
     // Evolve — fetch new base and rebuild instance
     const evolvedBase = await fetchPokemonBase(nextNode.species.name)
-    const evolvedMoveCache = await buildMoveCache(evolvedBase)
     const hpRatio = instance.stats.hp / instance.stats.maxHp
-    const evolved = buildPokemonInstance(evolvedBase, newLevel, evolvedMoveCache)
+    const evolved = buildPokemonInstance(evolvedBase, newLevel)
     // Preserve HP ratio
     const evolvedHp = Math.max(1, Math.floor(evolved.stats.maxHp * hpRatio))
+    // Preserve the Pokémon's current move tier across evolution (set via TM nodes,
+    // not by level), using the evolved Pokémon's primary type.
+    const preservedTier = instance.move?.tier ?? tierForLevel(newLevel)
     return {
       ...evolved,
       stats: { ...evolved.stats, hp: evolvedHp },
+      move: getTypeMove(evolvedBase.types[0], preservedTier),
       fainted: instance.fainted,
     }
   } catch {
@@ -212,12 +144,12 @@ export async function checkEvolution(instance, newLevel) {
   }
 }
 
-// Level up a Pokémon instance in place — recalculates stats and upgrades move if needed.
-export function levelUp(instance, base, levels, moveCache) {
+// Level up a Pokémon instance — recalculates stats only.
+// The move never changes on level-up; only a TM / Power Upgrade node changes it.
+export function levelUp(instance, base, levels) {
   const newLevel = instance.level + levels
   const newHp = calcHP(base.baseStats.hp, newLevel)
   const hpDiff = newHp - instance.stats.maxHp
-  const newMove = resolveMove(base.types[0], base.learnset, newLevel, moveCache)
   return {
     ...instance,
     level: newLevel,
@@ -231,6 +163,5 @@ export function levelUp(instance, base, levels, moveCache) {
       spDef:   calcStat(base.baseStats.spDef,   newLevel),
       speed:   calcStat(base.baseStats.speed,   newLevel),
     },
-    move: newMove ? moveCache[newMove.name] : instance.move,
   }
 }
