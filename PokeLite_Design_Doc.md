@@ -190,13 +190,14 @@ Each region will have its own set of specific pokemon.
 
 ## **Run Setup Flow**
 
-A new run is set up in three steps:
+A new run is set up in two steps:
 
 1. **Region Select** — the user picks one region. Each region card shows the region map, its three starters, and run stats. On selection, `prewarmCache()` begins fetching that region's Pokémon data.
-2. **Character Select** — the user picks an avatar from the region's character roster. The chosen character represents the player throughout the run (shown in the top-left of the battle UI) and has no gameplay effect.
-3. **Starter Select** — the user chooses their starter from 3 of the region's starters. The starter begins at level 5 with a small stat boost.
+2. **Starter Select** — the user chooses their starter from 3 of the region's starters. The starter begins at level 5 with a stat boost (see Levels & Experience → Starter Power Scale).
 
 Selecting the starter starts the run on the region's first map. `mapIndex` is reset to 0 at the start of every run.
+
+The **Character Select** step is currently **skipped** — every run uses a default protagonist (Hilbert). The character sprite is shown in the battle UI and has no gameplay effect. (The character-select screen exists in the code and can be re-enabled later.)
 
 # **Pokémon Stats**
 
@@ -219,7 +220,7 @@ Stats are pulled from PokéAPI at runtime. Each Pokémon has:
 * Move data is **authored by this game** (not pulled from PokéAPI). Each move defines:
   * `name` — the move's display name
   * `tier` — 1–4
-  * `basePower` — the flat power value for that tier (e.g. Tier 1 = 40)
+  * `basePower` — the flat power value for that tier (Tier 1 = 35)
   * `damageClass` — `physical` or `special` (authored per move; decides whether Attack/Defense or Sp. Attack/Sp. Defense is used)
   * `levelRange` — the level band that assigns this tier on spawn
   * (a move's **type** is implied by which type's list it belongs to)
@@ -238,9 +239,9 @@ A spawned/caught Pokémon's tier is chosen by where its level falls in these ban
 
 ### **Type Move Table**
 
-The authored move data is a single table covering **all 18 types × 4 tiers** (72 moves). The same table is reused across **all generations/regions** — it is type-based, not region-based, so future regions reuse it as-is.
+The authored move data is a single table covering **all 18 types × 4 tiers** (72 moves), **fully implemented** in `src/game/typeMoves.js`. The same table is reused across **all generations/regions** — it is type-based, not region-based, so future regions reuse it as-is.
 
-Representative rows (template — remaining types to be authored the same way):
+Representative rows:
 
 | Type | Tier 1 | Tier 2 | Tier 3 | Tier 4 |
 |------|--------|--------|--------|--------|
@@ -248,7 +249,7 @@ Representative rows (template — remaining types to be authored the same way):
 | Fire | Ember | Flamethrower | Fire Blast | Blast Burn |
 | Grass | Vine Whip | Razor Leaf | Solar Beam | Frenzy Plant |
 
-Each cell expands to the full move shape above (`name`, `tier`, `basePower`, `damageClass`, `levelRange`). `basePower` increases per tier (e.g. 40 / 65 / 90 / 120 — final numbers are balance knobs).
+Each cell expands to the full move shape above (`name`, `tier`, `basePower`, `damageClass`, `levelRange`). `basePower` per tier is **35 / 60 / 95 / 140** (balance knobs).
 
 ## **Levels & Experience**
 
@@ -259,6 +260,19 @@ Each cell expands to the full move shape above (`name`, `tier`, `basePower`, `da
 * A caught Pokémon joins the roster at the level it was presented
 * **Evolution** happens immediately after the battle that caused the Pokémon to reach its evolution level
 * Leveling up changes **stats only** (HP, Attack, Defense, Sp. Attack, Sp. Defense, Speed). It **does not** change a Pokémon's move tier — the starting Pokémon keeps its Tier 1 move until a Power Upgrade node raises it. (A higher level still increases damage indirectly, because Attack/Sp. Attack scale with level and feed the damage formula.)
+* Leveling **never revives** a fainted Pokémon — its HP stays at 0 through the level-up. Only a Pokécenter (or a boss win) revives.
+
+### **Starter Power Scale**
+
+* The chosen starter gets a **1.3× multiplier applied to all of its stats** (HP, Attack, Defense, Sp. Attack, Sp. Defense, Speed).
+* This boost **persists through level-ups and evolutions** — it is reapplied every time stats are recalculated, so an evolved starter keeps the bonus.
+* Only the player's starter is boosted; caught Pokémon and enemies are not.
+
+### **Victory Heal**
+
+* On **any win**, every **surviving** roster Pokémon recovers **5% of its max HP** (capped at max). Fainted Pokémon are **not** healed or revived by this.
+* **Boss wins** still fully heal and revive the entire roster (this overrides the 5% heal).
+* The 5% heal is shown on the battle card during the victory celebration (HP bars tick up) and persists to the roster.
 
 # **Damage & Move Scaling**
 
@@ -269,7 +283,7 @@ This system is **generation-agnostic** — it is type-based and stat-based, so e
 ## **Formula**
 
 ```
-basePower    = the basePower of the move's current tier (e.g. Tier 1 = 40)
+basePower    = the basePower of the move's current tier (Tier 1 = 35)
 physical     = (move.damageClass === 'physical')
 atk          = physical ? attacker.Attack  : attacker.SpAtk     // PokéAPI stats, scaled by level
 def          = physical ? defender.Defense : defender.SpDef
@@ -287,7 +301,7 @@ damage = max(1, floor( base × effectiveness × random × damageMultiplier × (c
 * **Move strength comes from the tier `basePower`** — our authored value, the one knob we tune for this game's power curve. Higher tier = higher `basePower` = more damage.
 * **`damageClass`** (authored per move) decides whether the move uses Attack/Defense (physical) or Sp. Attack/Sp. Defense (special).
 * **Type effectiveness** is applied via the existing type chart (see Pokémon type section).
-* **Region `damageMultiplier`** is kept as a final multiplier for per-region difficulty (e.g. Unova = 5, earlier regions = 2).
+* **Region `damageMultiplier`** is kept as a final multiplier for per-region difficulty (Unova = **2.5**).
 * **Crit (1/16, ×1.5)** and **random variance (0.85–1.00)** are kept.
 
 ## **What was intentionally removed**
@@ -298,23 +312,23 @@ damage = max(1, floor( base × effectiveness × random × damageMultiplier × (c
 
 ## **Worked Example**
 
-Squirtle (Water), holding its **Tier 1** move **Water Gun** (`basePower = 40`), at **level 8**:
+Squirtle (Water), holding its **Tier 1** move **Water Gun** (`basePower = 35`), at **level 8**:
 
 * Level 8 enters the formula through Squirtle's PokéAPI **Attack / Sp. Attack** stat (already scaled to level 8) — there is no separate level term on the move power.
-* `basePower = 40` flows through the formula above, then is multiplied by type effectiveness (Water vs the defender's types), the region `damageMultiplier`, and the crit/random rolls.
+* `basePower = 35` flows through the formula above, then is multiplied by type effectiveness (Water vs the defender's types), the region `damageMultiplier`, and the crit/random rolls.
 * If Squirtle later hits a Power Upgrade node, Water Gun becomes the Tier 2 Water move (Bubble Beam) with its higher `basePower`, increasing damage from that point on.
 
 > Note: the original sketch of this system used a 1.2 species scalar plus a `level × 0.01` term. Both were removed in the final design — the PokéAPI stats already represent species strength and level scaling, so the only authored knob is the tier `basePower`.
 
-## **Implementation Notes (future work)**
+## **Implementation (built)**
 
-This section documents the intended design; the code does not yet implement it. When built, the following changes apply:
+This system is **fully implemented**:
 
-* **New authored data file** (e.g. `src/game/typeMoves.js`) holding the 18 types × 4 tiers (name, basePower, damageClass, levelRange per move)
-* **`src/game/pokemon.js`** — replace the current `resolveMove` learnset logic with **tier assignment by level** against the Type Move Table; remove move re-resolution on level-up
-* **`src/game/battle.js`** — `calcDamage` uses the move's tier `basePower` in place of the raw PokéAPI `move.power` (formula skeleton otherwise unchanged)
-* **`src/components/StarterSelect.jsx`** — the hardcoded starter move table becomes simply "Tier 1 of the starter's primary type"
-* **`src/components/NodeMap.jsx`** — implement the Power Upgrade node handler (currently `NODE_TYPES.POWER_UPGRADE` falls through to "mark cleared"): show a roster picker, advance the chosen Pokémon's move by one tier (cap at Tier 4)
+* **`src/game/typeMoves.js`** — the authored data (18 types × 4 tiers: name, basePower, damageClass) plus `tierForLevel(level)` and `getTypeMove(type, tier)`
+* **`src/game/pokemon.js`** — a Pokémon's move is assigned by **tier for its level** on spawn; there is no learnset resolution and no move change on level-up
+* **`src/game/battle.js`** — `calcDamage` uses the move's tier `basePower` in place of the raw PokéAPI power
+* **`src/components/StarterSelect.jsx`** — the starter simply gets Tier 1 of its primary type
+* **`src/components/NodeMap.jsx`** + **`PowerUpgradeNode.jsx`** — the Power Upgrade node is implemented (roster picker → advance one Pokémon's move one tier, cap at Tier 4)
 
 # **Roster**
 
@@ -341,9 +355,11 @@ Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a t
 
 * Amount of pokemon is randomized for a range specific to that map — Map 1: 1–2 Pokémon, scaling up to Map 8: 1–4 Pokémon
 
-* Each trainer has a specific curated pool of Pokémon it can draw from
+* Each trainer has a specific curated pool of Pokémon it can draw from (the pool determines **species only**)
 
-* Enemy Pokémon levels are drawn from a per-map level pool — nodes later in the map have a higher chance of rolling a higher level
+* **Levels scale by position down the map.** Each map has a level band (see Regions), and a node's level is rolled from that band by its position (`positionWeight = node.id / totalNodes`): early nodes sit near the band **floor**, late nodes approach the band **ceiling** (that map's gym leader), with a loose random spread.
+
+* Trainer levels always use the **current map's** band — **not** the trainer type's own historical range. The same trainer type (e.g. Backpacker) appears on multiple maps and scales to whichever map it's on.
 
 * Each region has their own specific trainers (e.g. Youngster, Lass, Backpacker, Janitor for Unova Map 1)
 
@@ -351,7 +367,7 @@ Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a t
 
 ### **Pokeball**
 
-* Presents **3 random Pokémon** from the catchable pool for that map, each with a level drawn from the map's level range
+* Presents **3 random Pokémon** from the catchable pool for that map, each with a level drawn from the **map's band, scaled by node position** (same position weighting as trainers)
 
 * Each Pokémon card displays: name, sprite, level, types, stats, and its move
 
@@ -387,7 +403,7 @@ Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a t
 * The player selects **one** Pokémon from the roster; its move advances **one tier** within its primary type (e.g. Tier 1 Water Gun → Tier 2 Bubble Beam)
 * A Pokémon already on **Tier 4** is at the cap and cannot be upgraded further
 * Upgrading only changes the move tier (and therefore `basePower`/`damageClass`/`name`) — it does not change the Pokémon's stats or level
-* *(Implementation status: currently a stub — the node clears without applying an upgrade. To be implemented.)*
+* Implemented: the node opens a roster picker; a Tier-4 Pokémon shows "MAX" and can't be upgraded further
 
 ### **Pokecenter**
 
@@ -397,13 +413,50 @@ Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a t
 
 ### **Grass**
 
-* Encountering a single wild Pokémon randomly selected from the curated pool for that map
+* Encountering a single wild Pokémon randomly selected from that map's catch pool, at a level **~3 below the map's band** (also scaled by node position)
 
 * The user must battle it — no fleeing or catching
 
 * Follows standard battle mechanics; winning returns the user to the map
 
 * All roster Pokémon gain **1 level** on victory
+
+### **Master Ball (Legendary)** *(spec — not yet implemented)*
+
+* A **rare variant** of the Pokéball node. A Pokéball node has a small chance to instead be a **Master Ball** node.
+
+* **Spawn chance ramps by map:** 0% before Map 3, then **0.5% on Map 3**, rising each map up to **~10% on Map 8**.
+
+* **Visually distinct:** rendered with a **Master Ball icon** and a special label (e.g. "Legendary!") so a rare spawn stands out. (Gym/boss nodes use the leader's own sprite, so there is no icon conflict.)
+
+* Clicking it triggers a **legendary battle** — a single high-level legendary from the region. On **defeat**, the player is **offered the catch** (add to roster; if the roster is full, swap for an existing Pokémon — same flow as a Pokéball node).
+
+* A caught legendary is **stat-tracked for the Pokédex** exactly like any other catch.
+
+* **Unova legendary pool + levels** (per species, fixed — not map-scaled):
+
+  | Legendary | Level |
+  |-----------|-------|
+  | Cobalion | 40 |
+  | Terrakion | 40 |
+  | Virizion | 40 |
+  | Tornadus | 45 |
+  | Thundurus | 45 |
+  | Keldeo | 45 |
+  | Genesect | 50 |
+  | Reshiram | 65 |
+  | Zekrom | 65 |
+  | Kyurem | 70 |
+
+  *(Landorus is not yet in the pool — optional addition to complete the forces-of-nature trio. Whether stronger legendaries are gated to later maps is a future tuning knob.)*
+
+### **Portal** *(future — not scheduled)*
+
+* A rare **Portal** node. Clicking it **saves the current map, node position, and cleared nodes**, then teleports the player to a **bonus mini-map** (about half the node count, with custom art).
+
+* At the end of the mini-map is a reward — a **legendary Pokémon** or a **strong item**.
+
+* Completing or leaving the mini-map **returns the player to the saved checkpoint** (same map, same position). Spawn chance and reward tables are TBD.
 
 # **Battle Mechanics**
 
@@ -419,7 +472,13 @@ A battle begins when the user clicks on a Trainer, Gym Leader, Boss, or Grass no
 
 * A round = both Pokémon attack once
 
-* If Speed is tied, order is random
+* If Speed is tied, the tie-break order is decided **once per active pairing** (re-rolled only when a Pokémon faints/swaps in), not re-rolled every round — so a tied Pokémon can't appear to attack twice in a row across a round boundary
+
+## **Roster Reorder (battle start)** *(spec — reorder-in-prep not yet implemented)*
+
+* **Boss, gym, Elite Four, and Champion** battles open on a **prep screen** (the "Fight!" screen). On that screen the player can **drag to reorder** their roster before pressing Fight — letting them set their lead Pokémon for the matchup.
+* Regular **trainer and grass** battles start immediately (no prep screen), as they do now.
+* Reuses the existing roster drag/touch reorder system (`Roster.jsx` `onSwap`). (Currently the prep screen shows the "Fight!" button but not a reorderable roster — this adds the reorder.)
 
 ## **Turn Structure**
 
@@ -453,6 +512,8 @@ A battle begins when the user clicks on a Trainer, Gym Leader, Boss, or Grass no
 
 * User is returned to the map screen; node is marked as cleared
 
+* **Gym 8** win no longer ends the run — it heals the party and advances into the **Elite Four stage**. The **run is won when the Champion is defeated** (see Boss Selection & Elite Four).
+
 ## **Losing**
 
 * All user Pokémon faint → "Defeated..." shown in the battle UI (red text)
@@ -461,7 +522,23 @@ A battle begins when the user clicks on a Trainer, Gym Leader, Boss, or Grass no
 
 * No separate game over screen — the loss result is shown inline in the battle card
 
-# **Boss Selection**
+# **Boss Selection & Elite Four**
+
+## **Gym Bosses (per map)**
+
+* Each of the 8 maps ends in a **boss node** — the region's gym leader for that map (Map 1's is starter-assigned; Maps 2–8 are fixed).
+* Boss teams and levels are authored per leader (see Regions → Unova → the gym tables).
+
+## **Elite Four Stage** *(spec — not yet implemented)*
+
+After the **8th gym leader** is defeated, the run does **not** end — it continues into a special **Elite Four stage**:
+
+* On the Gym 8 win, the roster is **fully healed** and the **Elite Four stage loads** automatically. The four Elite Four members are presented as **sprites in a vertical line**, with the **Champion at the end** — a **linear path** (Member 1 → 2 → 3 → 4 → Champion), not a branching node map.
+* The player battles each member in order. **Between each battle**: full heal + a **roster-reorder screen** (see Battle Mechanics → Roster Reorder), then the next battle begins.
+* **Defeating the Champion = the run win** (this replaces "beat Gym 8" as the win condition — see Winning).
+* Unova members are the canonical four (**Shauntal, Grimsley, Caitlin, Marshal**) and the Champion is **Alder**. Their exact teams/levels are TBD (authored above the Gym 8 range of 71–73).
+
+Implemented as **additional map/stage entries** after Gym 8 in the region config (the engine already treats "boss defeated with no next map" as the run win, so the Champion becomes that final boss).
 
 # **Regions**
 
@@ -475,13 +552,13 @@ For Unova Map 1 (Striaton City gym), the boss is determined by the player's chos
 
 ### **Map 1 — Route 1 / Striaton City**
 
-**Trainer level pool:** 3–8 (nodes later in the map weight toward higher levels)
+**Trainer level band:** 3–10 (early nodes near 3–5, late nodes approach the gym's ace of 10; scaled by node position)
 
 **Trainer Pokémon count:** 1–2
 
 **Catchable Pokémon pool (Pokéball nodes):** Patrat, Lillipup, Purrloin, Pidove, Blitzle, Audino
 
-**Catchable level range:** 3–7
+**Catchable level range:** 3–10 (scaled by node position)
 
 **Grass encounter pool:** Patrat, Lillipup, Purrloin, Pidove
 
@@ -503,99 +580,124 @@ For Unova Map 1 (Striaton City gym), the boss is determined by the player's chos
 
 ***Cilan — Grass type — awards the Trio Badge***
 
-* Lillipup (Lv. 12)
+* Lillipup (Lv. 8)
 
-* Pansage (Lv. 14)
+* Pansage (Lv. 10)
 
 ***Chili — Fire type — awards the Trio Badge***
 
-* Lillipup (Lv. 12)
+* Lillipup (Lv. 8)
 
-* Pansear (Lv. 14)
+* Pansear (Lv. 10)
 
 ***Cress — Water type — awards the Trio Badge***
 
-* Lillipup (Lv. 12)
+* Lillipup (Lv. 8)
 
-* Panpour (Lv. 14)
+* Panpour (Lv. 10)
 
 ### **Gym 2 — Nacrene City**
 
 ***Lenora — Normal type — awards the Basic Badge***
 
-* Herdier (Lv. 18)
+* Herdier (Lv. 17)
 
-* Watchog (Lv. 20)
+* Audino (Lv. 19)
 
 ### **Gym 3 — Castelia City**
 
 ***Burgh — Bug type — awards the Beetle Badge***
 
-* Whirlipede (Lv. 21)
+* Sewaddle (Lv. 26)
 
-* Dwebble (Lv. 21)
+* Venipede (Lv. 26)
 
-* Leavanny (Lv. 23)
+* Whirlipede (Lv. 28)
 
 ### **Gym 4 — Nimbasa City**
 
 ***Elesa — Electric type — awards the Bolt Badge***
 
-* Emolga (Lv. 25)
+* Emolga (Lv. 35)
 
-* Emolga (Lv. 25)
+* Eelektrik (Lv. 35)
 
-* Zebstrika (Lv. 27)
+* Eelektross (Lv. 37)
 
 ### **Gym 5 — Driftveil City**
 
 ***Clay — Ground type — awards the Quake Badge***
 
-* Krokorok (Lv. 29)
+* Excadrill (Lv. 44)
 
-* Palpitoad (Lv. 29)
+* Excadrill (Lv. 44)
 
-* Excadrill (Lv. 31)
+* Krokorok (Lv. 46)
 
 ### **Gym 6 — Mistralton City**
 
 ***Skyla — Flying type — awards the Jet Badge***
 
-* Swoobat (Lv. 33)
+* Sigilyph (Lv. 53)
 
-* Unfezant (Lv. 33)
+* Swanna (Lv. 53)
 
-* Swanna (Lv. 35)
+* Tranquill (Lv. 55)
 
 ### **Gym 7 — Icirrus City**
 
 ***Brycen — Ice type — awards the Icicle Badge***
 
-* Vanillish (Lv. 37)
+* Beartic (Lv. 62)
 
-* Cryogonal (Lv. 37)
+* Cryogonal (Lv. 62)
 
-* Beartic (Lv. 39)
+* Vanillish (Lv. 64)
 
 ### **Gym 8 — Opelucid City**
 
 (Depends on version)
 
-***Drayden — Dragon type (Pokémon Black) — awards the Legend Badge***
+***Drayden — Dragon type — awards the Legend Badge*** (implemented)
 
-* Fraxure (Lv. 41)
+* Fraxure (Lv. 71)
 
-* Druddigon (Lv. 41)
+* Haxorus (Lv. 71)
 
-* Haxorus (Lv. 43)
+* Hydreigon (Lv. 73)
 
-***Iris — Dragon type (Pokémon White) — awards the Legend Badge***
+*(Iris is the White-version alternative in the source games; only Drayden is implemented here.)*
 
-* Fraxure (Lv. 41)
+### **Elite Four & Champion** *(spec — not yet implemented)*
 
-* Druddigon (Lv. 41)
+A final **linear stage** entered automatically after Drayden (Gym 8) is beaten — the party is fully healed, then the stage loads with the four members shown as sprites in a vertical line, Champion at the end. Full heal + roster reorder between each battle. Defeating the Champion wins the run.
 
-* Haxorus (Lv. 43)
+* **Shauntal** — Ghost type — team/levels TBD
+* **Grimsley** — Dark type — team/levels TBD
+* **Caitlin** — Psychic type — team/levels TBD
+* **Marshal** — Fighting type — team/levels TBD
+* **Champion Alder** — mixed — team/levels TBD
+
+(All teams authored above the Gym 8 range of 71–73.)
+
+### **Legendaries** *(spec — not yet implemented)*
+
+Legendaries appear via the rare **Master Ball node** (see Node Types → Master Ball). Spawn chance ramps **0.5% on Map 3 → ~10% on Map 8**. Defeat the legendary to be offered the catch.
+
+| Legendary | Level | Type |
+|-----------|-------|------|
+| Cobalion | 40 | Steel/Fighting |
+| Terrakion | 40 | Rock/Fighting |
+| Virizion | 40 | Grass/Fighting |
+| Tornadus | 45 | Flying |
+| Thundurus | 45 | Electric/Flying |
+| Keldeo | 45 | Water/Fighting |
+| Genesect | 50 | Bug/Steel |
+| Reshiram | 65 | Dragon/Fire |
+| Zekrom | 65 | Dragon/Electric |
+| Kyurem | 70 | Dragon/Ice |
+
+*(Landorus not yet included. Gating stronger legendaries to later maps is a future tuning knob.)*
 
 ## **Johto**
 
@@ -626,12 +728,28 @@ Each item has a `weight` out of 1000. The displayed rarity % = `weight / 10`.
 | Leftovers | Restores 10% max HP each turn | 200 | 20% |
 | Shell Bell | Restores HP equal to 20% of damage dealt | 180 | 18% |
 | Expert Belt | +20% damage on all moves | 160 | 16% |
-| Choice Band | +50% Sp. Atk | 120 | 12% |
+| Choice Band | +50% Attack | 120 | 12% |
 | Choice Scarf | +50% Speed | 120 | 12% |
 | Scope Lens | Raises crit rate by 30% | 100 | 10% |
 | Rocky Helmet | Deals 1/3 HP damage to attackers on contact | 80 | 8% |
 | Life Orb | +30% damage on all moves | 30 | 3% |
 | Focus Sash | Survive any KO hit at full HP | 10 | 1% |
+
+### **Effects (implemented)**
+
+All 9 effects are **live in battle** (`src/game/battle.js`). Player-held only for now, though the engine reads whichever side holds the item, so enemy/boss items are enablable later.
+
+* **Expert Belt** — ×1.2 damage dealt
+* **Life Orb** — ×1.3 damage dealt (stacks with Expert Belt)
+* **Choice Band** — ×1.5 physical **Attack** (no effect on special moves)
+* **Choice Scarf** — ×1.5 effective Speed for turn order
+* **Scope Lens** — crit chance ×1.3
+* **Shell Bell** — attacker heals 20% of the damage it dealt
+* **Rocky Helmet** — attacker takes 1/3 of its max HP as recoil on contact (can faint it)
+* **Leftovers** — heals 10% max HP at the end of each round
+* **Focus Sash** — if at full HP and would be KO'd, survive at 1 HP (every time)
+
+Non-attack effects (Shell Bell / Rocky Helmet / Leftovers / Focus Sash) show floating popups in the battle UI (green heal, red recoil, "Hung on!" for Focus Sash).
 
 ## **Unova**
 
@@ -669,7 +787,7 @@ Each completed run (win or loss) writes one row to the `runs` table in Supabase:
 | pokemon_caught_ids | int[] | PokéAPI IDs of all caught Pokémon (for Pokédex) |
 
 * **Loss** is recorded when all player Pokémon faint in battle
-* **Win** is recorded when the final boss of the last map is defeated
+* **Win** is recorded when the **Champion** (end of the Elite Four stage) is defeated
 * Stats reset on every new run (Play Again or fresh start)
 
 # **UI & Presentation**
@@ -687,6 +805,12 @@ The game is built mobile-first and scales up to desktop. Layout, text, and asset
 * Battle and selection screens use PokéAPI **pixel sprites** (`front_default` / `back_default`, 96×96) rendered with `image-rendering: pixelated` — not the HD official-artwork
 * Player Pokémon show their back sprite in battle; enemies show their front sprite
 
+## **Pokédex** *(caught-state spec — not yet implemented)*
+
+* The Pokédex lists every species per generation. A species the player **has not caught** shows **greyed out** (grayscale / dimmed); a species they **have caught** shows in full color with a small **Poké Ball icon in the top-left of its card**.
+* **Caught is persistent across all runs** (account-level): the caught set is aggregated from the user's Supabase `runs.pokemon_caught_ids` history and threaded into the Pokédex. (Persistence requires being logged in.)
+* *(Currently the Pokédex shows all species identically with no caught-state.)*
+
 ## **Starter Select**
 
 * Three starter cards sit side-by-side with small side padding on mobile, scaling up to a capped width on desktop
@@ -696,13 +820,14 @@ The game is built mobile-first and scales up to desktop. Layout, text, and asset
 ## **Battle UI (Desktop)**
 
 * Fixed **960×540** cinematic 16:9 card over a day battle background; the node map is hidden while a battle is active
-* **Top-left:** player character avatar + roster cards (held-item icon shown per card)
-* **Bottom-right:** enemy trainer avatar + roster cards
-* **Bottom-left:** player arena (back sprite on battle grass) with an info card above it
-* **Top-right:** enemy arena (front sprite on battle grass) with an info card below it
-* **Info card:** light-gray card, black border — left-aligned name + level, centered HP text, and a two-tone green HP bar (lighter top half, darker bottom half) with a black border
-* Victory / Defeat text appears **above** the card; the Continue / Play Again button sits **inside** the card at the bottom — there is no separate log bar
-* Prep ("wants to battle!" + Fight) and fainted notices render as overlays inside the card
+* **Vertical roster columns on the outer edges** — **player on the left, enemy on the right**. Each column = a trainer/character card on top + a roster panel of stacked rows below (no shadows; edge-to-edge with the card).
+* **Roster row:** held-item icon, the Pokémon sprite (hugging the outer edge), and a name / level / two-tone-HP-bar group. The right column is **mirrored** so enemy sprites hug the right edge. The **active** Pokémon's row is highlighted.
+* **Arenas (center):** the active player Pokémon (back sprite) and active enemy Pokémon (front sprite) stand on battle grass, nudged inward to clear the side columns. Each active Pokémon also has an **info card** — light-gray, black border, name + level, and a two-tone green HP bar (lighter top / darker bottom, black outline).
+* **Hit feedback:** the defending Pokémon's sprite **squishes** and flashes a translucent **red** overlay on impact, in sync with the move animation.
+* **HP bar behaviour:** when a Pokémon faints its bar visibly **drains to 0 before** the next Pokémon swaps in; a newly-sent Pokémon's bar **snaps to full** (no refill animation).
+* **Victory celebration:** on a win, each surviving roster Pokémon's sprite **pops** and a glowing yellow **"+2 LVL"** popup floats above it (**"+1 LVL"** for grass wins); HP bars tick up ~5%.
+* Victory / Defeat text appears **above** the card; the Continue / Play Again button sits **inside** the card — there is no separate log bar.
+* Prep ("wants to battle!" + Fight) and fainted notices render as overlays inside the card.
 
 ## **Battle UI (Mobile)**
 
@@ -715,8 +840,21 @@ The game is built mobile-first and scales up to desktop. Layout, text, and asset
 * Moves not in the pack fall back to a plain type-colored projectile orb with no sound
 * Frame stepping respects the user's battle-speed setting
 
+## **Nav Bar & Settings**
+
+The top nav bar has: **Home**, **Pokédex**, **Stats**, a **Light/Dark** toggle, **Restart run**, and **Settings** (battle speed). Two additions:
+
+* **Auto-close battle** — a nav-bar "Auto" toggle (persisted). When on, the battle UI **auto-closes shortly after a win** so you jump straight back to the map. It **never** auto-closes on a **loss** (the player must see the result and choose Play Again).
+* **Skip to next map** — a nav-bar button that advances directly to the next map (same effect as clearing the boss). Only shown when a next map exists.
+
+## **Map Card (Desktop)**
+
+* The map is a **fixed 400×800px** panel — **static**: it does not scale with viewport height (nodes stay a constant size).
+* The map background renders **pixelated** (`image-rendering: pixelated`) with `object-fit: contain`, sized to match the panel. Route/tilemap art is being authored per map.
+
 # **Performance**
 
-* All PokéAPI data (base stats, learnsets, move details) is cached in module-level Maps keyed by Pokémon ID
+* Each Pokémon's base data (base stats, types, sprites) is fetched once from PokéAPI and cached in a module-level Map keyed by ID
+* Moves are **not** fetched from PokéAPI — they come from the authored Type Move Table, so no learnset/move-detail requests are on the path
 * On region select, `prewarmCache()` pre-fetches all Pokémon in that region's catch pools, trainer pools, and boss teams in parallel — subsequent node activations are served from cache with no network delay
-* Evolution and move upgrade data is fetched on demand and also cached
+* Evolution data is fetched on demand and also cached

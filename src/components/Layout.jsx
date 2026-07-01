@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
+import { supabase } from '../lib/supabase'
 import Pokedex from './Pokedex'
 import SettingsPanel from './SettingsPanel'
 import homeIcon from '../assets/Icons/homeIcon.png'
@@ -16,6 +17,27 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const { dark, toggle } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [username, setUsername] = useState(null)
+
+  // Show the logged-in player's username in the center of the nav bar.
+  // Kept self-contained: Layout reads the session and profile itself.
+  useEffect(() => {
+    let cancelled = false
+    async function loadUsername(user) {
+      if (!user) { if (!cancelled) setUsername(null); return }
+      const { data } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (!cancelled) setUsername(data?.username ?? null)
+    }
+    supabase.auth.getUser().then(({ data }) => loadUsername(data.user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      loadUsername(session?.user ?? null)
+    })
+    return () => { cancelled = true; subscription.unsubscribe() }
+  }, [])
 
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
@@ -83,6 +105,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       backgroundRepeat: 'no-repeat',
     }}>
       <div style={{
+        position: 'relative',
         display: 'flex', alignItems: 'center', gap: '16px',
         padding: '8px 12px',
         backgroundColor: bg,
@@ -92,6 +115,16 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
         zIndex: 150,
       }}>
         <NavButtons row />
+        {username && (
+          <span style={{
+            position: 'absolute', left: '50%', top: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontFamily: 'Upheaval', fontSize: '13px', color: textColor,
+            pointerEvents: 'none', whiteSpace: 'nowrap',
+          }}>
+            {username}
+          </span>
+        )}
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
