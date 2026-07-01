@@ -318,8 +318,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
     }
 
-    console.log('[fetchEnemyTeam] type:', node.type, '| trainer:', node.trainer, '| specs:', specs)
-
     const team = await Promise.all(specs.map(async ({ id, level }) => {
       const base = await fetchPokemonBase(id)
       return buildPokemonInstance(base, level)
@@ -336,7 +334,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   async function fetchOfferedPokemon(node) {
     const pool = config.catchPools?.[mapIndex] ?? []
-    console.log('[PokeballNode] pool length:', pool.length, '| mapIndex:', mapIndex)
     if (pool.length === 0) return []
 
     const totalNodes = Object.keys(nodePositions).length

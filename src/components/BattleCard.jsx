@@ -56,10 +56,16 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 
   const [playerHp, setPlayerHp] = useState(() => playerRoster.map(p => p.stats.hp))
   const [enemyHp, setEnemyHp] = useState(() => enemyTeam.map(p => p.stats.hp))
-  const [playerFainted, setPlayerFainted] = useState(() => playerRoster.map(() => false))
-  const [enemyFainted, setEnemyFainted] = useState(() => enemyTeam.map(() => false))
-  const [activePlayer, setActivePlayer] = useState(0)
-  const [activeEnemy, setActiveEnemy] = useState(0)
+  const [playerFainted, setPlayerFainted] = useState(() => playerRoster.map(p => !!p.fainted))
+  const [enemyFainted, setEnemyFainted] = useState(() => enemyTeam.map(p => !!p.fainted))
+  // Start the active pointer on the first living Pokémon, not slot 0 — the
+  // roster can carry Pokémon that fainted in a previous battle. The sim
+  // (simulateBattle) starts on the first non-fainted index, so the display must
+  // match, otherwise a fainted lead shows on-screen while a different slot's HP
+  // actually changes.
+  const firstAlive = arr => { const i = arr.findIndex(p => !p.fainted); return i === -1 ? 0 : i }
+  const [activePlayer, setActivePlayer] = useState(() => firstAlive(playerRoster))
+  const [activeEnemy, setActiveEnemy] = useState(() => firstAlive(enemyTeam))
 
   const timerRef = useRef(null)
   const battleLogRef = useRef(null)

@@ -76,10 +76,7 @@ export default function App() {
   }
 
   async function recordRunEnd(result) {
-    if (!user) {
-      console.warn('[recordRunEnd] no user — not saving run')
-      return
-    }
+    if (!user) return
     const payload = {
       user_id: user.id,
       result,
@@ -88,10 +85,7 @@ export default function App() {
       pokemon_caught_ids: pokemonCaughtIds.current,
       pokemon_seen_ids: pokemonSeenIds.current,
     }
-    console.log('[recordRunEnd] inserting', payload)
-    const { data, error } = await supabase.from('runs').insert(payload).select()
-    if (error) console.error('[recordRunEnd] insert failed:', error)
-    else console.log('[recordRunEnd] saved', data)
+    await supabase.from('runs').insert(payload)
   }
 
   function handlePokemonCaught(pokemonId) {

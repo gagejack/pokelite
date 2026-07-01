@@ -28,7 +28,7 @@ drop policy if exists "runs_insert_own" on public.runs;
 create policy "runs_insert_own"
   on public.runs for insert
   with check (auth.uid() = user_id);
-
+still 
 -- A user may READ only their own runs (so the Pokédex can aggregate catches).
 drop policy if exists "runs_select_own" on public.runs;
 create policy "runs_select_own"
