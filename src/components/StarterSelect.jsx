@@ -12,7 +12,7 @@ const REGION_STARTERS = {
   Unova:  [495, 498, 501],
 }
 
-export default function StarterSelect({ region, onBack, onSelectStarter, pokedexOpen, setPokedexOpen }) {
+export default function StarterSelect({ region, onBack, onSelectStarter, caughtSet, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const [starters, setStarters] = useState([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +72,7 @@ export default function StarterSelect({ region, onBack, onSelectStarter, pokedex
                 pokemon={pokemon}
                 spriteGlow
                 statMax={50}
+                caught={caughtSet?.has(pokemon.id)}
                 onClick={() => onSelectStarter(pokemon)}
               />
             ))}

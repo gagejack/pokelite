@@ -25,9 +25,13 @@ export default function App() {
   const [bag, setBag] = useState([])
   const [mapIndex, setMapIndex] = useState(0)
   const [user, setUser] = useState(null)
+  // Persistent set of species the player has EVER caught (across all saved runs).
+  // Used to show the Poké Ball icon on in-run cards (starter / wild encounter).
+  const [caughtSet, setCaughtSet] = useState(() => new Set())
   const mapsCleared = useRef(0)
   const pokemonCaught = useRef(0)
   const pokemonCaughtIds = useRef([])
+  const pokemonSeenIds = useRef([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
@@ -37,10 +41,30 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Load the player's persistent caught set from saved runs whenever the user
+  // changes (login/logout). Feeds the Poké Ball icon on in-run cards.
+  useEffect(() => {
+    if (!user) { setCaughtSet(new Set()); return }
+    let cancelled = false
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('runs')
+        .select('pokemon_caught_ids')
+        .eq('user_id', user.id)
+      if (cancelled || error || !data) return
+      const set = new Set()
+      data.forEach(row => (row.pokemon_caught_ids ?? []).forEach(id => set.add(id)))
+      setCaughtSet(set)
+    })()
+    return () => { cancelled = true }
+  }, [user])
+
   async function initRoster(starter) {
     const base = await fetchPokemonBase(starter.id)
     const instance = buildPokemonInstance(base, 5, true)
     setRoster([instance])
+    // The starter is an owned species for the Pokédex (not a wild catch).
+    recordSpeciesOwned(instance.pokeId)
   }
 
   function startRun(starter) {
@@ -52,19 +76,44 @@ export default function App() {
   }
 
   async function recordRunEnd(result) {
-    if (!user) return
-    await supabase.from('runs').insert({
+    if (!user) {
+      console.warn('[recordRunEnd] no user — not saving run')
+      return
+    }
+    const payload = {
       user_id: user.id,
       result,
       maps_cleared: mapsCleared.current,
       pokemon_caught: pokemonCaught.current,
       pokemon_caught_ids: pokemonCaughtIds.current,
-    })
+      pokemon_seen_ids: pokemonSeenIds.current,
+    }
+    console.log('[recordRunEnd] inserting', payload)
+    const { data, error } = await supabase.from('runs').insert(payload).select()
+    if (error) console.error('[recordRunEnd] insert failed:', error)
+    else console.log('[recordRunEnd] saved', data)
   }
 
   function handlePokemonCaught(pokemonId) {
     pokemonCaught.current += 1
+    recordSpeciesOwned(pokemonId)
+  }
+
+  // Add a species to the Pokédex "owned" set (for greying/un-greying) without
+  // counting it as a wild catch. Used for the starter and for evolutions —
+  // both are species the player has owned, but neither is a Pokéball catch.
+  // Owning a species also means it's been seen.
+  function recordSpeciesOwned(pokemonId) {
+    recordSpeciesSeen(pokemonId)
+    if (pokemonId == null || pokemonCaughtIds.current.includes(pokemonId)) return
     pokemonCaughtIds.current = [...pokemonCaughtIds.current, pokemonId]
+  }
+
+  // Add a species to the Pokédex "seen" set — shown in color but without the
+  // Poké Ball icon. Triggered by enemies fought and wild Pokémon offered.
+  function recordSpeciesSeen(pokemonId) {
+    if (pokemonId == null || pokemonSeenIds.current.includes(pokemonId)) return
+    pokemonSeenIds.current = [...pokemonSeenIds.current, pokemonId]
   }
 
   function handleMapCleared() {
@@ -75,6 +124,7 @@ export default function App() {
     mapsCleared.current = 0
     pokemonCaught.current = 0
     pokemonCaughtIds.current = []
+    pokemonSeenIds.current = []
   }
 
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
@@ -98,6 +148,8 @@ export default function App() {
 
   function restartRun() {
     if (!selectedStarter) return
+    // The run is already saved at the moment of defeat (BattleCard onDefeat),
+    // so restarting just resets state — no save here (avoids a duplicate row).
     setResetting(true)
     setRoster([])
     setBag([])
@@ -144,6 +196,7 @@ export default function App() {
           region={selectedRegion}
           onBack={() => setScreen('region')}
           onSelectStarter={startRun}
+          caughtSet={caughtSet}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -164,6 +217,9 @@ export default function App() {
           onRestart={restartRun}
           onAdvanceMap={advanceMap}
           onPokemonCaught={handlePokemonCaught}
+          onSpeciesOwned={recordSpeciesOwned}
+          onSpeciesSeen={recordSpeciesSeen}
+          caughtSet={caughtSet}
           onMapCleared={handleMapCleared}
           onRunEnd={recordRunEnd}
           pokedexOpen={pokedexOpen}

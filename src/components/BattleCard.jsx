@@ -19,11 +19,12 @@ const PROJECTILE_DURATION = PROJECTILE_MS / 1000
 // the next Pokémon. Matches the AnimatedHpBar 0.6s width transition.
 const FAINT_DRAIN_MS = 650
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onRestart }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
   const isBoss = node.type === NODE_TYPES.BOSS
+  const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
   const levelsGained = node.type === NODE_TYPES.GRASS ? 1 : 2
 
   const borderStyle = dark ? '2px solid #333333' : '2px solid #666666'
@@ -33,7 +34,16 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const mutedColor = dark ? '#888' : '#777'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
 
-  const [phase, setPhase] = useState(isBoss ? 'prep' : 'battle')
+  // Prep-screen intro line. Legendaries are wild, so they announce the species
+  // ("A wild Kyurem appeared!") rather than a trainer name.
+  const legendaryName = enemyTeam[0]?.name
+    ? enemyTeam[0].name.charAt(0).toUpperCase() + enemyTeam[0].name.slice(1)
+    : 'Legendary'
+  const prepLabel = isMasterBall
+    ? `A wild ${legendaryName} appeared!`
+    : `${node.trainer} wants to battle!`
+
+  const [phase, setPhase] = useState(isBoss || isMasterBall ? 'prep' : 'battle')
   const [logIndex, setLogIndex] = useState(-1)
   const [battleResult, setBattleResult] = useState(null)
   const [projectile, setProjectile] = useState(null)
@@ -54,6 +64,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const timerRef = useRef(null)
   const battleLogRef = useRef(null)
   const autoCloseFiredRef = useRef(false)
+  const defeatFiredRef = useRef(false)
 
   // Mobile: refs to the active Pokémon sprites + arena container, used to
   // anchor the projectile and move animation to the actual on-screen sprites.
@@ -211,6 +222,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           : Math.min(playerRoster[i].stats.maxHp, hp + Math.round(playerRoster[i].stats.maxHp * 0.05))
       ))
     }
+    // On a loss (all player Pokémon fainted), record the run end immediately —
+    // not when the player later clicks "Play Again". Fire once.
+    if (battleResult === 'loss' && !defeatFiredRef.current) {
+      defeatFiredRef.current = true
+      onDefeat?.()
+    }
     // Auto-close only on a win — on a loss the player must see the result and
     // choose Play Again.
     if (battleResult === 'win' && autoClose && !autoCloseFiredRef.current) {
@@ -237,7 +254,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       {phase === 'prep' && (
         <>
           <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
-            {node.trainer} wants to battle!
+            {prepLabel}
           </span>
           <button
             onClick={() => setPhase('battle')}
@@ -635,7 +652,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
               backgroundColor: 'rgba(0,0,0,0.55)', padding: '10px 20px',
             }}>
               <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
-                {node.trainer} wants to battle!
+                {prepLabel}
               </span>
               <button
                 onClick={() => setPhase('battle')}

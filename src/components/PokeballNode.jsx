@@ -4,7 +4,7 @@ import PokemonCard from './PokemonCard'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
 // If roster is full (6), shows current roster so player can swap.
-export default function PokeballNode({ offered, roster, onPick, onClose }) {
+export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [swapTarget, setSwapTarget] = useState(null)
@@ -61,6 +61,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose }) {
               key={i}
               pokemon={poke}
               selected={selected === i}
+              caught={caughtSet?.has(poke.pokeId)}
               onClick={() => handleSelectPokemon(i)}
             />
           ))}

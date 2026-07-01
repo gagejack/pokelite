@@ -19,6 +19,7 @@ window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: tr
 
 const ITEM_ICONS = {
   [NODE_TYPES.POKEBALL]:      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
+  [NODE_TYPES.MASTER_BALL]:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
   [NODE_TYPES.POKECENTER]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
@@ -219,7 +220,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onPokemonCaught, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onPokemonCaught, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
@@ -232,6 +233,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [currentNode, setCurrentNode] = useState(0)
   const [pendingBattle, setPendingBattle] = useState(null)
   const [pendingPokeball, setPendingPokeball] = useState(null)
+  const [pendingLegendary, setPendingLegendary] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
   const [loadingNode, setLoadingNode] = useState(null)
@@ -291,12 +293,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   async function fetchEnemyTeam(node) {
     const isBoss = node.type === NODE_TYPES.BOSS
     const isTrainer = node.type === NODE_TYPES.TRAINER
+    const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
 
     let specs
     if (isBoss) {
       specs = BOSS_TEAMS[node.trainer] ?? []
+    } else if (isMasterBall) {
+      // Master Ball: a single legendary from this map's pool, at its fixed level
+      // (not position-scaled). Empty pool → no legendary (caller clears the node).
+      const pool = config.legendaryPools?.[mapIndex] ?? []
+      specs = pool.length > 0 ? [pick(pool)] : []
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
       specs = buildTrainerTeamSpec(node.trainer, count, positionWeight, mapIndex)
@@ -316,6 +324,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const base = await fetchPokemonBase(id)
       return buildPokemonInstance(base, level)
     }))
+    // Every enemy Pokémon fought counts as "seen" in the Pokédex.
+    team.forEach(p => onSpeciesSeen?.(p.pokeId))
 
     const trainerSprite = config.trainerFullSprites?.[node.trainer]
       ?? config.characters?.find(c => c.name === node.trainer)?.sprite
@@ -338,11 +348,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
     const chosen = shuffled.slice(0, 3)
 
-    return Promise.all(chosen.map(async (id) => {
+    const offered = await Promise.all(chosen.map(async (id) => {
       const base = await fetchPokemonBase(id)
       const instance = buildPokemonInstance(base, level)
       return { ...instance, level }
     }))
+    // Wild Pokémon offered at a Pokéball node count as "seen".
+    offered.forEach(p => onSpeciesSeen?.(p.pokeId))
+    return offered
   }
 
   const handleNodeClick = async (node) => {
@@ -351,12 +364,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isBattle = node.type === NODE_TYPES.TRAINER
       || node.type === NODE_TYPES.BOSS
       || node.type === NODE_TYPES.GRASS
+      || node.type === NODE_TYPES.MASTER_BALL
 
     if (isBattle) {
       setLoadingNode(node.id)
       const { team, trainerSprite } = await fetchEnemyTeam(node)
       setLoadingNode(null)
-      setPendingBattle({ node, enemyTeam: team, trainerSprite })
+      // Master Ball with an empty pool (shouldn't happen given the spawn ramp,
+      // but guard anyway) — just clear the node.
+      if (team.length === 0) {
+        setClearedNodes(prev => new Set([...prev, node.id]))
+        setCurrentNode(node.id)
+      } else {
+        setPendingBattle({ node, enemyTeam: team, trainerSprite })
+      }
     } else if (node.type === NODE_TYPES.POKEBALL) {
       setLoadingNode(node.id)
       const offered = await fetchOfferedPokemon(node)
@@ -386,6 +407,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!pendingBattle) return
     const node = pendingBattle.node
     const isBoss = node.type === NODE_TYPES.BOSS
+    const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
+    const legendary = pendingBattle.enemyTeam[0]
     const levelsGained = node.type === NODE_TYPES.GRASS ? 1 : 2
 
     if (won) {
@@ -408,6 +431,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         const evolved = await checkEvolution(p, p.level)
         if (evolved) {
           notices.push({ from: p.name, to: evolved.name })
+          // The evolved form is a new owned species for the Pokédex.
+          onSpeciesOwned?.(evolved.pokeId)
           return evolved
         }
         return p
@@ -417,7 +442,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       if (notices.length > 0) setEvolutionNotices(notices)
       setPendingBattle(null)
 
-      if (isBoss && config.maps[mapIndex + 1]) {
+      if (isMasterBall) {
+        // Beat the legendary → offer the catch (reuses the Pokéball catch UI).
+        // The node is cleared by the catch screen (pick or decline).
+        setPendingLegendary({ node, offered: [legendary] })
+      } else if (isBoss && config.maps[mapIndex + 1]) {
         onMapCleared?.()
         onAdvanceMap()
       } else if (isBoss) {
@@ -450,6 +479,22 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     setPendingPokeball(null)
   }
 
+  // Catch a defeated legendary — mirrors handlePokeballPick but for the
+  // pendingLegendary offer (single Pokémon, roster-full swap supported).
+  function handleLegendaryCatch({ pokemon, swapIndex }) {
+    if (!pendingLegendary) return
+    const node = pendingLegendary.node
+    if (swapIndex !== null) {
+      setRoster(prev => prev.map((p, i) => i === swapIndex ? pokemon : p))
+    } else {
+      setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
+    }
+    onPokemonCaught?.(pokemon.pokeId)
+    setClearedNodes(prev => new Set([...prev, node.id]))
+    setCurrentNode(node.id)
+    setPendingLegendary(null)
+  }
+
   function getIcon(node, isCurrentNode) {
     if (isCurrentNode && character) return character.sprite
     if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS) {
@@ -474,6 +519,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     switch (node.type) {
       case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: '+1 LVL' }
       case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: 'Catch a Pokémon' }
+      case NODE_TYPES.MASTER_BALL:   return { title: 'Master Ball', sub: 'Legendary!' }
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: 'Select an item' }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: 'Upgrade a move' }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
@@ -569,6 +615,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             character={character}
             damageMultiplier={config.damageMultiplier ?? 2}
             onBattleEnd={handleBattleEnd}
+            onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
           />
         </div>
@@ -606,11 +653,26 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         <PokeballNode
           offered={pendingPokeball.offered}
           roster={roster}
+          caughtSet={caughtSet}
           onPick={handlePokeballPick}
           onClose={() => {
             setClearedNodes(prev => new Set([...prev, pendingPokeball.node.id]))
             setCurrentNode(pendingPokeball.node.id)
             setPendingPokeball(null)
+          }}
+        />
+      )}
+
+      {pendingLegendary && (
+        <PokeballNode
+          offered={pendingLegendary.offered}
+          roster={roster}
+          caughtSet={caughtSet}
+          onPick={handleLegendaryCatch}
+          onClose={() => {
+            setClearedNodes(prev => new Set([...prev, pendingLegendary.node.id]))
+            setCurrentNode(pendingLegendary.node.id)
+            setPendingLegendary(null)
           }}
         />
       )}

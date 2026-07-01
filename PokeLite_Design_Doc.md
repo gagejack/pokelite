@@ -421,34 +421,36 @@ Hovering over any node (desktop) or long-pressing (mobile, 400ms hold) shows a t
 
 * All roster Pokémon gain **1 level** on victory
 
-### **Master Ball (Legendary)** *(spec — not yet implemented)*
+### **Master Ball (Legendary)** *(implemented — Unova only)*
 
-* A **rare variant** of the Pokéball node. A Pokéball node has a small chance to instead be a **Master Ball** node.
+* A **rare variant** of the Pokéball node. When a node rolls as a Pokéball, it has a small map-ramped chance to become a **Master Ball** node instead (`masterBallChance(mapIndex)` in `nodeMap.js`), so the overall node distribution is barely affected.
 
-* **Spawn chance ramps by map:** 0% before Map 3, then **0.5% on Map 3**, rising each map up to **~10% on Map 8**.
+* **Spawn chance ramps by map:** 0% before Map 3, then **0.5% on Map 3**, rising linearly up to **~10% on Map 8**.
 
-* **Visually distinct:** rendered with a **Master Ball icon** and a special label (e.g. "Legendary!") so a rare spawn stands out. (Gym/boss nodes use the leader's own sprite, so there is no icon conflict.)
+* **Visually distinct:** rendered with the **Master Ball icon** and the label **"Master Ball / Legendary!"** so a rare spawn stands out. (Gym/boss nodes use the leader's own sprite, so there is no icon conflict.)
 
-* Clicking it triggers a **legendary battle** — a single high-level legendary from the region. On **defeat**, the player is **offered the catch** (add to roster; if the roster is full, swap for an existing Pokémon — same flow as a Pokéball node).
+* Clicking it triggers a **legendary battle** — a single high-level legendary from the region. It opens with a **prep intro** ("A wild {Name} appeared!" + Fight!), like a boss. On **defeating** it, the player is **offered the catch** (reuses the Pokéball catch UI: add to roster, or swap if the roster is full). **Declining is allowed** — the node clears with no catch, and the legendary still counts as **seen** in the Pokédex. Losing follows the normal defeat path.
 
-* A caught legendary is **stat-tracked for the Pokédex** exactly like any other catch.
+* A caught legendary is **stat-tracked for the Pokédex** exactly like any other catch (flows through the same `pokemon_caught_ids`).
 
-* **Unova legendary pool + levels** (per species, fixed — not map-scaled):
+* **Map gating — weakest early → strongest late.** The legendary is drawn from a **per-map pool** (`legendaryPools` in the region config), tiered so a Lv70 legendary can't appear while the team is still low level:
 
-  | Legendary | Level |
-  |-----------|-------|
-  | Cobalion | 40 |
-  | Terrakion | 40 |
-  | Virizion | 40 |
-  | Tornadus | 45 |
-  | Thundurus | 45 |
-  | Keldeo | 45 |
-  | Genesect | 50 |
-  | Reshiram | 65 |
-  | Zekrom | 65 |
-  | Kyurem | 70 |
+  | Legendary | Level | Available from |
+  |-----------|-------|----------------|
+  | Cobalion | 40 | Map 3 |
+  | Terrakion | 40 | Map 3 |
+  | Virizion | 40 | Map 3 |
+  | Tornadus | 45 | Map 6 |
+  | Thundurus | 45 | Map 6 |
+  | Keldeo | 45 | Map 6 |
+  | Genesect | 50 | Map 6 |
+  | Reshiram | 65 | Map 8 |
+  | Zekrom | 65 | Map 8 |
+  | Kyurem | 70 | Map 8 |
 
-  *(Landorus is not yet in the pool — optional addition to complete the forces-of-nature trio. Whether stronger legendaries are gated to later maps is a future tuning knob.)*
+  Levels are **fixed** (not position-scaled). Maps 1–2 have no legendaries. Only Unova defines `legendaryPools`; other regions have none (safe — no Master Ball spawns there yet).
+
+  *(Landorus is not yet in the pool — optional addition to complete the forces-of-nature trio.)*
 
 ### **Portal** *(future — not scheduled)*
 
@@ -680,9 +682,9 @@ A final **linear stage** entered automatically after Drayden (Gym 8) is beaten �
 
 (All teams authored above the Gym 8 range of 71–73.)
 
-### **Legendaries** *(spec — not yet implemented)*
+### **Legendaries** *(implemented)*
 
-Legendaries appear via the rare **Master Ball node** (see Node Types → Master Ball). Spawn chance ramps **0.5% on Map 3 → ~10% on Map 8**. Defeat the legendary to be offered the catch.
+Legendaries appear via the rare **Master Ball node** (see Node Types → Master Ball). Spawn chance ramps **0.5% on Map 3 → ~10% on Map 8**. The encounter opens with a prep intro, then a 1v1 battle; defeat the legendary to be offered the catch (declining is allowed). Species are **gated by map** (weakest early → strongest late): the Fighting-trio (Lv40) from Map 3, the forces-of-nature + Genesect (Lv45–50) from Map 6, and Reshiram/Zekrom/Kyurem (Lv65–70) on Map 8.
 
 | Legendary | Level | Type |
 |-----------|-------|------|

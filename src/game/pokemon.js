@@ -2,6 +2,28 @@ import { getTypeMove, tierForLevel } from './typeMoves.js'
 
 const baseCache = new Map()
 
+// PokéAPI returns some species with a default-forme suffix, e.g.
+// "tornadus-incarnate", "keldeo-ordinary". For display we want just the base
+// species name ("tornadus", "keldeo"). We strip only these known forme
+// suffixes so legitimately hyphenated names (mr-mime, ho-oh, nidoran-f,
+// porygon-z, type-null, etc.) are left untouched.
+const FORME_SUFFIXES = [
+  '-incarnate',    // Tornadus, Thundurus, Landorus
+  '-ordinary',     // Keldeo
+  '-aria',         // Meloetta
+  '-standard',     // Darmanitan
+  '-red-striped',  // Basculin
+  '-blue-striped', // Basculin
+]
+
+export function displayName(name) {
+  if (!name) return name
+  for (const suffix of FORME_SUFFIXES) {
+    if (name.endsWith(suffix)) return name.slice(0, -suffix.length)
+  }
+  return name
+}
+
 // Pre-fetch base + move data for every Pokémon ID in a region config so all
 // subsequent node activations are served from cache with no network delay.
 export async function prewarmCache(regionConfig, trainerPokemonPools, bossTeams) {
@@ -44,7 +66,7 @@ export async function fetchPokemonBase(idOrName) {
 
   const result = {
     pokeId: data.id,
-    name: data.name,
+    name: displayName(data.name),
     types: data.types.map(t => t.type.name),
     baseStats: {
       hp:      data.stats.find(s => s.stat.name === 'hp').base_stat,

@@ -514,6 +514,36 @@ const CATCH_POOLS = [
   [633, 610, 621, 634, 613, 615, 582, 595],
 ]
 
+// --- Legendary pools per map (Master Ball nodes) ---
+// Fixed levels per species (not position-scaled). Tiered weakest→strongest so a
+// Lv70 Kyurem can't appear while the player's team is still low level.
+const LEG_MUSKETEERS = [
+  { id: 638, level: 40 }, // Cobalion
+  { id: 639, level: 40 }, // Terrakion
+  { id: 640, level: 40 }, // Virizion
+]
+const LEG_FORCES = [
+  { id: 641, level: 45 }, // Tornadus
+  { id: 642, level: 45 }, // Thundurus
+  { id: 647, level: 45 }, // Keldeo
+  { id: 649, level: 50 }, // Genesect
+]
+const LEG_TAO = [
+  { id: 643, level: 65 }, // Reshiram
+  { id: 644, level: 65 }, // Zekrom
+  { id: 646, level: 70 }, // Kyurem
+]
+const LEGENDARY_POOLS = [
+  [],                                                 // Map 1 — none
+  [],                                                 // Map 2 — none
+  LEG_MUSKETEERS,                                     // Map 3
+  LEG_MUSKETEERS,                                     // Map 4
+  LEG_MUSKETEERS,                                     // Map 5
+  [...LEG_MUSKETEERS, ...LEG_FORCES],                 // Map 6
+  [...LEG_MUSKETEERS, ...LEG_FORCES],                 // Map 7
+  [...LEG_MUSKETEERS, ...LEG_FORCES, ...LEG_TAO],     // Map 8
+]
+
 // --- Trainer pools per map ---
 const TRAINER_POOLS = [
   ['Youngster', 'Lass', 'Preschooler M', 'Preschooler F', 'Schoolkid M', 'Schoolkid F', 'Backpacker M', 'Backpacker F', 'Janitor'],
@@ -551,10 +581,11 @@ export const unovaConfig = {
   trainerFullSprites: TRAINER_FULL_SPRITES,
   characters: CHARACTERS,
   catchPools: CATCH_POOLS,
+  legendaryPools: LEGENDARY_POOLS,
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     generate: (starter) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Chili') : MAP_BOSSES[i]
-      return { region: 'Unova', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss) }
+      return { region: 'Unova', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss, i) }
     },
     edges: MAP_EDGES,
     background,

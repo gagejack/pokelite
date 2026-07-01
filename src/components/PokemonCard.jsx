@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { TYPE_COLORS } from '../game/types.js'
 
+const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
+
 // Shared Pokémon card — used by both the catch (PokeballNode) and starter
 // (StarterSelect) screens. Renders sprite, name, level, type chips, the stat
 // block (HP last, two-tone HP bar), and the move box.
@@ -11,7 +13,8 @@ import { TYPE_COLORS } from '../game/types.js'
 //   onClick    — click handler
 //   selected   — yellow border/glow (catch card's "team full → swap" state)
 //   spriteGlow — apply the yellow saturate/drop-shadow filter on the sprite
-export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100 }) {
+//   caught     — show a Poké Ball icon top-left (species caught before)
+export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false }) {
   const { dark } = useTheme()
   const [hovered, setHovered] = useState(false)
 
@@ -39,6 +42,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        position: 'relative',
         backgroundColor: cardBg,
         border: selected ? '2px solid #facc15' : hovered ? '2px solid #ffffff' : borderStyle,
         boxShadow: selected
@@ -55,6 +59,14 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
         cursor: 'pointer',
       }}
     >
+      {caught && (
+        <img
+          src={POKE_BALL_ICON}
+          alt="Caught"
+          title="Caught before"
+          style={{ position: 'absolute', top: '5px', left: '5px', width: '18px', height: '18px', imageRendering: 'pixelated', zIndex: 1 }}
+        />
+      )}
       <img
         src={pokemon.sprite}
         alt={pokemon.name}

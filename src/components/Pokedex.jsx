@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
+import { displayName } from '../game/pokemon.js'
 import { supabase } from '../lib/supabase'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
@@ -22,9 +23,13 @@ export default function Pokedex({ onClose }) {
   const [pokemon, setPokemon] = useState([])
   const [loadingPokemon, setLoadingPokemon] = useState(false)
   const [caughtSet, setCaughtSet] = useState(() => new Set())
+  const [seenSet, setSeenSet] = useState(() => new Set())
 
-  // Aggregate the caught set from the logged-in user's saved run history.
-  // Logged out → empty set (everything greyed). Requires the runs SELECT RLS policy.
+  // Aggregate the caught + seen sets from the logged-in user's saved run history.
+  // Logged out → empty sets (everything blacked out). Requires the runs SELECT RLS policy.
+  //  - caught: full color + Poké Ball icon
+  //  - seen (not caught): full color, no icon
+  //  - neither: black silhouette
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -32,12 +37,19 @@ export default function Pokedex({ onClose }) {
       if (!user) return
       const { data, error } = await supabase
         .from('runs')
-        .select('pokemon_caught_ids')
+        .select('pokemon_caught_ids, pokemon_seen_ids')
         .eq('user_id', user.id)
       if (cancelled || error || !data) return
-      const set = new Set()
-      data.forEach(row => (row.pokemon_caught_ids ?? []).forEach(id => set.add(id)))
-      setCaughtSet(set)
+      const caught = new Set()
+      const seen = new Set()
+      data.forEach(row => {
+        (row.pokemon_caught_ids ?? []).forEach(id => caught.add(id))
+        ;(row.pokemon_seen_ids ?? []).forEach(id => seen.add(id))
+      })
+      // A caught species is implicitly seen too.
+      caught.forEach(id => seen.add(id))
+      setCaughtSet(caught)
+      setSeenSet(seen)
     })()
     return () => { cancelled = true }
   }, [])
@@ -48,7 +60,7 @@ export default function Pokedex({ onClose }) {
     fetch(`https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`)
       .then(r => r.json())
       .then(data => {
-        const base = data.results.map((p, i) => ({ name: p.name, id: offset + i + 1, types: null }))
+        const base = data.results.map((p, i) => ({ name: displayName(p.name), id: offset + i + 1, types: null }))
         setPokemon(base)
         setLoadingPokemon(false)
         // fetch types in parallel, update each as it arrives
@@ -166,6 +178,7 @@ export default function Pokedex({ onClose }) {
             <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(6, 1fr)' : 'repeat(3, 1fr)', gap: isDesktop ? '10px' : '6px' }}>
               {pokemon.map(p => {
                 const caught = caughtSet.has(p.id)
+                const seen = seenSet.has(p.id)
                 return (
                   <div
                     key={p.id}
@@ -194,13 +207,13 @@ export default function Pokedex({ onClose }) {
                       alt={p.name}
                       style={{
                         width: isDesktop ? '72px' : '52px', height: isDesktop ? '72px' : '52px', imageRendering: 'pixelated',
-                        filter: caught ? 'none' : 'brightness(0)',
+                        filter: seen ? 'none' : 'brightness(0)',
                       }}
                     />
                     <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '14px' : '11px', color: dark ? '#DBDBDB' : '#333333', textAlign: 'center', marginTop: '2px' }}>
-                      {p.name}
+                      {seen ? p.name : '???'}
                     </span>
-                    {p.types && (
+                    {seen && p.types && (
                       <div style={{ display: 'flex', gap: '2px', marginTop: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {p.types.map(type => (
                           <span key={type} style={{
