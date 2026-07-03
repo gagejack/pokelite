@@ -113,41 +113,52 @@ export function buildPokemonInstance(base, level, isStarter = false) {
   }
 }
 
-// Check if a Pokémon should evolve after reaching newLevel.
-// Returns the evolved PokémonInstance (with fresh base/moveCache) or null.
-export async function checkEvolution(instance, newLevel) {
-  try {
-    const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${instance.pokeId}`)
-    if (!speciesRes.ok) return null
-    const species = await speciesRes.json()
+// Resolved evolution outcome per species id: null = no level-up evolution
+// (final stage / non-level trigger), or { speciesName, minLevel } for the next
+// stage. One chain fetch fills the whole evolutionary line, so repeat
+// checkEvolution calls after every battle cost zero network.
+const evoCache = new Map()
 
-    const chainRes = await fetch(species.evolution_chain.url)
-    if (!chainRes.ok) return null
-    const chainData = await chainRes.json()
+// Fetch a Pokémon's evolution chain and cache the outcome for every species
+// in it. Failures leave the cache unset so a later call can retry.
+async function loadEvolutionLine(pokeId) {
+  const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${pokeId}`)
+  if (!speciesRes.ok) return
+  const species = await speciesRes.json()
 
-    // Walk the chain to find this Pokémon and its next evolution
-    function findNext(node) {
-      if (node.species.name === instance.name) {
-        return node.evolves_to[0] ?? null
-      }
-      for (const child of node.evolves_to) {
-        const found = findNext(child)
-        if (found) return found
-      }
-      return null
-    }
+  const chainRes = await fetch(species.evolution_chain.url)
+  if (!chainRes.ok) return
+  const chainData = await chainRes.json()
 
-    const nextNode = findNext(chainData.chain)
-    if (!nextNode) return null
-
-    // Only level-up triggered evolutions
-    const trigger = nextNode.evolution_details.find(d =>
+  const walk = node => {
+    const id = Number(node.species.url.match(/\/(\d+)\/?$/)?.[1])
+    // Same semantics as before: only the first branch, only level-up triggers.
+    const next = node.evolves_to[0] ?? null
+    const trigger = next?.evolution_details.find(d =>
       d.trigger.name === 'level-up' && d.min_level != null
     )
-    if (!trigger || newLevel < trigger.min_level) return null
+    if (id) {
+      evoCache.set(id, next && trigger
+        ? { speciesName: next.species.name, minLevel: trigger.min_level }
+        : null)
+    }
+    node.evolves_to.forEach(walk)
+  }
+  walk(chainData.chain)
+}
+
+// Check if a Pokémon should evolve after reaching newLevel.
+// Returns the evolved PokémonInstance or null.
+export async function checkEvolution(instance, newLevel) {
+  try {
+    if (!evoCache.has(instance.pokeId)) {
+      await loadEvolutionLine(instance.pokeId)
+    }
+    const next = evoCache.get(instance.pokeId)
+    if (!next || newLevel < next.minLevel) return null
 
     // Evolve — fetch new base and rebuild instance
-    const evolvedBase = await fetchPokemonBase(nextNode.species.name)
+    const evolvedBase = await fetchPokemonBase(next.speciesName)
     const hpRatio = instance.stats.hp / instance.stats.maxHp
     const evolved = buildPokemonInstance(evolvedBase, newLevel)
     // Preserve HP ratio
@@ -164,6 +175,33 @@ export async function checkEvolution(instance, newLevel) {
   } catch {
     return null
   }
+}
+
+// Apply a battle victory to the sim's final team: level-ups, the 5% survivor
+// heal, an optional full heal + revive (boss wins), then evolution checks.
+// Returns { roster, evolutionNotices } where notices are { from, to, pokeId } —
+// Pokédex "owned" recording stays at the call site.
+export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false } = {}) {
+  let roster = finalPlayerTeam.map(fp => fp._base ? levelUp(fp, fp._base, levelsGained) : fp)
+  // Victory heal: every surviving Pokémon recovers 5% of max HP (capped).
+  roster = roster.map(p =>
+    p.fainted ? p
+      : { ...p, stats: { ...p.stats, hp: Math.min(p.stats.maxHp, p.stats.hp + Math.round(p.stats.maxHp * 0.05)) } }
+  )
+  if (fullHeal) {
+    roster = roster.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } }))
+  }
+
+  const evolutionNotices = []
+  roster = await Promise.all(roster.map(async p => {
+    const evolved = await checkEvolution(p, p.level)
+    if (evolved) {
+      evolutionNotices.push({ from: p.name, to: evolved.name, pokeId: evolved.pokeId })
+      return evolved
+    }
+    return p
+  }))
+  return { roster, evolutionNotices }
 }
 
 // Level up a Pokémon instance — recalculates stats only.

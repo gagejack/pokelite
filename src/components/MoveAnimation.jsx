@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { MOVE_ANIMATIONS } from '../game/moveAnimations.js'
+import { getMoveAnimation } from '../game/moveAnimations.js'
 
 const FRAME_MS = 80
 
 export default function MoveAnimation({ moveName, onDone, battleSpeed = 1, size = 192 }) {
-  const anim = MOVE_ANIMATIONS[moveName]
+  const anim = getMoveAnimation(moveName)
   const [frame, setFrame] = useState(0)
   const intervalRef = useRef(null)
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import Layout from './Layout'
 import PokemonCard from './PokemonCard'
-import { getTypeMove, tierForLevel } from '../game/typeMoves.js'
+import { fetchPokemonBase, buildPokemonInstance } from '../game/pokemon.js'
 
 const REGION_STARTERS = {
   Kanto:  [1, 4, 7],
@@ -22,24 +22,11 @@ export default function StarterSelect({ region, onBack, onSelectStarter, caughtS
     const ids = REGION_STARTERS[region.name]
     Promise.all(
       ids.map(async id => {
-        const data = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`).then(r => r.json())
-        const types = data.types.map(t => t.type.name)
-        const statsMap = {}
-        data.stats.forEach(s => { statsMap[s.stat.name] = s.base_stat })
-        const calcHP   = (b, l) => Math.floor(((2 * b + 31) * l) / 100) + l + 10
-        const calcStat = (b, l) => Math.floor(((2 * b + 31) * l) / 100) + 5
-        const stats = {
-          hp:      calcHP(statsMap.hp, LEVEL),
-          maxHp:   calcHP(statsMap.hp, LEVEL),
-          attack:  calcStat(statsMap.attack,             LEVEL),
-          defense: calcStat(statsMap.defense,            LEVEL),
-          spAtk:   calcStat(statsMap['special-attack'],  LEVEL),
-          spDef:   calcStat(statsMap['special-defense'], LEVEL),
-          speed:   calcStat(statsMap.speed,              LEVEL),
-        }
-        // Starter holds its primary type's Tier 1 move (level 5 → Tier 1)
-        const move = getTypeMove(types[0], tierForLevel(LEVEL))
-        return { id, name: data.name, types, sprite: data.sprites.front_default, stats, level: LEVEL, move }
+        // Unboosted display instance — the real roster starter (with the 1.3×
+        // starter boost) is rebuilt in App.initRoster.
+        const base = await fetchPokemonBase(id)
+        const instance = buildPokemonInstance(base, LEVEL, false)
+        return { ...instance, id: instance.pokeId }
       })
     ).then(results => { setStarters(results); setLoading(false) })
   }, [region])

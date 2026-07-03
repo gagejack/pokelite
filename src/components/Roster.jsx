@@ -396,9 +396,6 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
                 <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: mutedColor }}>
                   PWR: <span style={{ color: textColor }}>{move.power ?? '—'}</span>
                 </span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: mutedColor }}>
-                  ACC: <span style={{ color: textColor }}>{move.accuracy ?? '—'}%</span>
-                </span>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: mutedColor, textTransform: 'capitalize' }}>
                   {move.damageClass}
                 </span>

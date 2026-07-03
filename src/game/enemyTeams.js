@@ -4,21 +4,26 @@ import { pick } from './nodeMap.js'
 export const POKEMON_TYPES = {
   504:'normal',506:'normal',507:'normal',509:'dark',511:'grass',513:'fire',515:'water',
   519:'normal',520:'normal',522:'electric',527:'psychic',529:'ground',530:'ground',
-  531:'normal',540:'bug',543:'bug',544:'bug',551:'ground',552:'ground',559:'dark',
-  561:'psychic',568:'poison',574:'psychic',580:'water',581:'water',582:'ice',583:'ice',
-  587:'electric',595:'bug',602:'electric',603:'electric',604:'electric',610:'dragon',
-  611:'dragon',612:'dragon',613:'ice',614:'ice',615:'ice',621:'dragon',633:'dragon',
-  634:'dragon',635:'dragon',
+  531:'normal',534:'fighting',538:'fighting',540:'bug',543:'bug',544:'bug',551:'ground',
+  552:'ground',553:'ground',559:'dark',560:'dark',561:'psychic',563:'ghost',568:'poison',
+  574:'psychic',576:'psychic',579:'psychic',580:'water',581:'water',582:'ice',583:'ice',
+  584:'ice',587:'electric',595:'bug',602:'electric',603:'electric',604:'electric',
+  609:'ghost',610:'dragon',611:'dragon',612:'dragon',613:'ice',614:'ice',615:'ice',
+  617:'bug',620:'fighting',621:'dragon',623:'ground',625:'dark',626:'normal',
+  633:'dragon',634:'dragon',635:'dragon',637:'bug',
 }
 
 export const POKEMON_NAMES = {
   504:'patrat',506:'lillipup',507:'herdier',509:'purrloin',511:'pansage',513:'pansear',
   515:'panpour',519:'pidove',520:'tranquill',522:'blitzle',527:'woobat',529:'drilbur',
-  530:'excadrill',531:'audino',540:'sewaddle',543:'venipede',544:'whirlipede',551:'sandile',
-  552:'krokorok',559:'scraggy',561:'sigilyph',568:'trubbish',574:'gothita',580:'ducklett',
-  581:'swanna',582:'vanillite',583:'vanillish',587:'emolga',595:'joltik',602:'tynamo',
-  603:'eelektrik',604:'eelektross',610:'axew',611:'fraxure',612:'haxorus',613:'cubchoo',
-  614:'beartic',615:'cryogonal',621:'druddigon',633:'deino',634:'zweilous',635:'hydreigon',
+  530:'excadrill',531:'audino',534:'conkeldurr',538:'throh',540:'sewaddle',543:'venipede',
+  544:'whirlipede',551:'sandile',552:'krokorok',553:'krookodile',559:'scraggy',560:'scrafty',
+  561:'sigilyph',563:'cofagrigus',568:'trubbish',574:'gothita',576:'gothitelle',
+  579:'reuniclus',580:'ducklett',581:'swanna',582:'vanillite',583:'vanillish',584:'vanilluxe',
+  587:'emolga',595:'joltik',602:'tynamo',603:'eelektrik',604:'eelektross',609:'chandelure',
+  610:'axew',611:'fraxure',612:'haxorus',613:'cubchoo',614:'beartic',615:'cryogonal',
+  617:'accelgor',620:'mienshao',621:'druddigon',623:'golurk',625:'bisharp',626:'bouffalant',
+  633:'deino',634:'zweilous',635:'hydreigon',637:'volcarona',
 }
 
 // Pokémon pools per trainer type.
@@ -97,6 +102,16 @@ export const BOSS_TEAMS = {
 
   // Map 8 — Opelucid City Gym (Dragon)
   'Drayden': [{ id: 611, level: 71 }, { id: 612, level: 71 }, { id: 635, level: 73 }], // Fraxure, Haxorus, Hydreigon
+}
+
+// Elite Four + Champion — fought in order after the 8th gym, authored above
+// Drayden's 71–73 band (the player gains +2 levels per battle along the way).
+export const ELITE_FOUR_TEAMS = {
+  'Shauntal': [{ id: 563, level: 74 }, { id: 623, level: 74 }, { id: 609, level: 76 }], // Cofagrigus, Golurk, Chandelure
+  'Grimsley': [{ id: 560, level: 74 }, { id: 553, level: 74 }, { id: 625, level: 76 }], // Scrafty, Krookodile, Bisharp
+  'Caitlin':  [{ id: 561, level: 74 }, { id: 576, level: 74 }, { id: 579, level: 76 }], // Sigilyph, Gothitelle, Reuniclus
+  'Marshal':  [{ id: 538, level: 74 }, { id: 620, level: 74 }, { id: 534, level: 76 }], // Throh, Mienshao, Conkeldurr
+  'Alder':    [{ id: 617, level: 77 }, { id: 626, level: 77 }, { id: 621, level: 78 }, { id: 584, level: 78 }, { id: 637, level: 80 }], // Accelgor, Bouffalant, Druddigon, Vanilluxe, Volcarona (ace)
 }
 
 // Per-map level ranges (indexed by mapIndex). Mirrors the trainer pools above.

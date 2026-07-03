@@ -51,6 +51,12 @@ import trainerClay from '../../assets/regions/Unova/Characters Overworlds/Clay.w
 import trainerSkyla from '../../assets/regions/Unova/Characters Overworlds/Skyla 1.webp'
 import trainerBrycen from '../../assets/regions/Unova/Characters Overworlds/Brycen.webp'
 import trainerDrayden from '../../assets/regions/Unova/Characters Overworlds/Drayden.webp'
+// Elite Four + Champion overworlds
+import owShauntal from '../../assets/regions/Unova/Characters Overworlds/Shauntal 1.webp'
+import owGrimsley from '../../assets/regions/Unova/Characters Overworlds/Grimsley 1.webp'
+import owCaitlin from '../../assets/regions/Unova/Characters Overworlds/Caitlin 1.webp'
+import owMarshal from '../../assets/regions/Unova/Characters Overworlds/Marshal.webp'
+import owAlder from '../../assets/regions/Unova/Characters Overworlds/Alder.webp'
 
 // Trainer full battle sprites
 import fullAceTrainer1 from '../../assets/regions/Unova/Trainer Full Sprites/Ace Trainer 1.webp'
@@ -434,6 +440,12 @@ const TRAINER_FULL_SPRITES = {
   'Skyla':   fullSkyla,
   'Brycen':  fullBrycen,
   'Drayden': fullDrayden,
+  // Elite Four + Champion (Character Full Sprites, already imported above)
+  'Shauntal': Shauntal1,
+  'Grimsley': Grimsley1,
+  'Caitlin':  Caitlin1,
+  'Marshal':  Marshal,
+  'Alder':    Alder,
 }
 
 // --- Trainer overworld sprites ---
@@ -582,6 +594,15 @@ export const unovaConfig = {
   characters: CHARACTERS,
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
+  // Elite Four stage — a linear gauntlet after the 8th gym; beating the
+  // champion wins the run. Teams live in ELITE_FOUR_TEAMS (enemyTeams.js).
+  eliteFour: [
+    { name: 'Shauntal', type: 'ghost',    sprite: owShauntal, fullSprite: Shauntal1 },
+    { name: 'Grimsley', type: 'dark',     sprite: owGrimsley, fullSprite: Grimsley1 },
+    { name: 'Caitlin',  type: 'psychic',  sprite: owCaitlin,  fullSprite: Caitlin1 },
+    { name: 'Marshal',  type: 'fighting', sprite: owMarshal,  fullSprite: Marshal },
+    { name: 'Alder',    type: 'champion', sprite: owAlder,    fullSprite: Alder, champion: true },
+  ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     generate: (starter) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Chili') : MAP_BOSSES[i]

@@ -5,9 +5,10 @@ import MainMenu from './components/MainMenu'
 import RegionSelect from './components/RegionSelect'
 import StarterSelect from './components/StarterSelect'
 import NodeMap from './components/NodeMap'
+import EliteFour from './components/EliteFour'
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
-import { TRAINER_POKEMON_POOLS, BOSS_TEAMS } from './game/enemyTeams.js'
+import { TRAINER_POKEMON_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS } from './game/enemyTeams.js'
 import { supabase } from './lib/supabase.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
@@ -178,7 +179,7 @@ export default function App() {
           onSelectRegion={region => {
             setSelectedRegion(region)
             const config = getRegionConfig(region.name)
-            if (config) prewarmCache(config, TRAINER_POKEMON_POOLS, BOSS_TEAMS)
+            if (config) prewarmCache(config, TRAINER_POKEMON_POOLS, { ...BOSS_TEAMS, ...ELITE_FOUR_TEAMS })
             setScreen('starter')
           }}
           pokedexOpen={pokedexOpen}
@@ -210,12 +211,29 @@ export default function App() {
           onBack={resetRun}
           onRestart={restartRun}
           onAdvanceMap={advanceMap}
+          onEnterEliteFour={() => setScreen('elitefour')}
           onPokemonCaught={handlePokemonCaught}
           onSpeciesOwned={recordSpeciesOwned}
           onSpeciesSeen={recordSpeciesSeen}
           caughtSet={caughtSet}
           onMapCleared={handleMapCleared}
           onRunEnd={recordRunEnd}
+          pokedexOpen={pokedexOpen}
+          setPokedexOpen={setPokedexOpen}
+        />
+      )}
+      {screen === 'elitefour' && (
+        <EliteFour
+          region={selectedRegion}
+          character={selectedCharacter}
+          roster={roster}
+          setRoster={setRoster}
+          onBack={resetRun}
+          onRestart={restartRun}
+          onMapCleared={handleMapCleared}
+          onRunEnd={recordRunEnd}
+          onSpeciesSeen={recordSpeciesSeen}
+          onSpeciesOwned={recordSpeciesOwned}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />

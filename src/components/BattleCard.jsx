@@ -8,6 +8,7 @@ import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { itemIconUrl } from '../game/items.js'
 import MoveAnimation from './MoveAnimation.jsx'
+import Roster from './Roster.jsx'
 import battleGrass from '../assets/battleGrass.png'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 import { TYPE_COLORS } from '../game/types.js'
@@ -44,6 +45,9 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     : `${node.trainer} wants to battle!`
 
   const [phase, setPhase] = useState(isBoss || isMasterBall ? 'prep' : 'battle')
+  // Local copy of the roster so the prep screen can drag-reorder it before
+  // Fight. Regular battles skip prep, so there it stays identical to the prop.
+  const [battleRoster, setBattleRoster] = useState(playerRoster)
   const [logIndex, setLogIndex] = useState(-1)
   const [battleResult, setBattleResult] = useState(null)
   const [projectile, setProjectile] = useState(null)
@@ -54,9 +58,9 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const [celebrate, setCelebrate] = useState(false) // victory: heal + level popup on player roster
   const [itemFx, setItemFx] = useState(null) // { side, label, color } — held-item heal/recoil popup
 
-  const [playerHp, setPlayerHp] = useState(() => playerRoster.map(p => p.stats.hp))
+  const [playerHp, setPlayerHp] = useState(() => battleRoster.map(p => p.stats.hp))
   const [enemyHp, setEnemyHp] = useState(() => enemyTeam.map(p => p.stats.hp))
-  const [playerFainted, setPlayerFainted] = useState(() => playerRoster.map(p => !!p.fainted))
+  const [playerFainted, setPlayerFainted] = useState(() => battleRoster.map(p => !!p.fainted))
   const [enemyFainted, setEnemyFainted] = useState(() => enemyTeam.map(p => !!p.fainted))
   // Start the active pointer on the first living Pokémon, not slot 0 — the
   // roster can carry Pokémon that fainted in a previous battle. The sim
@@ -64,7 +68,26 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // match, otherwise a fainted lead shows on-screen while a different slot's HP
   // actually changes.
   const firstAlive = arr => { const i = arr.findIndex(p => !p.fainted); return i === -1 ? 0 : i }
-  const [activePlayer, setActivePlayer] = useState(() => firstAlive(playerRoster))
+  const [activePlayer, setActivePlayer] = useState(() => firstAlive(battleRoster))
+
+  // Prep-screen reorder: swap the roster and its parallel battle-state arrays
+  // together so HP bars stay aligned with the Pokémon they belong to.
+  function swapRosterSlots(a, b) {
+    const swap = arr => { const n = [...arr]; [n[a], n[b]] = [n[b], n[a]]; return n }
+    setBattleRoster(swap)
+    setPlayerHp(swap)
+    setPlayerFainted(swap)
+  }
+
+  // The playerHp/playerFainted/activePlayer initializers captured the
+  // mount-time order, so re-seed them from the (possibly reordered) roster
+  // before the sim runs.
+  function startBattle() {
+    setPlayerHp(battleRoster.map(p => p.stats.hp))
+    setPlayerFainted(battleRoster.map(p => !!p.fainted))
+    setActivePlayer(firstAlive(battleRoster))
+    setPhase('battle')
+  }
   const [activeEnemy, setActiveEnemy] = useState(() => firstAlive(enemyTeam))
 
   const timerRef = useRef(null)
@@ -81,7 +104,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 
   useEffect(() => {
     if (phase !== 'battle') return
-    const result = simulateBattle(playerRoster, enemyTeam, damageMultiplier)
+    const result = simulateBattle(battleRoster, enemyTeam, damageMultiplier)
     battleLogRef.current = result
     setLogIndex(0)
   }, [phase])
@@ -203,9 +226,9 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     } else {
       setPlayerFainted(prev => { const n = [...prev]; n[index] = true; return n })
       setActivePlayer(prev => {
-        const fwd = playerRoster.findIndex((_, i) => i > index && !playerFainted[i])
+        const fwd = battleRoster.findIndex((_, i) => i > index && !playerFainted[i])
         if (fwd !== -1) return fwd
-        const any = playerRoster.findIndex((_, i) => !playerFainted[i] && i !== index)
+        const any = battleRoster.findIndex((_, i) => !playerFainted[i] && i !== index)
         return any !== -1 ? any : prev
       })
     }
@@ -225,7 +248,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       setCelebrate(true)
       setPlayerHp(prev => prev.map((hp, i) =>
         playerFainted[i] ? hp
-          : Math.min(playerRoster[i].stats.maxHp, hp + Math.round(playerRoster[i].stats.maxHp * 0.05))
+          : Math.min(battleRoster[i].stats.maxHp, hp + Math.round(battleRoster[i].stats.maxHp * 0.05))
       ))
     }
     // On a loss (all player Pokémon fainted), record the run end immediately —
@@ -262,8 +285,14 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
             {prepLabel}
           </span>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor }}>
+            Drag to reorder your roster before the fight
+          </span>
+          <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflowX: 'auto' }}>
+            <Roster roster={battleRoster} horizontal onSwap={swapRosterSlots} />
+          </div>
           <button
-            onClick={() => setPhase('battle')}
+            onClick={startBattle}
             style={{
               fontFamily: 'Upheaval', fontSize: '11px', color: '#fff',
               border: borderStyle, backgroundColor: '#dc2626',
@@ -324,7 +353,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 
   const playerColumnProps = {
     characterSprite: character?.sprite, characterName: character?.name,
-    roster: playerRoster, hpArr: playerHp, faintedArr: playerFainted,
+    roster: battleRoster, hpArr: playerHp, faintedArr: playerFainted,
     activeIndex: activePlayer, hurtActive: hurtSide === 'player',
     phase, dark, textColor, mutedColor, mobile: !isDesktop,
     borderStyle, label: 'You',
@@ -465,7 +494,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             side="left"
             trainerSprite={character?.sprite}
             trainerName={character?.name}
-            roster={playerRoster}
+            roster={battleRoster}
             hpArr={playerHp}
             faintedArr={playerFainted}
             activeIndex={activePlayer}
@@ -560,8 +589,8 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             display: 'flex', flexDirection: 'column', alignItems: 'center',
           }}>
             <DesktopInfoCard
-              name={playerRoster[activePlayer]?.name} level={playerRoster[activePlayer]?.level}
-              hp={playerHp[activePlayer]} maxHp={playerRoster[activePlayer]?.stats.maxHp}
+              name={battleRoster[activePlayer]?.name} level={battleRoster[activePlayer]?.level}
+              hp={playerHp[activePlayer]} maxHp={battleRoster[activePlayer]?.stats.maxHp}
               fainted={playerFainted[activePlayer]}
               resetKey={activePlayer}
             />
@@ -590,8 +619,8 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 }}
               >
                 <img
-                  src={playerRoster[activePlayer]?.spriteBack ?? playerRoster[activePlayer]?.sprite}
-                  alt={playerRoster[activePlayer]?.name}
+                  src={battleRoster[activePlayer]?.spriteBack ?? battleRoster[activePlayer]?.sprite}
+                  alt={battleRoster[activePlayer]?.name}
                   style={{
                     width: '213px', height: '213px', imageRendering: 'pixelated', display: 'block',
                     filter: playerFainted[activePlayer] ? 'grayscale(1) opacity(0.3)' : 'none',
@@ -600,7 +629,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 />
                 {/* Red hit flash — red silhouette overlay of the same sprite */}
                 <motion.img
-                  src={playerRoster[activePlayer]?.spriteBack ?? playerRoster[activePlayer]?.sprite}
+                  src={battleRoster[activePlayer]?.spriteBack ?? battleRoster[activePlayer]?.sprite}
                   alt=""
                   initial={false}
                   animate={{ opacity: hurtSide === 'player' ? [0, 0.55, 0] : 0 }}
@@ -660,8 +689,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
               <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
                 {prepLabel}
               </span>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#ccc' }}>
+                Drag to reorder your roster before the fight
+              </span>
+              <Roster roster={battleRoster} horizontal onSwap={swapRosterSlots} />
               <button
-                onClick={() => setPhase('battle')}
+                onClick={startBattle}
                 style={{
                   fontFamily: 'Upheaval', fontSize: '13px', color: '#fff',
                   border: '2px solid #fff', backgroundColor: '#dc2626',

@@ -10,7 +10,7 @@ import PowerUpgradeNode from './PowerUpgradeNode'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, levelUp, checkEvolution } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES, mapLevelRange, pickLevel } from '../game/enemyTeams.js'
 
@@ -220,7 +220,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onPokemonCaught, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
@@ -409,31 +409,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const levelsGained = node.type === NODE_TYPES.GRASS ? 1 : 2
 
     if (won) {
-      let updatedRoster = roster.map((p, i) => {
-        const fp = finalPlayerTeam[i]
-        if (!fp._base) return fp
-        return levelUp(fp, fp._base, levelsGained)
-      })
-      // Victory heal: every surviving Pokémon recovers 5% of max HP (capped).
-      updatedRoster = updatedRoster.map(p =>
-        p.fainted ? p
-          : { ...p, stats: { ...p.stats, hp: Math.min(p.stats.maxHp, p.stats.hp + Math.round(p.stats.maxHp * 0.05)) } }
-      )
-      if (isBoss) {
-        updatedRoster = updatedRoster.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } }))
-      }
-
-      const notices = []
-      updatedRoster = await Promise.all(updatedRoster.map(async p => {
-        const evolved = await checkEvolution(p, p.level)
-        if (evolved) {
-          notices.push({ from: p.name, to: evolved.name })
-          // The evolved form is a new owned species for the Pokédex.
-          onSpeciesOwned?.(evolved.pokeId)
-          return evolved
-        }
-        return p
-      }))
+      const { roster: updatedRoster, evolutionNotices: notices } =
+        await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss })
+      // Each evolved form is a new owned species for the Pokédex.
+      notices.forEach(n => onSpeciesOwned?.(n.pokeId))
 
       setRoster(updatedRoster)
       if (notices.length > 0) setEvolutionNotices(notices)
@@ -446,6 +425,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       } else if (isBoss && config.maps[mapIndex + 1]) {
         onMapCleared?.()
         onAdvanceMap()
+      } else if (isBoss && config.eliteFour) {
+        // Final gym beaten — the run continues into the Elite Four stage
+        // (roster is already full-healed by the boss win above).
+        onMapCleared?.()
+        onEnterEliteFour?.()
       } else if (isBoss) {
         onMapCleared?.()
         onRunEnd?.('win')
@@ -456,7 +440,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setCurrentNode(node.id)
       }
     } else {
-      setRoster(prev => prev.map((p, i) => ({ ...p, ...finalPlayerTeam[i] })))
+      // Adopt the sim's final team wholesale — it's in battle order, which may
+      // have been reordered on the prep screen; merging by index against the
+      // old order would put HP/fainted on the wrong Pokémon.
+      setRoster(finalPlayerTeam.map(fp => ({ ...fp })))
       onRunEnd?.('loss')
       setPendingBattle(null)
     }
@@ -541,11 +528,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     background: mapConfig.background,
   }
 
-  // Skip directly to the next map (mirrors the boss-clear advance), only when a
-  // next map exists.
+  // Skip directly to the next map (mirrors the boss-clear advance). On the
+  // last map, skip into the Elite Four stage when the region has one.
   const handleSkipMap = config.maps[mapIndex + 1]
     ? () => { onMapCleared?.(); onAdvanceMap() }
-    : null
+    : config.eliteFour
+      ? () => { onMapCleared?.(); onEnterEliteFour?.() }
+      : null
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>

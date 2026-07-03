@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { getRegionConfig } from '../game/regionRegistry'
 import Layout from './Layout'
 import KantoMap from '../assets/regions/KantoMap.png'
 import JohtoMap from '../assets/regions/JohtoMap.png'
@@ -27,7 +28,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
   const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
 
   const RegionCard = ({ region }) => {
-    const isHovered = hovered === region.name
+    // A region is playable only if its config has authored maps — the others
+    // would crash at config.maps[0] when a run starts.
+    const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
+    const isHovered = available && hovered === region.name
     if (isDesktop) {
       const cardH = 'min(60vh, 460px)'
       const textColor = cards ? '#DBDBDB' : '#333333'
@@ -36,8 +40,8 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', flexShrink: 0 }}>
           {/* Card */}
           <button
-            onClick={() => onSelectRegion(region)}
-            className="relative overflow-hidden active:scale-95"
+            onClick={available ? () => onSelectRegion(region) : undefined}
+            className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
             style={{
               height: cardH,
               aspectRatio: '9 / 21',
@@ -47,6 +51,7 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
                 : (cards ? '-7px 10px 0 0 #000000' : '-4px 6px 0 0 #666666'),
               transform: isHovered ? 'scale(1.03) translateY(-4px)' : 'scale(1)',
               transition: 'transform 0.15s, box-shadow 0.15s',
+              cursor: available ? 'pointer' : 'default',
             }}
             onMouseEnter={() => setHovered(region.name)}
             onMouseLeave={() => setHovered(null)}
@@ -59,7 +64,9 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
                 position: 'absolute', inset: 0,
                 width: '100%', height: '100%',
                 objectFit: 'cover',
-                filter: isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.75)',
+                filter: !available
+                  ? 'blur(.75px) grayscale(0.6) brightness(0.5)'
+                  : isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.75)',
                 transform: 'scale(1.05)',
                 transition: 'filter 0.2s',
               }}
@@ -95,6 +102,17 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
                 {region.gen}
               </span>
             </div>
+            {!available && (
+              <div style={{
+                position: 'absolute', top: '50%', left: 0, right: 0, transform: 'translateY(-50%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '6px 0', backgroundColor: 'rgba(0,0,0,0.75)',
+              }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: '#facc15', letterSpacing: '1px' }}>
+                  COMING SOON
+                </span>
+              </div>
+            )}
           </button>
           {/* Stats below card */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -112,9 +130,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
     return (
       <button
         key={region.name}
-        onClick={() => onSelectRegion(region)}
-        className="relative overflow-hidden active:scale-95"
+        onClick={available ? () => onSelectRegion(region) : undefined}
+        className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
         style={{
+          cursor: available ? 'pointer' : 'default',
           width: '320px', height: '100px',
           border: cards ? '3px solid #000000' : borderStyle,
           boxShadow: isHovered
@@ -133,7 +152,9 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             position: 'absolute', inset: 0,
             width: '100%', height: '100%',
             objectFit: 'cover',
-            filter: isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.85)',
+            filter: !available
+              ? 'blur(.75px) grayscale(0.6) brightness(0.5)'
+              : isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.85)',
             transform: 'scale(1.05)',
             transition: 'filter 0.2s',
           }}
@@ -151,6 +172,11 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ paddingLeft: '52px', paddingRight: '110px' }}>
           <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: '#fff', textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>{region.name}</span>
           <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#fff', textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>{region.gen}</span>
+          {!available && (
+            <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#facc15', letterSpacing: '1px', textShadow: '0 2px 15px rgba(0,0,0,0.9)' }}>
+              COMING SOON
+            </span>
+          )}
         </div>
         <div className="absolute top-0 right-0 h-full flex flex-col items-start justify-around py-2 px-2" style={{ width: '110px', backgroundColor: 'hsla(0,0%,0%,0.58)' }}>
           {['Attempts:', 'Successful Runs:', 'Pokemon Caught:', 'Shiny Caught:'].map(label => (
