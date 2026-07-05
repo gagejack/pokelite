@@ -8,7 +8,6 @@ import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { itemIconUrl } from '../game/items.js'
 import MoveAnimation from './MoveAnimation.jsx'
-import Roster from './Roster.jsx'
 import battleGrass from '../assets/battleGrass.png'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 import { TYPE_COLORS } from '../game/types.js'
@@ -285,12 +284,6 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
             {prepLabel}
           </span>
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor }}>
-            Drag to reorder your roster before the fight
-          </span>
-          <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100%', overflowX: 'auto' }}>
-            <Roster roster={battleRoster} horizontal onSwap={swapRosterSlots} />
-          </div>
           <button
             onClick={startBattle}
             style={{
@@ -359,6 +352,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     borderStyle, label: 'You',
     flashText: flashText?.side === 'player' ? flashText.text : null,
     activeSpriteRef: playerActiveRef,
+    onSwap: swapRosterSlots,
   }
   const enemyColumnProps = {
     characterSprite: trainerSprite, characterName: node.trainer,
@@ -489,7 +483,8 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
         {/* All content over background */}
         <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
 
-          {/* LEFT EDGE: player character card + roster panel */}
+          {/* LEFT EDGE: player character card + roster panel.
+              Rows are drag-reorderable during the prep phase. */}
           <RosterColumn
             side="left"
             trainerSprite={character?.sprite}
@@ -501,6 +496,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             phase={phase}
             celebrate={celebrate}
             levelsGained={levelsGained}
+            onSwap={swapRosterSlots}
           />
 
           {/* RIGHT EDGE: enemy trainer card + roster panel */}
@@ -679,20 +675,16 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             )}
           </AnimatePresence>
 
-          {/* Prep overlay */}
+          {/* Prep overlay — just the Fight button; the player's roster on the
+              left edge is drag-reorderable during this phase. */}
           {phase === 'prep' && (
             <div style={{
               position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-              backgroundColor: 'rgba(0,0,0,0.55)', padding: '10px 20px',
             }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff', textShadow: '1px 1px 0 #000' }}>
                 {prepLabel}
               </span>
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#ccc' }}>
-                Drag to reorder your roster before the fight
-              </span>
-              <Roster roster={battleRoster} horizontal onSwap={swapRosterSlots} />
               <button
                 onClick={startBattle}
                 style={{
@@ -921,9 +913,36 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
 }
 
 // A vertical edge column: trainer/character card on top, roster panel below.
-function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, faintedArr, activeIndex, phase, celebrate = false, levelsGained = 0 }) {
+function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, faintedArr, activeIndex, phase, celebrate = false, levelsGained = 0, onSwap }) {
   const mirrored = side === 'right'
   const cardSurface = '#212121'
+  // The player's roster can be drag-reordered during the prep phase.
+  const reorderable = !!onSwap && phase === 'prep'
+  const [dragFrom, setDragFrom] = useState(null)
+  const [dragOver, setDragOver] = useState(null)
+  const touchFrom = useRef(null)
+
+  const slotFromPoint = (clientX, clientY) => {
+    const el = document.elementFromPoint(clientX, clientY)?.closest('[data-battle-slot]')
+    return el ? parseInt(el.dataset.battleSlot, 10) : null
+  }
+  const dragProps = i => reorderable ? {
+    'data-battle-slot': i,
+    draggable: true,
+    onDragStart: () => setDragFrom(i),
+    onDragEnter: () => setDragOver(i),
+    onDragOver: e => e.preventDefault(),
+    onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
+    onDragEnd: () => { setDragFrom(null); setDragOver(null) },
+    onTouchStart: () => { touchFrom.current = i; setDragFrom(i) },
+    onTouchMove: e => { e.preventDefault(); const t = e.touches[0]; setDragOver(slotFromPoint(t.clientX, t.clientY)) },
+    onTouchEnd: e => {
+      const t = e.changedTouches[0]; const to = slotFromPoint(t.clientX, t.clientY)
+      if (touchFrom.current !== null && to !== null && touchFrom.current !== to) onSwap(touchFrom.current, to)
+      touchFrom.current = null; setDragFrom(null); setDragOver(null)
+    },
+  } : {}
+
   return (
     <div style={{
       position: 'absolute', top: 0, bottom: 0,
@@ -956,23 +975,60 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
         padding: '4px',
       }}>
         {roster.map((p, i) => (
-          <RosterRow
+          <div
             key={i}
-            pokemon={p}
-            hp={hpArr[i]}
-            fainted={faintedArr[i]}
-            active={i === activeIndex && phase === 'battle'}
-            mirrored={mirrored}
-            celebrate={celebrate && !faintedArr[i]}
-            levelsGained={levelsGained}
-          />
+            {...dragProps(i)}
+            style={reorderable ? {
+              cursor: 'grab',
+              opacity: dragFrom === i ? 0.4 : 1,
+              outline: dragOver === i && dragFrom !== i ? '2px dashed #facc15' : 'none',
+              borderRadius: '2px',
+            } : undefined}
+          >
+            <RosterRow
+              pokemon={p}
+              hp={hpArr[i]}
+              fainted={faintedArr[i]}
+              active={i === activeIndex && phase === 'battle'}
+              mirrored={mirrored}
+              celebrate={celebrate && !faintedArr[i]}
+              levelsGained={levelsGained}
+            />
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedArr, activeIndex, hurtActive, phase, dark, textColor, mutedColor, mobile, borderStyle, label, spriteSize = 60, spriteH = 84, flashText, activeSpriteRef }) {
+function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedArr, activeIndex, hurtActive, phase, dark, textColor, mutedColor, mobile, borderStyle, label, spriteSize = 60, spriteH = 84, flashText, activeSpriteRef, onSwap }) {
+  // The player's roster can be drag-reordered during the prep phase.
+  const reorderable = !!onSwap && phase === 'prep'
+  const [dragFrom, setDragFrom] = useState(null)
+  const [dragOver, setDragOver] = useState(null)
+  const touchFrom = useRef(null)
+
+  const slotFromPoint = (clientX, clientY) => {
+    const el = document.elementFromPoint(clientX, clientY)?.closest('[data-battle-slot]')
+    return el ? parseInt(el.dataset.battleSlot, 10) : null
+  }
+  const dragProps = i => reorderable ? {
+    'data-battle-slot': i,
+    draggable: true,
+    onDragStart: () => setDragFrom(i),
+    onDragEnter: () => setDragOver(i),
+    onDragOver: e => e.preventDefault(),
+    onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
+    onDragEnd: () => { setDragFrom(null); setDragOver(null) },
+    onTouchStart: () => { touchFrom.current = i; setDragFrom(i) },
+    onTouchMove: e => { e.preventDefault(); const t = e.touches[0]; setDragOver(slotFromPoint(t.clientX, t.clientY)) },
+    onTouchEnd: e => {
+      const t = e.changedTouches[0]; const to = slotFromPoint(t.clientX, t.clientY)
+      if (touchFrom.current !== null && to !== null && touchFrom.current !== to) onSwap(touchFrom.current, to)
+      touchFrom.current = null; setDragFrom(null); setDragOver(null)
+    },
+  } : {}
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{
@@ -988,12 +1044,23 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
       </div>
       <div style={{ flex: 1, width: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px' }}>
         {roster.map((p, i) => (
-          <RosterSlot key={i} pokemon={p} hp={hpArr[i]} fainted={faintedArr[i]}
-            active={i === activeIndex && phase === 'battle'}
-            attacking={i === activeIndex && hurtActive}
-            dark={dark} textColor={textColor} mutedColor={mutedColor} mobile={mobile}
-            flashText={i === activeIndex ? flashText : null}
-            spriteRef={i === activeIndex ? activeSpriteRef : null} />
+          <div
+            key={i}
+            {...dragProps(i)}
+            style={reorderable ? {
+              cursor: 'grab',
+              opacity: dragFrom === i ? 0.4 : 1,
+              outline: dragOver === i && dragFrom !== i ? '2px dashed #facc15' : 'none',
+              borderRadius: '2px',
+            } : undefined}
+          >
+            <RosterSlot pokemon={p} hp={hpArr[i]} fainted={faintedArr[i]}
+              active={i === activeIndex && phase === 'battle'}
+              attacking={i === activeIndex && hurtActive}
+              dark={dark} textColor={textColor} mutedColor={mutedColor} mobile={mobile}
+              flashText={i === activeIndex ? flashText : null}
+              spriteRef={i === activeIndex ? activeSpriteRef : null} />
+          </div>
         ))}
       </div>
     </div>

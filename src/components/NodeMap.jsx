@@ -12,6 +12,7 @@ import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
+import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES, mapLevelRange, pickLevel } from '../game/enemyTeams.js'
 
 let isTouchDevice = false
@@ -208,7 +209,24 @@ function MapSvg({
               }}>
                 <div style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize' }}>{title}</div>
                 {Array.isArray(sub)
-                  ? sub.map((line, i) => <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', lineHeight: '1.4' }}>{line}</div>)
+                  ? sub.map((line, i) => typeof line === 'object'
+                    // Boss Pokémon: type chip to the left of the name + level.
+                    ? (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', lineHeight: '1.4' }}>
+                        <span style={{
+                          fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                          backgroundColor: TYPE_COLORS[line.type] ?? '#888',
+                          padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
+                        }}>
+                          {line.type ?? '?'}
+                        </span>
+                        <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', textTransform: 'capitalize' }}>
+                          {line.name} lv.{line.level}
+                        </span>
+                      </div>
+                    )
+                    : <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', lineHeight: '1.4' }}>{line}</div>
+                  )
                   : <div style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', marginTop: '1px' }}>{sub}</div>
                 }
               </div>
@@ -497,7 +515,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     }
     if (node.type === NODE_TYPES.BOSS) {
       const team = BOSS_TEAMS[node.trainer] ?? []
-      const sub = team.map(p => `${POKEMON_NAMES[p.id] ?? '???'} lv.${p.level}`)
+      // Object lines carry the type so the tooltip can show a colored type chip
+      // to the left of each Pokémon's name.
+      const sub = team.map(p => ({
+        type: POKEMON_TYPES[p.id] ?? null,
+        name: POKEMON_NAMES[p.id] ?? '???',
+        level: p.level,
+      }))
       return { title: node.trainer ?? 'Gym Leader', sub }
     }
     switch (node.type) {

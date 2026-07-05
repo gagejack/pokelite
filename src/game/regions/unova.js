@@ -3,12 +3,6 @@ import { buildRows, NODE_TYPES } from '../nodeMap.js'
 // --- Assets ---
 import routeBg1 from '../../assets/regions/Unova/MapAssets/Map1.png'
 import routeBg2 from '../../assets/regions/Unova/MapAssets/Map2.png'
-import routeBg3 from '../../assets/regions/Unova/MapAssets/Route4.png'
-import routeBg4 from '../../assets/regions/Unova/MapAssets/Route6.png'
-import routeBg5 from '../../assets/regions/Unova/MapAssets/Route7.png'
-import routeBg6 from '../../assets/regions/Unova/MapAssets/Route8.png'
-import routeBg7 from '../../assets/regions/Unova/MapAssets/Route9.png'
-import routeBg8 from '../../assets/regions/Unova/MapAssets/Route16.png'
 import grassIcon from '../../assets/regions/Unova/MapAssets/BW_Dark_Grass_Sp.png'
 
 // Trainer overworld sprites
@@ -583,7 +577,9 @@ const MAP_EDGES = [
   [20, 22], [21, 22],
 ]
 
-const MAP_BACKGROUNDS = [routeBg1, routeBg2, routeBg3, routeBg4, routeBg5, routeBg6, routeBg7, routeBg8]
+// Maps 1–2 have their own art; maps 3–8 reuse Map1/Map2 alternately as
+// placeholders until per-map backgrounds are authored.
+const MAP_BACKGROUNDS = [routeBg1, routeBg2, routeBg1, routeBg2, routeBg1, routeBg2, routeBg1, routeBg2]
 
 // --- Region config ---
 export const unovaConfig = {

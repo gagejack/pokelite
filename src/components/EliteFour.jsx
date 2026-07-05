@@ -110,12 +110,20 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
             transition: 'opacity 0.2s',
           }}
         >
-          <img
-            src={member.sprite}
-            alt={member.name}
+          {/* Overworld sprites are 3-col × 4-row walk sheets of 32×32 frames —
+              crop to the top-left (front-facing, first frame). The box stays
+              square so the frame keeps its native aspect ratio. */}
+          <div
+            role="img"
+            aria-label={member.name}
             style={{
-              width: '56px', height: '56px', objectFit: 'contain', imageRendering: 'pixelated',
-              filter: beaten ? 'grayscale(1)' : locked ? 'brightness(0.5)' : 'none', flexShrink: 0,
+              width: '56px', height: '56px', flexShrink: 0,
+              backgroundImage: `url(${member.sprite})`,
+              backgroundSize: '300% 400%',
+              backgroundPosition: 'top left',
+              backgroundRepeat: 'no-repeat',
+              imageRendering: 'pixelated',
+              filter: beaten ? 'grayscale(1)' : locked ? 'brightness(0.5)' : 'none',
             }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px', minWidth: 0 }}>
