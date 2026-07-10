@@ -736,10 +736,26 @@ Each item has a `weight` out of 1000. The displayed rarity % = `weight / 10`.
 | Rocky Helmet | Deals 1/3 HP damage to attackers on contact | 80 | 8% |
 | Life Orb | +30% damage on all moves | 30 | 3% |
 | Focus Sash | Survive any KO hit at full HP | 10 | 1% |
+| Muscle Band | +20% damage on physical moves | 130 | 13% |
+| Wise Glasses | +20% damage on special moves | 130 | 13% |
+| Assault Vest | Takes 33% less special damage | 110 | 11% |
+| Sitrus Berry | Heals 25% HP once when it drops below 50% | 110 | 11% |
+| King's Rock | 20% of hits deal +30% damage | 100 | 10% |
+| Light Clay | Takes 20% less physical damage | 100 | 10% |
+| Bright Powder | 15% chance an incoming hit is halved | 90 | 9% |
+| Black Sludge | Restores 12% max HP each turn | 90 | 9% |
+| Big Root | All HP recovery is 50% stronger | 80 | 8% |
+| Razor Claw | +60% crit rate | 80 | 8% |
+| Iron Ball | +35% damage dealt, but −40% Speed | 60 | 6% |
+| Cell Battery | +30% damage after it is first hit | 55 | 5.5% |
+| Eviolite | Takes 33% less damage from all moves | 50 | 5% |
+| Weakness Policy | +50% damage after a super-effective hit | 45 | 4.5% |
 
 ### **Effects (implemented)**
 
-All 9 effects are **live in battle** (`src/game/battle.js`). Player-held only for now, though the engine reads whichever side holds the item, so enemy/boss items are enablable later.
+All 23 effects are **live in battle** (`src/game/battle.js`). Player-held only for now, though the engine reads whichever side holds the item, so enemy/boss items are enablable later.
+
+Original 9:
 
 * **Expert Belt** — ×1.2 damage dealt
 * **Life Orb** — ×1.3 damage dealt (stacks with Expert Belt)
@@ -751,7 +767,24 @@ All 9 effects are **live in battle** (`src/game/battle.js`). Player-held only fo
 * **Leftovers** — heals 10% max HP at the end of each round
 * **Focus Sash** — if at full HP and would be KO'd, survive at 1 HP (every time)
 
-Non-attack effects (Shell Bell / Rocky Helmet / Leftovers / Focus Sash) show floating popups in the battle UI (green heal, red recoil, "Hung on!" for Focus Sash).
+Added 14:
+
+* **Muscle Band** — ×1.2 damage on **physical** moves only
+* **Wise Glasses** — ×1.2 damage on **special** moves only
+* **Assault Vest** — holder's Sp. Def ×1.5 (takes ~33% less special damage)
+* **Eviolite** — holder's Def and Sp. Def ×1.5 (takes ~33% less from all moves)
+* **Light Clay** — holder's Def ×1.25 (takes 20% less physical damage)
+* **Razor Claw** — crit chance ×1.6
+* **King's Rock** — 20% of the holder's hits deal ×1.3 damage
+* **Bright Powder** — 15% of incoming hits deal ×0.5 damage
+* **Iron Ball** — ×1.35 damage dealt, effective Speed ×0.6 (turn order)
+* **Big Root** — all HP recovery the holder receives ×1.5 (Leftovers / Shell Bell / Black Sludge / Sitrus)
+* **Black Sludge** — heals 12% max HP at the end of each round
+* **Sitrus Berry** — once per battle, heals 25% max HP the first time the holder drops below 50% HP
+* **Weakness Policy** — after taking a super-effective hit, ×1.5 damage for the rest of the battle
+* **Cell Battery** — the first time the holder is hit, ×1.3 damage for the rest of the battle
+
+Non-attack effects that recover or preserve HP (Shell Bell / Rocky Helmet / Leftovers / Focus Sash / Sitrus Berry / Black Sludge) show floating popups in the battle UI (green heal, red recoil, "Hung on!" for Focus Sash). The stateful bonuses (Weakness Policy / Cell Battery) use per-battle flags on the cloned combatants, so they never persist to the roster.
 
 ## **Unova**
 

@@ -7,13 +7,15 @@ import BattleCard from './BattleCard'
 import PokeballNode from './PokeballNode'
 import ItemNode from './ItemNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
+import EvolutionNotice from './EvolutionNotice'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
-import { buildTrainerTeamSpec, pickTrainerCount, BOSS_TEAMS, TRAINER_POKEMON_POOLS, POKEMON_TYPES, POKEMON_NAMES, mapLevelRange, pickLevel } from '../game/enemyTeams.js'
+import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
+import { swapInRoster } from '../game/roster.js'
 
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
@@ -238,8 +240,11 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onRunEnd, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
+  // Item currently being placed via bag-drag or the stat-card "move" picker.
+  // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
+  const [movingItem, setMovingItem] = useState(null)
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
   const mapConfig = config.maps[mapIndex]
@@ -317,7 +322,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     let specs
     if (isBoss) {
-      specs = BOSS_TEAMS[node.trainer] ?? []
+      specs = config.bossTeams?.[node.trainer] ?? []
     } else if (isMasterBall) {
       // Master Ball: a single legendary from this map's pool, at its fixed level
       // (not position-scaled). Empty pool → no legendary (caller clears the node).
@@ -325,13 +330,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       specs = pool.length > 0 ? [pick(pool)] : []
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
-      specs = buildTrainerTeamSpec(node.trainer, count, positionWeight, mapIndex)
+      const pool = config.trainerSpeciesPools?.[Math.min(mapIndex, (config.trainerSpeciesPools?.length ?? 1) - 1)] ?? []
+      const band = mapLevelRange(config.mapLevelRanges, mapIndex)
+      specs = buildTrainerTeamSpec(pool, band, count, positionWeight)
     } else {
       // Grass: one wild Pokémon from this map's catch pool, a few levels below
-      // the map's trainers, scaled by node position.
+      // the map's trainers, scaled by node position. Grass ignores rarity —
+      // it's a forced fight, not a reward — so pick a species uniformly.
       const pool = config.catchPools?.[mapIndex] ?? []
-      const id = pool.length > 0 ? pick(pool) : 504
-      const [min, max] = mapLevelRange(mapIndex)
+      const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
       const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
       specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
     }
@@ -358,12 +366,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const positionWeight = node.id / totalNodes
     // Catch levels scale per map (same range as that map's trainers), weighted
     // by node position.
-    const level = pickLevel(mapLevelRange(mapIndex), positionWeight)
+    const level = pickLevel(mapLevelRange(config.mapLevelRanges, mapIndex), positionWeight)
 
-    const shuffled = [...pool].sort(() => Math.random() - 0.5)
-    const chosen = shuffled.slice(0, 3)
+    // Draw 3 distinct species weighted by rarity tier (common/rare/epic/legendary).
+    const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
 
-    const offered = await Promise.all(chosen.map(async (id) => {
+    const offered = await Promise.all(chosen.map(async ({ id }) => {
       const base = await fetchPokemonBase(id)
       const instance = buildPokemonInstance(base, level)
       return { ...instance, level }
@@ -508,18 +516,22 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function getNodeLabel(node) {
     if (node.type === NODE_TYPES.TRAINER) {
-      const pool = TRAINER_POKEMON_POOLS[node.trainer] ?? []
-      const types = [...new Set(pool.map(p => POKEMON_TYPES[p.id]).filter(Boolean))]
+      // Trainer teams are drawn from the map's species pool at battle time, so
+      // the exact team isn't known here — show the route's typical variety.
+      // Types come from the prewarmed base cache (see prewarmCache/cachedType).
+      const pools = config.trainerSpeciesPools ?? []
+      const pool = pools[Math.min(mapIndex, pools.length - 1)] ?? []
+      const types = [...new Set(pool.map(id => cachedType(id)).filter(Boolean))]
       const sub = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : '+2 LVL'
       return { title: node.trainer ?? 'Trainer', sub }
     }
     if (node.type === NODE_TYPES.BOSS) {
-      const team = BOSS_TEAMS[node.trainer] ?? []
+      const team = config.bossTeams?.[node.trainer] ?? []
       // Object lines carry the type so the tooltip can show a colored type chip
-      // to the left of each Pokémon's name.
+      // to the left of each Pokémon's name (type/name from the base cache).
       const sub = team.map(p => ({
-        type: POKEMON_TYPES[p.id] ?? null,
-        name: POKEMON_NAMES[p.id] ?? '???',
+        type: cachedType(p.id),
+        name: cachedName(p.id) ?? '???',
         level: p.level,
       }))
       return { title: node.trainer ?? 'Gym Leader', sub }
@@ -552,6 +564,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     background: mapConfig.background,
   }
 
+  const swapRoster = swapInRoster(setRoster)
+
+  // --- Held-item movement (bag drag + stat-card picker) ---
+  const isMovingItem = !!movingItem
+  // Resolve a pending move onto a target (a roster Pokémon or the bag).
+  function resolveItemMove(to) {
+    if (!movingItem) return
+    onMoveItem?.({ item: movingItem.item, from: movingItem.from, to })
+    setMovingItem(null)
+  }
+  const cancelItemMove = () => setMovingItem(null)
+
   // Skip directly to the next map (mirrors the boss-clear advance). On the
   // last map, skip into the Elite Four stage when the region has one.
   const handleSkipMap = config.maps[mapIndex + 1]
@@ -565,30 +589,60 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       {isDesktop ? (
         <div className="flex flex-col items-center gap-2 w-full py-4" style={{ visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px' }}>
-            <Roster roster={roster} onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })} />
+            <Roster
+              roster={roster}
+              onSwap={swapRoster}
+              itemTargeting={isMovingItem}
+              onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
+              onMoveHeldItem={(item, pokeIndex) => setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+            />
             <div style={{ width: '400px', height: '750px', display: 'flex', flexDirection: 'column' }}>
               <MapSvg {...mapSvgProps} />
             </div>
-            <div style={{
-              width: '90px',
-              border: dark ? '2px solid #121212' : '2px solid #666666',
-              boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666',
-              backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', flexShrink: 0,
-            }}>
+            {/* Bag — drag an item onto a Pokémon to equip it. During an item
+                move, the whole panel is a drop target for stowing back to bag. */}
+            <div
+              onClick={() => { if (isMovingItem) resolveItemMove({ kind: 'bag' }) }}
+              onDragOver={e => { if (isMovingItem) e.preventDefault() }}
+              onDrop={e => { if (isMovingItem) { e.preventDefault(); resolveItemMove({ kind: 'bag' }) } }}
+              style={{
+                width: '90px',
+                border: isMovingItem ? '2px solid #facc15' : (dark ? '2px solid #121212' : '2px solid #666666'),
+                boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'),
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', flexShrink: 0,
+                cursor: isMovingItem ? 'pointer' : 'default',
+              }}
+            >
               <div style={{ backgroundColor: '#facc15', padding: '3px 10px', width: '100%', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a' }}>BAG</span>
               </div>
               {bag && bag.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '4px' }}>
-                  {bag.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px' }}>
-                      <img src={itemIconUrl(item)} alt={item.name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated', flexShrink: 0 }} />
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: dark ? '#DBDBDB' : '#333', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                        {item.name}
-                      </span>
-                    </div>
-                  ))}
+                  {bag.map((item, i) => {
+                    const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+                    return (
+                      <div
+                        key={i}
+                        draggable
+                        onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
+                        onDragEnd={() => setMovingItem(null)}
+                        onClick={e => { e.stopPropagation(); setMovingItem(picked ? null : { item, from: { kind: 'bag', index: i } }) }}
+                        title={`${item.name} — drag onto a Pokémon or click to move`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px',
+                          cursor: 'grab', borderRadius: '2px',
+                          outline: picked ? '2px solid #facc15' : 'none',
+                          opacity: picked ? 0.6 : 1,
+                        }}
+                      >
+                        <img src={itemIconUrl(item)} alt={item.name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated', flexShrink: 0, pointerEvents: 'none' }} />
+                        <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: dark ? '#DBDBDB' : '#333', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', pointerEvents: 'none' }}>
+                          {item.name}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: dark ? '#555' : '#aaa', padding: '6px 4px', textAlign: 'center' }}>— empty —</span>
@@ -598,20 +652,72 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         </div>
       ) : (
         <div style={{ flex: 1, minHeight: 0, backgroundColor: dark ? '#1a1a1a' : '#c8c8c8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 0 8px' }}>
-          <Roster roster={roster} horizontal onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })} />
-          <div style={{
-            width: '360px', flexShrink: 0,
-            border: borderStyle,
-            boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
-            backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-            display: 'flex', flexDirection: 'row', alignItems: 'center',
-            padding: '4px 8px', gap: '8px', marginTop: '6px',
-          }}>
+          <Roster
+            roster={roster}
+            horizontal
+            onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })}
+            itemTargeting={isMovingItem}
+            onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
+            onMoveHeldItem={(item, pokeIndex) => setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+          />
+          {/* Bag — tap an item to pick it up, then tap a Pokémon to equip.
+              During a move, the bag row is a drop target for stowing back. */}
+          <div
+            onClick={() => { if (isMovingItem) resolveItemMove({ kind: 'bag' }) }}
+            style={{
+              width: '360px', flexShrink: 0,
+              border: isMovingItem ? '2px solid #facc15' : borderStyle,
+              boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666'),
+              backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+              display: 'flex', flexDirection: 'row', alignItems: 'center',
+              padding: '4px 8px', gap: '6px', marginTop: '6px', overflowX: 'auto',
+              cursor: isMovingItem ? 'pointer' : 'default',
+            }}
+          >
             <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#1a1a1a', backgroundColor: '#facc15', padding: '2px 6px', flexShrink: 0 }}>BAG</span>
+            {bag && bag.length > 0 ? bag.map((item, i) => {
+              const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+              return (
+                <img
+                  key={i}
+                  src={itemIconUrl(item)}
+                  alt={item.name}
+                  title={item.name}
+                  onClick={e => { e.stopPropagation(); setMovingItem(picked ? null : { item, from: { kind: 'bag', index: i } }) }}
+                  style={{
+                    width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'pointer',
+                    outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,
+                  }}
+                />
+              )
+            }) : (
+              <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: dark ? '#555' : '#aaa' }}>— empty —</span>
+            )}
           </div>
           <div style={{ width: '360px', flex: 1, minHeight: 0, marginTop: '6px', display: 'flex', flexDirection: 'column' }}>
             <MapSvg {...mapSvgProps} />
           </div>
+        </div>
+      )}
+
+      {/* Item-move targeting banner — shown while placing an item. */}
+      {isMovingItem && (
+        <div style={{
+          position: 'fixed', top: '48px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 90, display: 'flex', alignItems: 'center', gap: '10px',
+          backgroundColor: 'rgba(0,0,0,0.82)', border: '2px solid #facc15',
+          padding: '8px 14px',
+        }}>
+          <img src={itemIconUrl(movingItem.item)} alt="" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+          <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
+            Choose a Pokémon or the Bag for {movingItem.item.name}
+          </span>
+          <button
+            onClick={cancelItemMove}
+            style={{ fontFamily: 'Upheaval', fontSize: '10px', color: '#1a1a1a', backgroundColor: '#facc15', border: 'none', padding: '4px 10px', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
         </div>
       )}
 
@@ -631,33 +737,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         </div>
       )}
 
-      {evolutionNotices.length > 0 && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
-          <div style={{
-            backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-            border: dark ? '2px solid #121212' : '2px solid #666666',
-            boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666',
-            padding: '24px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
-          }}>
-            {evolutionNotices.map(({ from, to }, i) => (
-              <span key={i} style={{ fontFamily: 'Orange Kid', fontSize: '16px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize', textAlign: 'center' }}>
-                {from} evolved into {to}!
-              </span>
-            ))}
-            <button
-              onClick={() => setEvolutionNotices([])}
-              style={{
-                fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333',
-                border: dark ? '2px solid #121212' : '2px solid #666666',
-                backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
-                padding: '6px 20px', cursor: 'pointer', marginTop: '4px',
-              }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+      <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
+
 
       {pendingPokeball && (
         <PokeballNode

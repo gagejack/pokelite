@@ -11,7 +11,7 @@ export const TYPE_CHART = {
   rock:     { flying: SE, bug: SE, fire: SE, ice: SE, fighting: NV, ground: NV, steel: NV, water: NV, grass: NV },
   bug:      { grass: SE, psychic: SE, dark: SE, flying: NV, rock: NV, fire: NV, fighting: NV, ghost: NV, steel: NV, fairy: NV },
   ghost:    { ghost: SE, psychic: SE, dark: NV, normal: IM, fighting: IM },
-  steel:    { rock: SE, ice: SE, fairy: SE, fighting: NV, ground: NV, fire: NV, water: NV, electric: NV, steel: NV, flying: NV, psychic: NV, bug: NV, grass: NV, ice: NV, dragon: NV, fairy: NV, normal: NV, poison: IM },
+  steel:    { rock: SE, ice: SE, fairy: SE, steel: NV, fire: NV, water: NV, electric: NV, poison: IM },
   fire:     { bug: SE, steel: SE, grass: SE, ice: SE, rock: NV, water: NV, fire: NV, dragon: NV },
   water:    { ground: SE, rock: SE, fire: SE, grass: NV, water: NV, dragon: NV },
   grass:    { ground: SE, rock: SE, water: SE, flying: NV, poison: NV, bug: NV, fire: NV, grass: NV, steel: NV, dragon: NV },

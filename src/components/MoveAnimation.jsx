@@ -11,10 +11,7 @@ export default function MoveAnimation({ moveName, onDone, battleSpeed = 1, size 
   useEffect(() => {
     if (!anim) { onDone?.(); return }
 
-    // Play sound
-    const audio = new Audio(anim.sound)
-    audio.volume = 0.6
-    audio.play().catch(() => {})
+    // Sound effects are disabled — move animations play silently.
 
     if (anim.frameCount <= 1) {
       // Single frame: hold briefly then done

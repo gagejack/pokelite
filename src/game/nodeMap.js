@@ -65,6 +65,9 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
     Array.from({ length: width }, () => randomNode(id++, trainerPool, mapIndex))
   )
 
+  // Row 1's left node (the first fork off the start) is always a Pokéball.
+  rows[1][0] = { id: rows[1][0].id, type: NODE_TYPES.POKEBALL }
+
   // Row 7 (2 nodes) — guaranteed pokecenter among 2
   const pcIndex = Math.random() < 0.5 ? 0 : 1
   rows.push(Array.from({ length: 2 }, (_, i) =>

@@ -8,7 +8,6 @@ import NodeMap from './components/NodeMap'
 import EliteFour from './components/EliteFour'
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
-import { TRAINER_POKEMON_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS } from './game/enemyTeams.js'
 import { supabase } from './lib/supabase.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
@@ -131,6 +130,40 @@ export default function App() {
     setBag(prev => [...prev, item])
   }
 
+  // Move an already-owned item between the bag and roster Pokémon.
+  //   from: { kind: 'bag', index } | { kind: 'pokemon', pokeIndex }
+  //   to:   { kind: 'bag' }        | { kind: 'pokemon', pokeIndex }
+  // Equipping onto a Pokémon that already holds an item sends the OLD item to
+  // the bag (one-directional). Resolved in one pass so nothing is duplicated/lost.
+  function moveItem({ item, from, to }) {
+    if (!item) return
+    // No-op: dropping an item back onto the same Pokémon it came from.
+    if (from.kind === 'pokemon' && to.kind === 'pokemon' && from.pokeIndex === to.pokeIndex) return
+
+    // Compute the displaced item (target's current held item) once, up front,
+    // from current roster — so the two state updaters below stay pure. React
+    // may invoke updaters more than once (StrictMode); nesting setBag inside
+    // setRoster caused the item to be added to the bag twice (duplication bug).
+    const displaced = to.kind === 'pokemon' ? (roster[to.pokeIndex]?.heldItem ?? null) : null
+
+    // Roster: clear the source Pokémon (if any) and set the target's held item.
+    setRoster(prev => prev.map((p, i) => {
+      let next = p
+      if (from.kind === 'pokemon' && i === from.pokeIndex) next = { ...next, heldItem: null }
+      if (to.kind === 'pokemon' && i === to.pokeIndex) next = { ...next, heldItem: item }
+      return next
+    }))
+
+    // Bag: remove the source item (if it came from the bag), then add the item
+    // (if it's going to the bag) and any displaced target item.
+    setBag(prev => {
+      let next = from.kind === 'bag' ? prev.filter((_, i) => i !== from.index) : [...prev]
+      if (to.kind === 'bag') next = [...next, item]
+      if (displaced) next = [...next, displaced]
+      return next
+    })
+  }
+
   function resetRun() {
     setSelectedRegion(null)
     setSelectedCharacter(DEFAULT_CHARACTER)
@@ -179,7 +212,7 @@ export default function App() {
           onSelectRegion={region => {
             setSelectedRegion(region)
             const config = getRegionConfig(region.name)
-            if (config) prewarmCache(config, TRAINER_POKEMON_POOLS, { ...BOSS_TEAMS, ...ELITE_FOUR_TEAMS })
+            if (config) prewarmCache(config)
             setScreen('starter')
           }}
           pokedexOpen={pokedexOpen}
@@ -207,6 +240,7 @@ export default function App() {
           bag={bag}
           onItemAssign={handleItemAssign}
           onItemKeepInBag={handleItemKeepInBag}
+          onMoveItem={moveItem}
           mapIndex={mapIndex}
           onBack={resetRun}
           onRestart={restartRun}

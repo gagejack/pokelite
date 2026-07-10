@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { itemIconUrl } from '../game/items'
+import { itemIconUrl, tierColor } from '../game/items'
+import { TYPE_COLORS } from '../game/types.js'
 
 export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose }) {
   const { dark } = useTheme()
@@ -73,11 +74,24 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     alt={pokemon.name}
                     style={{ width: '40px', height: '40px', imageRendering: 'pixelated', flexShrink: 0 }}
                   />
-                  {/* Name + level */}
+                  {/* Name + type chips + level */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#ffffff', textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                      {pokemon.name}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#ffffff', textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                        {pokemon.name}
+                      </span>
+                      <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                        {pokemon.types?.map(t => (
+                          <span key={t} style={{
+                            fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                            backgroundColor: TYPE_COLORS[t] || '#888',
+                            padding: '2px 5px', textTransform: 'capitalize',
+                          }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                     <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: '#facc15' }}>
                       LVL {pokemon.level}
                     </span>
@@ -179,6 +193,8 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
         <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
           {offered.map((item, i) => {
             const isHovered = hoveredOffer === i
+            const rarity = tierColor(item)
+            const glows = item.tier !== 'common'
             return (
               <button
                 key={item.id}
@@ -187,10 +203,11 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 onMouseLeave={() => setHoveredOffer(null)}
                 style={{
                   backgroundColor: innerBg,
-                  border: isHovered ? '2px solid #ffffff' : borderStyle,
-                  boxShadow: isHovered
-                    ? '0 0 10px 2px rgba(255,255,255,0.3)'
-                    : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666'),
+                  // Border tinted by rarity; glow only for rare+ (common has none).
+                  border: `2px solid ${rarity}`,
+                  boxShadow: glows
+                    ? (isHovered ? `0 0 14px 3px ${rarity}` : `0 0 7px 1px ${rarity}`)
+                    : 'none',
                   transform: isHovered ? 'translateY(-2px)' : 'none',
                   transition: 'transform 0.1s, box-shadow 0.1s',
                   padding: 'clamp(8px, 2vw, 14px) clamp(6px, 1.5vw, 10px)',

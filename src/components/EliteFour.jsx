@@ -4,10 +4,11 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
 import BattleCard from './BattleCard'
+import EvolutionNotice from './EvolutionNotice'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory } from '../game/pokemon.js'
-import { ELITE_FOUR_TEAMS, POKEMON_NAMES } from '../game/enemyTeams.js'
+import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedName } from '../game/pokemon.js'
+import { swapInRoster } from '../game/roster.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
@@ -39,7 +40,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     const member = members[index]
     setLoadingIndex(index)
     try {
-      const specs = ELITE_FOUR_TEAMS[member.name] ?? []
+      const specs = config?.eliteFourTeams?.[member.name] ?? []
       const enemyTeam = await Promise.all(
         specs.map(async s => buildPokemonInstance(await fetchPokemonBase(s.id), s.level))
       )
@@ -89,7 +90,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     const beaten = index < defeated
     const isNext = index === defeated && !won
     const locked = index > defeated
-    const specs = ELITE_FOUR_TEAMS[member.name] ?? []
+    const specs = config?.eliteFourTeams?.[member.name] ?? []
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {index > 0 && (
@@ -140,7 +141,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
               </span>
             </div>
             <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor, textAlign: 'left', textTransform: 'capitalize', lineHeight: 1.4 }}>
-              {specs.map(s => `${POKEMON_NAMES[s.id] ?? '???'} Lv${s.level}`).join(' · ')}
+              {specs.map(s => `${cachedName(s.id) ?? '???'} Lv${s.level}`).join(' · ')}
             </span>
           </div>
           <span style={{ marginLeft: 'auto', fontFamily: 'Upheaval', fontSize: '10px', flexShrink: 0,
@@ -166,7 +167,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     </div>
   )
 
-  const swapRoster = (a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })
+  const swapRoster = swapInRoster(setRoster)
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
@@ -200,30 +201,8 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
         </div>
       )}
 
-      {evolutionNotices.length > 0 && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
-          <div style={{
-            backgroundColor: cardBg, border: borderStyle, boxShadow: shadowStyle,
-            padding: '24px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
-          }}>
-            {evolutionNotices.map(({ from, to }, i) => (
-              <span key={i} style={{ fontFamily: 'Orange Kid', fontSize: '16px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>
-                {from} evolved into {to}!
-              </span>
-            ))}
-            <button
-              onClick={() => setEvolutionNotices([])}
-              style={{
-                fontFamily: 'Upheaval', fontSize: '11px', color: textColor,
-                border: borderStyle, backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
-                padding: '6px 20px', cursor: 'pointer', marginTop: '4px',
-              }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+      <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
+
 
       {won && evolutionNotices.length === 0 && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>

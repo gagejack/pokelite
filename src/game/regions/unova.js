@@ -1,4 +1,6 @@
-import { buildRows, NODE_TYPES } from '../nodeMap.js'
+import { buildRows } from '../nodeMap.js'
+import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
+import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES } from './unova.teams.js'
 
 // --- Assets ---
 import routeBg1 from '../../assets/regions/Unova/MapAssets/Map1.png'
@@ -501,23 +503,39 @@ const STARTER_BOSS = {
 }
 
 // --- Catch pools per map ---
+// Each entry is { id, rarity }. Pokéball nodes draw 3 by rarity weight (see
+// pickCatchOffer). Pools are evolution-gated by band: early maps hold base
+// forms, late maps hold evolved forms (a species only appears where its band
+// can reach its evolution level). Every non-legendary Unova line has at least
+// one representative across the 8 maps; each species appears on only one map.
+// Rarity mirrors the item system (common/rare/epic/legendary, 60/25/10/5).
 const CATCH_POOLS = [
-  // Map 1 — Routes 1–2
-  [504, 506, 509, 519, 522, 540, 543, 551, 554, 556, 559, 562, 566, 568, 577, 580],
-  // Map 2 — Route 3
-  [522, 519, 506, 504, 531, 540, 543, 509],
-  // Map 3 — Route 4 (desert)
-  [551, 529, 559, 568, 554, 556, 543, 544],
-  // Map 4 — Route 6 (electric)
-  [587, 522, 595, 602, 580, 577, 529, 519],
-  // Map 5 — Route 7
-  [529, 551, 574, 582, 587, 577, 559, 580],
-  // Map 6 — Route 8 (flying/water)
-  [519, 580, 561, 527, 566, 581, 574, 577],
-  // Map 7 — Route 9 (ice)
-  [582, 613, 615, 614, 529, 559, 577, 574],
-  // Map 8 — Route 16 (dragon)
-  [633, 610, 621, 634, 613, 615, 582, 595],
+  // Map 1 — Routes 1–2 (base forms): patrat, lillipup, purrloin, pidove, blitzle,
+  // sewaddle, venipede, scraggy, sandile, zorua
+  [{ id: 504, rarity: 'common' }, { id: 506, rarity: 'common' }, { id: 509, rarity: 'common' }, { id: 519, rarity: 'common' }, { id: 522, rarity: 'common' }, { id: 540, rarity: 'common' }, { id: 543, rarity: 'common' }, { id: 559, rarity: 'rare' }, { id: 551, rarity: 'epic' }, { id: 570, rarity: 'legendary' }],
+  // Map 2 — Route 3: pansage, pansear, panpour, roggenrola, woobat, drilbur,
+  // timburr, tympole, cottonee, petilil, munna, audino
+  [{ id: 511, rarity: 'common' }, { id: 513, rarity: 'common' }, { id: 515, rarity: 'common' }, { id: 524, rarity: 'common' }, { id: 527, rarity: 'common' }, { id: 529, rarity: 'common' }, { id: 532, rarity: 'common' }, { id: 535, rarity: 'common' }, { id: 546, rarity: 'common' }, { id: 548, rarity: 'rare' }, { id: 517, rarity: 'epic' }, { id: 531, rarity: 'legendary' }],
+  // Map 3 — Route 4 (desert): watchog, darumaka, dwebble, yamask, trubbish,
+  // basculin, maractus, sigilyph, sawk
+  [{ id: 505, rarity: 'common' }, { id: 554, rarity: 'common' }, { id: 557, rarity: 'common' }, { id: 562, rarity: 'common' }, { id: 568, rarity: 'common' }, { id: 550, rarity: 'rare' }, { id: 556, rarity: 'rare' }, { id: 561, rarity: 'epic' }, { id: 539, rarity: 'legendary' }],
+  // Map 4 — Route 6 (electric): zebstrika, gurdurr, palpitoad, whirlipede,
+  // krokorok, excadrill, emolga, darmanitan, galvantula
+  [{ id: 523, rarity: 'common' }, { id: 533, rarity: 'common' }, { id: 536, rarity: 'common' }, { id: 544, rarity: 'common' }, { id: 552, rarity: 'common' }, { id: 530, rarity: 'rare' }, { id: 587, rarity: 'rare' }, { id: 555, rarity: 'epic' }, { id: 596, rarity: 'legendary' }],
+  // Map 5 — Route 7 (finals): leavanny, scolipede, crustle, cofagrigus, garbodor,
+  // sawsbuck, bouffalant, whimsicott, lilligant, carracosta, archeops, scrafty,
+  // amoonguss, throh
+  [{ id: 542, rarity: 'common' }, { id: 545, rarity: 'common' }, { id: 558, rarity: 'common' }, { id: 563, rarity: 'common' }, { id: 569, rarity: 'common' }, { id: 586, rarity: 'common' }, { id: 626, rarity: 'common' }, { id: 547, rarity: 'rare' }, { id: 549, rarity: 'rare' }, { id: 565, rarity: 'rare' }, { id: 567, rarity: 'rare' }, { id: 560, rarity: 'epic' }, { id: 591, rarity: 'epic' }, { id: 538, rarity: 'legendary' }],
+  // Map 6 — Route 8 (flying/water): musharna, swoobat, seismitoad, cinccino,
+  // swanna, jellicent, alomomola, gigalith, eelektrik, zoroark, krookodile
+  [{ id: 518, rarity: 'common' }, { id: 528, rarity: 'common' }, { id: 537, rarity: 'common' }, { id: 573, rarity: 'common' }, { id: 581, rarity: 'common' }, { id: 593, rarity: 'common' }, { id: 594, rarity: 'common' }, { id: 526, rarity: 'rare' }, { id: 603, rarity: 'rare' }, { id: 571, rarity: 'epic' }, { id: 553, rarity: 'legendary' }],
+  // Map 7 — Route 9 (ice): gothitelle, reuniclus, vanilluxe, beheeyem, beartic,
+  // golurk, heatmor, mienshao, cryogonal, chandelure
+  [{ id: 576, rarity: 'common' }, { id: 579, rarity: 'common' }, { id: 584, rarity: 'common' }, { id: 606, rarity: 'common' }, { id: 614, rarity: 'common' }, { id: 623, rarity: 'common' }, { id: 631, rarity: 'common' }, { id: 620, rarity: 'rare' }, { id: 615, rarity: 'epic' }, { id: 609, rarity: 'legendary' }],
+  // Map 8 — Route 16 (dragon finale): escavalier, ferrothorn, klinklang,
+  // eelektross, stunfisk, bisharp, accelgor, druddigon, braviary, mandibuzz,
+  // durant, haxorus, hydreigon, volcarona
+  [{ id: 589, rarity: 'common' }, { id: 598, rarity: 'common' }, { id: 601, rarity: 'common' }, { id: 604, rarity: 'common' }, { id: 618, rarity: 'common' }, { id: 625, rarity: 'common' }, { id: 617, rarity: 'rare' }, { id: 621, rarity: 'rare' }, { id: 628, rarity: 'rare' }, { id: 630, rarity: 'rare' }, { id: 632, rarity: 'rare' }, { id: 612, rarity: 'epic' }, { id: 635, rarity: 'epic' }, { id: 637, rarity: 'legendary' }],
 ]
 
 // --- Legendary pools per map (Master Ball nodes) ---
@@ -537,7 +555,7 @@ const LEG_FORCES = [
 const LEG_TAO = [
   { id: 643, level: 65 }, // Reshiram
   { id: 644, level: 65 }, // Zekrom
-  { id: 646, level: 70 }, // Kyurem
+  { id: 646, level: 75 }, // Kyurem
 ]
 const LEGENDARY_POOLS = [
   [],                                                 // Map 1 — none
@@ -590,8 +608,20 @@ export const unovaConfig = {
   characters: CHARACTERS,
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
+  // Battle data (see unova.teams.js) — read by the generic loop via config.
+  trainerSpeciesPools: TRAINER_SPECIES_POOLS,
+  bossTeams: BOSS_TEAMS,
+  eliteFourTeams: ELITE_FOUR_TEAMS,
+  mapLevelRanges: MAP_LEVEL_RANGES,
+  // Catch tuning + generic draw algorithm (game/catch.js).
+  catchTierBudget: CATCH_TIER_BUDGET,
+  pickCatchOffer,
+  // Map-1 boss depends on the chosen starter; fallback is Chili (Fire).
+  starterBoss: STARTER_BOSS,
+  // Species used when a map's catch/grass pool is empty (region-safe default).
+  fallbackSpeciesId: 504,
   // Elite Four stage — a linear gauntlet after the 8th gym; beating the
-  // champion wins the run. Teams live in ELITE_FOUR_TEAMS (enemyTeams.js).
+  // champion wins the run. Teams live in ELITE_FOUR_TEAMS (unova.teams.js).
   eliteFour: [
     { name: 'Shauntal', type: 'ghost',    sprite: owShauntal, fullSprite: Shauntal1 },
     { name: 'Grimsley', type: 'dark',     sprite: owGrimsley, fullSprite: Grimsley1 },

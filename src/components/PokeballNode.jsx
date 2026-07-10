@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import PokemonCard from './PokemonCard'
+import { TYPE_COLORS } from '../game/types.js'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
 // If roster is full (6), shows current roster so player can swap.
@@ -102,6 +103,17 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
                     <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: mutedColor }}>
                       Lv.{p.level}
                     </span>
+                    <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {p.types?.map(t => (
+                        <span key={t} style={{
+                          fontFamily: 'Upheaval', fontSize: '6px', color: '#fff',
+                          backgroundColor: TYPE_COLORS[t] || '#888',
+                          padding: '1px 3px', textTransform: 'capitalize',
+                        }}>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
                   </button>
                 )
               })}

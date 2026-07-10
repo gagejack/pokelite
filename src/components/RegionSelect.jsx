@@ -33,18 +33,16 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
     const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
     const isHovered = available && hovered === region.name
     if (isDesktop) {
-      const cardH = 'min(60vh, 460px)'
-      const textColor = cards ? '#DBDBDB' : '#333333'
-      const mutedColor = cards ? '#888' : '#777'
+      const cardSize = 'min(26vh, 240px)'
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flexShrink: 0 }}>
           {/* Card */}
           <button
             onClick={available ? () => onSelectRegion(region) : undefined}
             className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
             style={{
-              height: cardH,
-              aspectRatio: '9 / 21',
+              width: cardSize,
+              height: cardSize,
               border: cards ? '3px solid #000000' : borderStyle,
               boxShadow: isHovered
                 ? (cards ? '-9px 13px 0 0 #000000' : '-6px 8px 0 0 #444444')
@@ -114,14 +112,6 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
               </div>
             )}
           </button>
-          {/* Stats below card */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            {[['Attempts:', '-'], ['Successful Runs:', '-'], ['Pokemon Caught:', '-'], ['Shiny Caught:', '-']].map(([label, val]) => (
-              <span key={label} style={{ fontFamily: 'Upheaval', fontSize: '11px', color: textColor, lineHeight: 1.9 }}>
-                {label} <span style={{ color: mutedColor }}>{val}</span>
-              </span>
-            ))}
-          </div>
         </div>
       )
     }
@@ -207,15 +197,22 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           </span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          flexDirection: isDesktop ? 'row' : 'column',
-          gap: isDesktop ? '16px' : '16px',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {REGIONS.map(region => <RegionCard key={region.name} region={region} />)}
-        </div>
+        {isDesktop ? (
+          // Desktop: 3-column grid → 3 cards on top, 2 on bottom.
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, auto)',
+            gap: '20px',
+            justifyContent: 'center',
+            justifyItems: 'center',
+          }}>
+            {REGIONS.map(region => <RegionCard key={region.name} region={region} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
+            {REGIONS.map(region => <RegionCard key={region.name} region={region} />)}
+          </div>
+        )}
 
         <button
           onClick={onBack}

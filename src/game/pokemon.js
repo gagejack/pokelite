@@ -24,19 +24,21 @@ export function displayName(name) {
   return name
 }
 
-// Pre-fetch base + move data for every Pokémon ID in a region config so all
-// subsequent node activations are served from cache with no network delay.
-export async function prewarmCache(regionConfig, trainerPokemonPools, bossTeams) {
+// Pre-fetch base + move data for every Pokémon ID a region config references so
+// all subsequent node activations are served from cache with no network delay.
+// Everything is read off the region config — the loop stays region-agnostic.
+export async function prewarmCache(regionConfig) {
   const ids = new Set()
 
-  // Catch pools (array of arrays)
-  regionConfig.catchPools?.forEach(pool => pool.forEach(id => ids.add(id)))
-
-  // Trainer pools
-  Object.values(trainerPokemonPools).forEach(pool => pool.forEach(({ id }) => ids.add(id)))
-
-  // Boss teams
-  Object.values(bossTeams).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  // Catch pools (per-map arrays of { id, rarity })
+  regionConfig.catchPools?.forEach(pool => pool.forEach(m => ids.add(m.id)))
+  // Trainer pools (per-map arrays of ids)
+  regionConfig.trainerSpeciesPools?.forEach(pool => pool.forEach(id => ids.add(id)))
+  // Boss teams + Elite Four teams (keyed by trainer name → [{ id, level }])
+  Object.values(regionConfig.bossTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  Object.values(regionConfig.eliteFourTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  // Legendary (Master Ball) pools (per-map arrays of { id, level })
+  regionConfig.legendaryPools?.forEach(pool => pool.forEach(({ id }) => ids.add(id)))
 
   await Promise.all([...ids].map(async id => {
     try {
@@ -45,6 +47,18 @@ export async function prewarmCache(regionConfig, trainerPokemonPools, bossTeams)
       // Non-fatal — node will fall back to live fetch
     }
   }))
+}
+
+// Read a prewarmed species' primary type / display name straight from the base
+// cache (populated by prewarmCache before a map renders). Used by node tooltips
+// so we don't hand-maintain per-region id→type / id→name tables. Returns null if
+// the id hasn't been fetched yet (callers show a placeholder).
+export function cachedType(id) {
+  return baseCache.get(id)?.types?.[0] ?? null
+}
+
+export function cachedName(id) {
+  return baseCache.get(id)?.name ?? null
 }
 
 // Pure stat formula (Gen 5, 31 IVs, neutral nature, 0 EVs)
