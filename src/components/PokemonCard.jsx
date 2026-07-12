@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { TYPE_COLORS } from '../game/types.js'
+import { TIER_COLORS } from '../game/items.js'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
 
@@ -14,9 +15,14 @@ const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master
 //   selected   — yellow border/glow (catch card's "team full → swap" state)
 //   spriteGlow — apply the yellow saturate/drop-shadow filter on the sprite
 //   caught     — show a Poké Ball icon top-left (species caught before)
-export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false }) {
+//   rarity     — 'common'|'rare'|'epic'|'legendary'; sets a rarity-colored
+//                border (common gets none, matching the item rarity system)
+export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false, rarity }) {
   const { dark } = useTheme()
   const [hovered, setHovered] = useState(false)
+
+  // Rarity border — skip common (no color) so only rare/epic/legendary stand out.
+  const rarityColor = rarity && rarity !== 'common' ? TIER_COLORS[rarity] : null
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const cardBg = dark ? '#1a1a1a' : '#ffffff'
@@ -44,7 +50,10 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
       style={{
         position: 'relative',
         backgroundColor: cardBg,
-        border: selected ? '2px solid #facc15' : hovered ? '2px solid #ffffff' : borderStyle,
+        border: selected ? '2px solid #facc15'
+          : hovered ? '2px solid #ffffff'
+          : rarityColor ? `2px solid ${rarityColor}`
+          : borderStyle,
         boxShadow: selected
           ? '0 0 8px 2px rgba(250,204,21,0.45)'
           : hovered

@@ -19,15 +19,11 @@ const REGIONS = [
   { name: 'Unova',  gen: 'Gen 5', map: UnovaMap,  starters: [495, 498, 501] },
 ]
 
-export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
-  const { dark, cards } = useTheme()
-  const isDesktop = useIsDesktop()
-  const [hovered, setHovered] = useState(null)
-
-  const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
-  const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
-
-  const RegionCard = ({ region }) => {
+// Defined at module scope (not nested inside RegionSelect) so its component
+// identity is stable across parent re-renders. Nesting it caused every card to
+// remount whenever `hovered` changed, replaying all five images' filter
+// transitions at once — the "all regions flash" bug.
+function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered, onSelectRegion }) {
     // A region is playable only if its config has authored maps — the others
     // would crash at config.maps[0] when a run starts.
     const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
@@ -177,7 +173,15 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         </div>
       </button>
     )
-  }
+}
+
+export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
+  const { cards } = useTheme()
+  const isDesktop = useIsDesktop()
+  const [hovered, setHovered] = useState(null)
+
+  const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
+  const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
 
   return (
     <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
@@ -206,11 +210,19 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             justifyContent: 'center',
             justifyItems: 'center',
           }}>
-            {REGIONS.map(region => <RegionCard key={region.name} region={region} />)}
+            {REGIONS.map(region => (
+              <RegionCard key={region.name} region={region}
+                isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
+                hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
+            ))}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
-            {REGIONS.map(region => <RegionCard key={region.name} region={region} />)}
+            {REGIONS.map(region => (
+              <RegionCard key={region.name} region={region}
+                isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
+                hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
+            ))}
           </div>
         )}
 

@@ -28,7 +28,7 @@ import { sinnohConfig } from './regions/sinnoh.js'
 //   starterBoss:        { [starterId]: bossName },     // map-1 boss by starter
 //   fallbackSpeciesId:  number,                        // when a pool is empty
 //   eliteFour:          [{ name, type, sprite, fullSprite, champion? }],
-//   maps:               [ { generate(starter), edges, background, grassIcon } ],
+//   maps:               [ { name, generate(starter), edges, background, grassIcon } ],
 // }
 //
 // id→type and id→name for tooltips are NOT stored here — they're read at

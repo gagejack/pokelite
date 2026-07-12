@@ -61,6 +61,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
             <PokemonCard
               key={i}
               pokemon={poke}
+              rarity={poke.rarity}
               selected={selected === i}
               caught={caughtSet?.has(poke.pokeId)}
               onClick={() => handleSelectPokemon(i)}

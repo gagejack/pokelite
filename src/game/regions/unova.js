@@ -3,8 +3,11 @@ import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
 import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES } from './unova.teams.js'
 
 // --- Assets ---
-import routeBg1 from '../../assets/regions/Unova/MapAssets/Map1.png'
-import routeBg2 from '../../assets/regions/Unova/MapAssets/Map2.png'
+import bgStriaton from '../../assets/regions/Unova/MapAssets/Striaton.png'
+import bgNacrene from '../../assets/regions/Unova/MapAssets/Nacrene.png'
+import bgCastelia from '../../assets/regions/Unova/MapAssets/Castelia.png'
+import bgNimbasa from '../../assets/regions/Unova/MapAssets/Nimbasa.png'
+import bgDriftveil from '../../assets/regions/Unova/MapAssets/Driftveil.png'
 import grassIcon from '../../assets/regions/Unova/MapAssets/BW_Dark_Grass_Sp.png'
 
 // Trainer overworld sprites
@@ -595,9 +598,16 @@ const MAP_EDGES = [
   [20, 22], [21, 22],
 ]
 
-// Maps 1–2 have their own art; maps 3–8 reuse Map1/Map2 alternately as
-// placeholders until per-map backgrounds are authored.
-const MAP_BACKGROUNDS = [routeBg1, routeBg2, routeBg1, routeBg2, routeBg1, routeBg2, routeBg1, routeBg2]
+// The 8 maps correspond to Unova's gym cities, in order. Display-only labels —
+// the engine still addresses maps by index (see regionRegistry config shape).
+const MAP_NAMES = [
+  'Striaton City', 'Nacrene City', 'Castelia City', 'Nimbasa City',
+  'Driftveil City', 'Mistralton City', 'Icirrus City', 'Opelucid City',
+]
+
+// Maps 1–5 have their own art; maps 6–8 reuse earlier city art as placeholders
+// until their own backgrounds are authored.
+const MAP_BACKGROUNDS = [bgStriaton, bgNacrene, bgCastelia, bgNimbasa, bgDriftveil, bgNacrene, bgStriaton, bgNacrene]
 
 // --- Region config ---
 export const unovaConfig = {
@@ -630,6 +640,7 @@ export const unovaConfig = {
     { name: 'Alder',    type: 'champion', sprite: owAlder,    fullSprite: Alder, champion: true },
   ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
+    name: MAP_NAMES[i],
     generate: (starter) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Chili') : MAP_BOSSES[i]
       return { region: 'Unova', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss, i) }

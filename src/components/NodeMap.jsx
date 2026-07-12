@@ -32,7 +32,10 @@ const ITEM_ICONS = {
 const NODE_SIZE = 100
 const ROW_HEIGHT = 200
 const COL_WIDTH = 200
-const PADDING_TOP = 40
+const PADDING_TOP = 90
+// Top/bottom breathing room (px) around the desktop map card so it doesn't
+// touch the nav bar or the window's bottom edge (matches the old py-4).
+const MAP_PAD_Y = 16
 
 function MapSvg({
   dark, borderStyle, shadowStyle,
@@ -41,8 +44,14 @@ function MapSvg({
   mapContainerRef, holdTimerRef, holdActivatedRef,
   setContainerSize, setHoveredNode,
   handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
-  mapScale, mapOffsetX, mapOffsetY, background,
+  mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY, background,
 }) {
+  // The SVG stretches to fill the card on both axes (preserveAspectRatio none),
+  // so node POSITIONS fill the card even when the card ratio differs from the
+  // node layout. To keep node ICONS square despite that stretch, each node group
+  // is counter-scaled so its icon renders at a uniform mapScale in pixels.
+  const iconFixX = scaleX ? mapScale / scaleX : 1
+  const iconFixY = scaleY ? mapScale / scaleY : 1
   useEffect(() => {
     if (!mapContainerRef.current) return
     const ro = new ResizeObserver(([entry]) => {
@@ -53,9 +62,11 @@ function MapSvg({
     return () => ro.disconnect()
   }, [])
 
+  // Overlay hit-targets follow the stretched node POSITIONS (scaleX/scaleY) so
+  // they line up with the SVG icons; the button SIZE stays square via mapScale.
   const toPixel = (svgX, svgY) => ({
-    px: mapOffsetX + (svgX + svgWidth / 2) * mapScale,
-    py: mapOffsetY + svgY * mapScale,
+    px: mapOffsetX + (svgX + svgWidth / 2) * scaleX,
+    py: mapOffsetY + svgY * scaleY,
   })
 
   return (
@@ -67,13 +78,13 @@ function MapSvg({
       <img
         src={background}
         alt="map background"
-        style={{ position: 'absolute', top: -40, left: 0, width: '400px', height: '800px', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated' }}
       />
       <svg
         width="100%"
         height="100%"
         viewBox={`${-svgWidth / 2} 0 ${svgWidth} ${svgHeight}`}
-        preserveAspectRatio="xMidYMin slice"
+        preserveAspectRatio="none"
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
       >
         <defs>
@@ -125,7 +136,7 @@ function MapSvg({
           const opacity = isCurrentNode ? 1 : cleared ? 0.8 : reachable ? 1 : locked ? 0.2 : .85
           const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS
           return (
-            <g key={node.id} transform={`translate(${x - NODE_SIZE / 2}, ${y})`}>
+            <g key={node.id} transform={`translate(${x}, ${y}) scale(${iconFixX}, ${iconFixY}) translate(${-NODE_SIZE / 2}, 0)`}>
               {isCurrentNode ? (
                 <image href={icon}
                   x={-NODE_SIZE * 0.2} y={-NODE_SIZE * 0.2}
@@ -215,13 +226,15 @@ function MapSvg({
                     // Boss Pokémon: type chip to the left of the name + level.
                     ? (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', lineHeight: '1.4' }}>
-                        <span style={{
-                          fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
-                          backgroundColor: TYPE_COLORS[line.type] ?? '#888',
-                          padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
-                        }}>
-                          {line.type ?? '?'}
-                        </span>
+                        {line.type && (
+                          <span style={{
+                            fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                            backgroundColor: TYPE_COLORS[line.type] ?? '#888',
+                            padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
+                          }}>
+                            {line.type}
+                          </span>
+                        )}
                         <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', textTransform: 'capitalize' }}>
                           {line.name} lv.{line.level}
                         </span>
@@ -263,9 +276,29 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [hoveredNode, setHoveredNode] = useState(null)
   const [evolutionNotices, setEvolutionNotices] = useState([])
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
+  // Aspect ratio (w/h) of the current map's background image. The card sizes
+  // itself to this so the whole image shows and the nodes sit on it. Null until
+  // the image loads → fall back to the map's node-layout ratio.
+  const [bgRatio, setBgRatio] = useState(null)
   const mapContainerRef = useRef(null)
   const holdTimerRef = useRef(null)
   const holdActivatedRef = useRef(false)
+
+  // Measure the background image's natural aspect ratio so the card can size
+  // itself to show the whole image. Re-runs whenever the map's background
+  // changes (advancing maps).
+  useEffect(() => {
+    let cancelled = false
+    setBgRatio(null)
+    const img = new Image()
+    img.onload = () => {
+      if (!cancelled && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setBgRatio(img.naturalWidth / img.naturalHeight)
+      }
+    }
+    img.src = mapConfig.background
+    return () => { cancelled = true }
+  }, [mapConfig.background])
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
@@ -371,10 +404,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // Draw 3 distinct species weighted by rarity tier (common/rare/epic/legendary).
     const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
 
-    const offered = await Promise.all(chosen.map(async ({ id }) => {
+    const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       const base = await fetchPokemonBase(id)
       const instance = buildPokemonInstance(base, level)
-      return { ...instance, level }
+      return { ...instance, level, rarity }
     }))
     // Wild Pokémon offered at a Pokéball node count as "seen".
     offered.forEach(p => onSpeciesSeen?.(p.pokeId))
@@ -446,8 +479,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
       if (isMasterBall) {
         // Beat the legendary → offer the catch (reuses the Pokéball catch UI).
-        // The node is cleared by the catch screen (pick or decline).
-        setPendingLegendary({ node, offered: [legendary] })
+        // The node is cleared by the catch screen (pick or decline). Tag it
+        // legendary so the catch card shows the legendary-tier glow.
+        setPendingLegendary({ node, offered: [{ ...legendary, rarity: 'legendary' }] })
       } else if (isBoss && config.maps[mapIndex + 1]) {
         onMapCleared?.()
         onAdvanceMap()
@@ -536,10 +570,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       }))
       return { title: node.trainer ?? 'Gym Leader', sub }
     }
+    if (node.type === NODE_TYPES.MASTER_BALL) {
+      // The exact legendary is rolled at battle time, so hide its identity (???)
+      // but show the level (or range) drawn from this map's legendary pool.
+      const pool = config.legendaryPools?.[mapIndex] ?? []
+      const levels = pool.map(l => l.level)
+      const lo = levels.length ? Math.min(...levels) : null
+      const hi = levels.length ? Math.max(...levels) : null
+      const lvl = lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
+      // Object line reuses the boss tooltip's { type, name, level } row format.
+      return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }] }
+    }
     switch (node.type) {
       case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: '+1 LVL' }
       case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: 'Catch a Pokémon' }
-      case NODE_TYPES.MASTER_BALL:   return { title: 'Master Ball', sub: 'Legendary!' }
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: 'Select an item' }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: 'Upgrade a move' }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
@@ -547,9 +591,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     }
   }
 
-  // Scale by width only so nodes stay a constant size regardless of viewport
-  // height (the card has fixed width; height changes must not shrink the map).
-  const mapScale = containerSize.w ? containerSize.w / svgWidth : 0
+  // The card now matches the background image's aspect ratio, which may differ
+  // from the node layout's (svgWidth:svgHeight). So we stretch node POSITIONS
+  // independently on each axis to fill the card (scaleX/scaleY), while node
+  // ICONS stay square by sizing to the smaller axis scale (mapScale) so sprites
+  // never distort.
+  const scaleX = containerSize.w ? containerSize.w / svgWidth : 0
+  const scaleY = containerSize.h ? containerSize.h / svgHeight : 0
+  const mapScale = Math.min(scaleX, scaleY) || scaleX
   const mapOffsetX = 0
   const mapOffsetY = 0
 
@@ -560,7 +609,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     mapContainerRef, holdTimerRef, holdActivatedRef,
     setContainerSize, setHoveredNode,
     handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
-    mapScale, mapOffsetX, mapOffsetY,
+    mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY,
     background: mapConfig.background,
   }
 
@@ -587,8 +636,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
       {isDesktop ? (
-        <div className="flex flex-col items-center gap-2 w-full py-4" style={{ visibility: pendingBattle ? 'hidden' : 'visible' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px' }}>
+        <div className="flex flex-col items-center gap-2 w-full" style={{ flex: 1, minHeight: 0, visibility: pendingBattle ? 'hidden' : 'visible' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px', flex: 1, minHeight: 0, padding: `${MAP_PAD_Y}px 0` }}>
             <Roster
               roster={roster}
               onSwap={swapRoster}
@@ -596,7 +645,17 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
               onMoveHeldItem={(item, pokeIndex) => setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })}
             />
-            <div style={{ width: '400px', height: '750px', display: 'flex', flexDirection: 'column' }}>
+            {/* Map card — height fills the content row; width follows the
+                background image's aspect ratio (so the whole image shows and
+                nodes sit on it), falling back to the node-layout ratio until the
+                image's size is known. The card + nodes scale with browser height. */}
+            <div style={{
+              height: '100%',
+              aspectRatio: bgRatio ? `${bgRatio}` : `${svgWidth} / ${svgHeight}`,
+              alignSelf: 'stretch',
+              display: 'flex', flexDirection: 'column',
+              flexShrink: 0,
+            }}>
               <MapSvg {...mapSvgProps} />
             </div>
             {/* Bag — drag an item onto a Pokémon to equip it. During an item
