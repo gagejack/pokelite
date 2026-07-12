@@ -64,6 +64,8 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   // Bright Powder — 15% chance an incoming hit is halved.
   let defDmg = 1
   if (dItem === 'bright_powder' && Math.random() < 0.15) defDmg *= 0.5
+  // Resist Charm — super-effective hits against the holder deal 50% less.
+  if (dItem === 'resist_charm' && effectiveness > 1) defDmg *= 0.5
 
   const base = Math.floor(((2 * attacker.level / 5 + 2) * move.power * atk / def) / 50) + 2
   const damage = Math.max(1, Math.floor(base * effectiveness * random * damageMultiplier * itemDmg * defDmg * (crit ? 1.5 : 1)))

@@ -26,8 +26,8 @@ export const TIER_BUDGET = {
 export const TIER_COLORS = {
   common:    '#9ca3af', // grey
   rare:      '#3b82f6', // blue
-  epic:      '#facc15', // gold
-  legendary: '#a855f7', // purple
+  epic:      '#a855f7', // purple
+  legendary: '#facc15', // yellow
 }
 
 export function tierColor(item) {
@@ -98,6 +98,7 @@ export const ITEMS = [
   // --- Legendary ---
   { id: 'focus_sash',     name: 'Focus Sash',     description: 'Survive any KO hit at full HP',            tier: 'legendary',     icon: 'focus-sash' },
   { id: 'weakness_policy',name: 'Weakness Policy',description: '+50% damage after a super-effective hit',  tier: 'legendary',     icon: 'weakness-policy' },
+  { id: 'resist_charm',   name: 'Resist Charm',   description: 'Super-effective hits deal 50% less damage', tier: 'legendary',    icon: 'chople-berry' },
 
   // --- Type-boost items (Common) ---
   // +50% damage to moves of one type. Generated below from TYPE_BOOST_ITEMS so

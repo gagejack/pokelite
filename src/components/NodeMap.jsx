@@ -280,6 +280,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // itself to this so the whole image shows and the nodes sit on it. Null until
   // the image loads → fall back to the map's node-layout ratio.
   const [bgRatio, setBgRatio] = useState(null)
+  // Mobile: size of the slot the map card lives in, so we can fit the card to
+  // it on whichever axis binds (portrait maps can be width- OR height-bound
+  // depending on the map's ratio and how much height the Roster/Bag rows leave).
+  const [mobileSlot, setMobileSlot] = useState({ w: 0, h: 0 })
+  const mobileSlotRef = useRef(null)
   const mapContainerRef = useRef(null)
   const holdTimerRef = useRef(null)
   const holdActivatedRef = useRef(false)
@@ -299,6 +304,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     img.src = mapConfig.background
     return () => { cancelled = true }
   }, [mapConfig.background])
+
+  // Measure the mobile map slot so the card can be fit to it on the binding axis.
+  useEffect(() => {
+    const el = mobileSlotRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) setMobileSlot({ w: width, h: height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isDesktop])
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
@@ -602,6 +619,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const mapOffsetX = 0
   const mapOffsetY = 0
 
+  // Mobile: fit an (image-aspect-ratio) card inside the measured slot, bound by
+  // whichever axis is tighter — width for wide maps, height for tall maps — so
+  // the whole map shows centered with no distortion (desktop gets this via the
+  // aspect-locked card whose width can grow freely).
+  const mobileCard = (() => {
+    const ratio = bgRatio || svgWidth / svgHeight
+    const { w, h } = mobileSlot
+    if (!w || !h) return null
+    const width = Math.min(w, h * ratio)
+    return { width, height: width / ratio }
+  })()
+
   const mapSvgProps = {
     dark, borderStyle, shadowStyle,
     nodePositions, edges, svgWidth, svgHeight,
@@ -753,8 +782,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: dark ? '#555' : '#aaa' }}>— empty —</span>
             )}
           </div>
-          <div style={{ width: '360px', flex: 1, minHeight: 0, marginTop: '6px', display: 'flex', flexDirection: 'column' }}>
-            <MapSvg {...mapSvgProps} />
+          {/* Map slot — fills the height left below the Roster + Bag rows and
+              centers the card. The card is sized (in JS) to the image's aspect
+              ratio, fit to whichever slot axis binds, so the whole map shows
+              centered with no distortion (mirrors desktop). */}
+          <div ref={mobileSlotRef} style={{ flex: 1, minHeight: 0, marginTop: '6px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{
+              width: mobileCard ? `${mobileCard.width}px` : '100%',
+              height: mobileCard ? `${mobileCard.height}px` : '100%',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <MapSvg {...mapSvgProps} />
+            </div>
           </div>
         </div>
       )}
