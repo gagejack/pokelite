@@ -5,7 +5,7 @@ import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 
-export default function Roster({ roster, horizontal = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem }) {
+export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [selectedIndex, setSelectedIndex] = useState(null)
@@ -126,7 +126,7 @@ export default function Roster({ roster, horizontal = false, onSwap, itemTargeti
       {horizontal ? (
         // Mobile: slots only, no header bar
         <div style={{
-          width: '360px',
+          width: fullWidth ? '100%' : '360px',
           border: borderStyle,
           boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
           backgroundColor: cardBg,

@@ -114,6 +114,23 @@ export default function App() {
     mapsCleared.current += 1
   }
 
+  // A gym leader was beaten → the player earned badge `badgeIndex` (0–7) for the
+  // current region. Increment the lifetime per-badge counter in the `badges`
+  // table, live, the moment it's earned. Uses an atomic Postgres RPC so
+  // concurrent runs can't clobber each other's counts.
+  //   Expected schema (create in Supabase):
+  //     table badges (user_id uuid, region text, badge_index int2, count int4,
+  //                   primary key (user_id, region, badge_index))
+  //     rpc increment_badge(p_region text, p_badge_index int2) → upsert +1
+  async function recordBadgeEarned(badgeIndex) {
+    if (!user || badgeIndex == null || !selectedRegion) return
+    const { error } = await supabase.rpc('increment_badge', {
+      p_region: selectedRegion.name,
+      p_badge_index: badgeIndex,
+    })
+    if (error) console.warn('increment_badge failed:', error.message)
+  }
+
   function resetRunStats() {
     mapsCleared.current = 0
     pokemonCaught.current = 0
@@ -251,6 +268,7 @@ export default function App() {
           onSpeciesSeen={recordSpeciesSeen}
           caughtSet={caughtSet}
           onMapCleared={handleMapCleared}
+          onBadgeEarned={recordBadgeEarned}
           onRunEnd={recordRunEnd}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}

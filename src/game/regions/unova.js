@@ -10,6 +10,16 @@ import bgNimbasa from '../../assets/regions/Unova/MapAssets/Nimbasa.png'
 import bgDriftveil from '../../assets/regions/Unova/MapAssets/Driftveil.png'
 import grassIcon from '../../assets/regions/Unova/MapAssets/BW_Dark_Grass_Sp.png'
 
+// Gym badges — one per map (index 0–7), earned by beating that map's gym leader.
+import badgeTrio from '../../assets/regions/Unova/Badges/Triobadge.webp'
+import badgeBasic from '../../assets/regions/Unova/Badges/Basicbadge.webp'
+import badgeInsect from '../../assets/regions/Unova/Badges/Insectbadge.webp'
+import badgeBolt from '../../assets/regions/Unova/Badges/Boltbadge.webp'
+import badgeQuake from '../../assets/regions/Unova/Badges/Quakebadge.webp'
+import badgeJet from '../../assets/regions/Unova/Badges/Jetbadge.webp'
+import badgeFreeze from '../../assets/regions/Unova/Badges/Freezebadge.webp'
+import badgeLegend from '../../assets/regions/Unova/Badges/Legendbadge.webp'
+
 // Trainer overworld sprites
 import trainerYoungster from '../../assets/regions/Unova/Trainers Overworlds/Youngster.webp'
 import trainerLass from '../../assets/regions/Unova/Trainers Overworlds/Lass.webp'
@@ -609,6 +619,19 @@ const MAP_NAMES = [
 // until their own backgrounds are authored.
 const MAP_BACKGROUNDS = [bgStriaton, bgNacrene, bgCastelia, bgNimbasa, bgDriftveil, bgNacrene, bgStriaton, bgNacrene]
 
+// Gym badges in map order (index i is earned by beating map i's gym leader).
+// { name, icon } — the badge list UI blacks these out until earned.
+const BADGES = [
+  { name: 'Trio Badge',   icon: badgeTrio },
+  { name: 'Basic Badge',  icon: badgeBasic },
+  { name: 'Insect Badge', icon: badgeInsect },
+  { name: 'Bolt Badge',   icon: badgeBolt },
+  { name: 'Quake Badge',  icon: badgeQuake },
+  { name: 'Jet Badge',    icon: badgeJet },
+  { name: 'Freeze Badge', icon: badgeFreeze },
+  { name: 'Legend Badge', icon: badgeLegend },
+]
+
 // --- Region config ---
 export const unovaConfig = {
   name: 'Unova',
@@ -618,6 +641,7 @@ export const unovaConfig = {
   characters: CHARACTERS,
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
+  badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
   bossTeams: BOSS_TEAMS,
