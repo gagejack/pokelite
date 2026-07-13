@@ -1084,6 +1084,19 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
         position: 'relative',
       }}
     >
+      {/* Translucent red flash over the whole slot box when this active Pokémon
+          is hit — same box the move animation lands on. */}
+      {mobile && (
+        <motion.div
+          initial={false}
+          animate={{ opacity: attacking ? [0, 0.4, 0] : 0 }}
+          transition={{ duration: 0.45 }}
+          style={{
+            position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none',
+            backgroundColor: '#ef4444', borderRadius: '1px',
+          }}
+        />
+      )}
       <div style={{ position: 'relative' }}>
         <AnimatePresence>
           {flashText && (

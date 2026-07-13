@@ -8,171 +8,110 @@ import JohtoMap from '../assets/regions/JohtoMap.png'
 import HoennMap from '../assets/regions/HoennMap.png'
 import SinnohMap from '../assets/regions/SinnohMap.png'
 import UnovaMap from '../assets/regions/UnovaMap.png'
+import DayBattleBackground from '../assets/DayBattleBackground.png'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 
 const REGIONS = [
-  { name: 'Kanto',  gen: 'Gen 1', map: KantoMap,  starters: [1, 4, 7] },
-  { name: 'Johto',  gen: 'Gen 2', map: JohtoMap,  starters: [152, 155, 158] },
-  { name: 'Hoenn',  gen: 'Gen 3', map: HoennMap,  starters: [252, 255, 258] },
-  { name: 'Sinnoh', gen: 'Gen 4', map: SinnohMap, starters: [387, 390, 393] },
-  { name: 'Unova',  gen: 'Gen 5', map: UnovaMap,  starters: [495, 498, 501] },
+  { name: 'Kanto',  gen: 'Gen 1', map: KantoMap,  starters: [1, 4, 7],       legendaries: [150, 151] }, // Mewtwo, Mew
+  { name: 'Johto',  gen: 'Gen 2', map: JohtoMap,  starters: [152, 155, 158], legendaries: [249, 250] }, // Lugia, Ho-Oh
+  { name: 'Hoenn',  gen: 'Gen 3', map: HoennMap,  starters: [252, 255, 258], legendaries: [382, 383] }, // Kyogre, Groudon
+  { name: 'Sinnoh', gen: 'Gen 4', map: SinnohMap, starters: [387, 390, 393], legendaries: [483, 484] }, // Dialga, Palkia
+  { name: 'Unova',  gen: 'Gen 5', map: UnovaMap,  starters: [495, 498, 501], legendaries: [643, 644] }, // Reshiram, Zekrom
 ]
 
 // Defined at module scope (not nested inside RegionSelect) so its component
 // identity is stable across parent re-renders. Nesting it caused every card to
 // remount whenever `hovered` changed, replaying all five images' filter
 // transitions at once — the "all regions flash" bug.
+// Shared square box for both desktop and mobile: the two version-mascot
+// legendaries fill the background; region name (title font) + gen (Orange Kid)
+// are centered. Desktop scales the sprites/text up and adds a hover lift.
 function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered, onSelectRegion }) {
     // A region is playable only if its config has authored maps — the others
     // would crash at config.maps[0] when a run starts.
     const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
     const isHovered = available && hovered === region.name
-    if (isDesktop) {
-      const cardSize = 'min(26vh, 240px)'
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flexShrink: 0 }}>
-          {/* Card */}
-          <button
-            onClick={available ? () => onSelectRegion(region) : undefined}
-            className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
-            style={{
-              width: cardSize,
-              height: cardSize,
-              border: cards ? '3px solid #000000' : borderStyle,
-              boxShadow: isHovered
-                ? (cards ? '-9px 13px 0 0 #000000' : '-6px 8px 0 0 #444444')
-                : (cards ? '-7px 10px 0 0 #000000' : '-4px 6px 0 0 #666666'),
-              transform: isHovered ? 'scale(1.03) translateY(-4px)' : 'scale(1)',
-              transition: 'transform 0.15s, box-shadow 0.15s',
-              cursor: available ? 'pointer' : 'default',
-            }}
-            onMouseEnter={() => setHovered(region.name)}
-            onMouseLeave={() => setHovered(null)}
-          >
-            {/* Background map — stays fixed */}
-            <img
-              src={region.map}
-              alt={region.name}
-              style={{
-                position: 'absolute', inset: 0,
-                width: '100%', height: '100%',
-                objectFit: 'cover',
-                filter: !available
-                  ? 'blur(.75px) grayscale(0.6) brightness(0.5)'
-                  : isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.75)',
-                transform: 'scale(1.05)',
-                transition: 'filter 0.2s',
-              }}
-            />
-            {/* Top starter strip */}
-            <div
-              style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                paddingTop: '6px', paddingBottom: '4px',
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
-              }}
-            >
-              {region.starters.map(id => (
-                <img key={id} src={SPRITE(id)} alt={`pokemon-${id}`}
-                  style={{ width: '52px', height: '52px', imageRendering: 'pixelated', filter: 'drop-shadow(1px 2px 2px rgba(0,0,0,0.9))' }}
-                />
-              ))}
-            </div>
-            {/* Region name + gen — near bottom of card */}
-            <div
-              style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
-                paddingBottom: '10px', paddingTop: '40px',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
-              }}
-            >
-              <span style={{ fontFamily: 'Upheaval', fontSize: '20px', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.9)' }}>
-                {region.name}
-              </span>
-              <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#facc15', textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
-                {region.gen}
-              </span>
-            </div>
-            {!available && (
-              <div style={{
-                position: 'absolute', top: '50%', left: 0, right: 0, transform: 'translateY(-50%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '6px 0', backgroundColor: 'rgba(0,0,0,0.75)',
-              }}>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: '#facc15', letterSpacing: '1px' }}>
-                  COMING SOON
-                </span>
-              </div>
-            )}
-          </button>
-        </div>
-      )
-    }
-
-    // Mobile: horizontal bar (existing layout)
+    const restShadow = cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #666666'
+    const hoverShadow = cards ? '-7px 10px 0 0 #000000' : '-5px 7px 0 0 #444444'
     return (
       <button
-        key={region.name}
         onClick={available ? () => onSelectRegion(region) : undefined}
+        onMouseEnter={() => setHovered(region.name)}
+        onMouseLeave={() => setHovered(null)}
         className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
         style={{
           cursor: available ? 'pointer' : 'default',
-          width: '320px', height: '100px',
+          width: '100%', aspectRatio: '1',
           border: cards ? '3px solid #000000' : borderStyle,
-          boxShadow: isHovered
-            ? (cards ? '-9px 13px 0 0 #000000' : '-6px 8px 0 0 #444444')
-            : (cards ? '-7px 10px 0 0 #000000' : '-4px 6px 0 0 #666666'),
-          transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+          boxShadow: isHovered ? hoverShadow : restShadow,
+          transform: isHovered ? 'scale(1.03) translateY(-4px)' : 'scale(1)',
           transition: 'transform 0.15s, box-shadow 0.15s',
+          backgroundColor: '#1a1a1a',
         }}
-        onMouseEnter={() => setHovered(region.name)}
-        onMouseLeave={() => setHovered(null)}
       >
-        <img
-          src={region.map}
-          alt={region.name}
-          style={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
-            objectFit: 'cover',
-            filter: !available
-              ? 'blur(.75px) grayscale(0.6) brightness(0.5)'
-              : isHovered ? 'blur(0px) brightness(1.1)' : 'blur(.75px) brightness(0.85)',
-            transform: 'scale(1.05)',
-            transition: 'filter 0.2s',
-          }}
-        />
-        <div
-          className="absolute top-0 left-0 h-full flex flex-col items-center justify-center"
-          style={{ width: '52px', backgroundColor: 'rgba(5,5,5,0.57)' }}
-        >
-          {region.starters.map(id => (
-            <img key={id} src={SPRITE(id)} alt={`pokemon-${id}`}
-              style={{ width: '35px', height: '35px', imageRendering: 'pixelated', marginTop: '-6px', filter: 'drop-shadow(2px 3px 2px rgba(0,0,0,0.8))' }}
+        {/* Battle-scene backdrop, darkened ~55% */}
+        <img src={DayBattleBackground} alt="" style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'cover', filter: available ? 'brightness(0.45)' : 'brightness(0.28) grayscale(0.5)',
+        }} />
+        {/* Legendary duo — fills the box as the background */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {region.legendaries.map((id, i) => (
+            <img key={id} src={SPRITE(id)} alt=""
+              style={{
+                width: '58%', height: '58%', objectFit: 'contain', imageRendering: 'pixelated',
+                marginLeft: i === 1 ? '-22%' : 0,
+                filter: available
+                  ? `drop-shadow(1px 2px 3px rgba(0,0,0,0.8))${isHovered ? ' brightness(1.12)' : ''}`
+                  : 'grayscale(0.7) brightness(.8)',
+                transition: 'filter 0.2s',
+              }}
             />
           ))}
         </div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ paddingLeft: '52px', paddingRight: '110px' }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: '#fff', textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>{region.name}</span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#fff', textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>{region.gen}</span>
+        {/* Darkening scrim so the centered text stays legible over the sprites */}
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 100%)' }} />
+        {/* Region name + gen, centered */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '30px' : '22px', color: '#fff', textShadow: '0 2px 6px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.95)' }}>
+            {region.name}
+          </span>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '20px' : '15px', color: '#facc15', textShadow: '0 2px 5px rgba(0,0,0,0.95)' }}>
+            {region.gen}
+          </span>
           {!available && (
-            <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#facc15', letterSpacing: '1px', textShadow: '0 2px 15px rgba(0,0,0,0.9)' }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '13px' : '10px', color: '#facc15', letterSpacing: '1px', marginTop: '4px', textShadow: '0 2px 5px rgba(0,0,0,0.95)' }}>
               COMING SOON
             </span>
           )}
         </div>
-        <div className="absolute top-0 right-0 h-full flex flex-col items-start justify-around py-2 px-2" style={{ width: '110px', backgroundColor: 'hsla(0,0%,0%,0.58)' }}>
-          {['Attempts:', 'Successful Runs:', 'Pokemon Caught:', 'Shiny Caught:'].map(label => (
-            <span key={label} style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', lineHeight: 1.2 }}>
-              {label} -
-            </span>
-          ))}
-        </div>
       </button>
     )
+}
+
+// A locked placeholder box that fills the 6th grid cell.
+function ComingSoonCell({ cards, borderStyle, isDesktop }) {
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={{
+        width: '100%', aspectRatio: '1',
+        border: cards ? '3px solid #000000' : borderStyle,
+        boxShadow: cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #666666',
+        backgroundColor: '#1a1a1a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <img src={DayBattleBackground} alt="" style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        objectFit: 'cover', filter: 'brightness(0.3) grayscale(0.5)',
+      }} />
+      <span style={{ position: 'relative', fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '12px', color: '#facc15', letterSpacing: '1px', textAlign: 'center', lineHeight: 1.4 }}>
+        COMING<br />SOON
+      </span>
+    </div>
+  )
 }
 
 export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
@@ -201,30 +140,21 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           </span>
         </div>
 
-        {isDesktop ? (
-          // Desktop: 3-column grid → 3 cards on top, 2 on bottom.
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, auto)',
-            gap: '20px',
-            justifyContent: 'center',
-            justifyItems: 'center',
-          }}>
-            {REGIONS.map(region => (
-              <RegionCard key={region.name} region={region}
-                isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
-                hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
-            ))}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
-            {REGIONS.map(region => (
-              <RegionCard key={region.name} region={region}
-                isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
-                hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
-            ))}
-          </div>
-        )}
+        {/* 3×2 grid of square boxes (5 regions + a Coming Soon cell), same on
+            desktop and mobile — desktop just uses a larger max width. */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: isDesktop ? '20px' : '10px',
+          width: '100%', maxWidth: isDesktop ? '720px' : '360px',
+        }}>
+          {REGIONS.map(region => (
+            <RegionCard key={region.name} region={region}
+              isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
+              hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
+          ))}
+          <ComingSoonCell cards={cards} borderStyle={borderStyle} isDesktop={isDesktop} />
+        </div>
 
         <button
           onClick={onBack}

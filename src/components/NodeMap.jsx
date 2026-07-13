@@ -30,9 +30,17 @@ const ITEM_ICONS = {
 }
 
 const NODE_SIZE = 100
+// Multiplier for how big node icons render (1 = default). Bump this to make ALL
+// nodes bigger without touching map spacing/layout — icons grow in place,
+// centered on their node point. Grass, trainer, and the current-player icon all
+// scale with it too.
+const NODE_SCALE = 1.3
+// Extra multiplier applied to gym-leader (boss) nodes so they stand out as
+// bigger than regular nodes. Stacks on top of NODE_SCALE.
+const BOSS_SCALE = 1.4
 const ROW_HEIGHT = 200
 const COL_WIDTH = 200
-const PADDING_TOP = 90
+const PADDING_TOP = 150
 // Top/bottom breathing room (px) around the desktop map card so it doesn't
 // touch the nav bar or the window's bottom edge (matches the old py-4).
 const MAP_PAD_Y = 16
@@ -91,10 +99,13 @@ function MapSvg({
           <clipPath id="trainer-clip">
             <rect x={0} y={0} width={NODE_SIZE} height={NODE_SIZE * 1.15} />
           </clipPath>
-          <filter id="node-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <filter id="node-shadow" x="-60%" y="-60%" width="220%" height="220%">
+            {/* Larger, softer, subtler shadow behind the tight one */}
+            <feDropShadow dx="3" dy="7" stdDeviation="9" floodColor="rgba(0,0,0,0.35)" />
             <feDropShadow dx="2" dy="3" stdDeviation="3" floodColor="rgba(0,0,0,0.9)" />
           </filter>
-          <filter id="trainer-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <filter id="trainer-shadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="3" dy="7" stdDeviation="9" floodColor="rgba(0,0,0,0.35)" />
             <feDropShadow dx="2" dy="3" stdDeviation="3" floodColor="rgba(0,0,0,0.9)" />
           </filter>
           <filter id="hover-outline" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
@@ -104,6 +115,18 @@ function MapSvg({
             <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#facc15" floodOpacity="0.9" result="glow" />
             <feMerge>
               <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Resting white stroke for the immediately-available (reachable)
+              nodes — a plain outline, no glow, so the player sees where they can
+              go next. Hover upgrades to #hover-outline (white + yellow glow). */}
+          <filter id="white-outline" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feMerge>
               <feMergeNode in="outline" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
@@ -135,8 +158,10 @@ function MapSvg({
           const icon = getIcon(node, isCurrentNode)
           const opacity = isCurrentNode ? 1 : cleared ? 0.8 : reachable ? 1 : locked ? 0.2 : .85
           const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS
+          // Gym leaders (boss nodes) render larger than everything else.
+          const nodeScale = NODE_SCALE * (node.type === NODE_TYPES.BOSS ? BOSS_SCALE : 1)
           return (
-            <g key={node.id} transform={`translate(${x}, ${y}) scale(${iconFixX}, ${iconFixY}) translate(${-NODE_SIZE / 2}, 0)`}>
+            <g key={node.id} transform={`translate(${x}, ${y}) scale(${iconFixX * nodeScale}, ${iconFixY * nodeScale}) translate(${-NODE_SIZE / 2}, 0)`}>
               {isCurrentNode ? (
                 <image href={icon}
                   x={-NODE_SIZE * 0.2} y={-NODE_SIZE * 0.2}
@@ -146,7 +171,7 @@ function MapSvg({
                   style={{ imageRendering: 'pixelated', opacity }}
                 />
               ) : isTrainerNode ? (
-                <g clipPath="url(#trainer-clip)" filter={isHovered ? 'url(#hover-outline)' : 'url(#trainer-shadow)'}>
+                <g clipPath="url(#trainer-clip)" filter={isHovered ? 'url(#hover-outline)' : reachable ? 'url(#white-outline)' : 'url(#trainer-shadow)'}>
                   <image href={icon}
                     x={-NODE_SIZE * 0.083} y={-NODE_SIZE * 0.075}
                     width={NODE_SIZE * 3.5} height={NODE_SIZE * 4.5}
@@ -160,7 +185,7 @@ function MapSvg({
                 return (
                   <image href={icon} x={offset} y={offset}
                     width={size} height={size}
-                    filter={isHovered ? 'url(#hover-outline)' : 'url(#node-shadow)'}
+                    filter={isHovered ? 'url(#hover-outline)' : reachable ? 'url(#white-outline)' : 'url(#node-shadow)'}
                     style={{ imageRendering: 'pixelated', opacity }}
                   />
                 )
@@ -174,7 +199,7 @@ function MapSvg({
         const cleared = clearedNodes.has(node.id)
         const reachable = !cleared && isReachable(node.id)
         const { px, py } = toPixel(x, y)
-        const size = NODE_SIZE * mapScale
+        const size = NODE_SIZE * mapScale * NODE_SCALE * (node.type === NODE_TYPES.BOSS ? BOSS_SCALE : 1)
         const isHovered = hoveredNode?.id === node.id
         const { title, sub } = getNodeLabel(node)
         return (
