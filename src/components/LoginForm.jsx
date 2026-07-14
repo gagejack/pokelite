@@ -82,7 +82,7 @@ export default function LoginForm({ onAuthSuccess }) {
           bg-white dark:bg-[#1a1a1a] text-black dark:text-white
           placeholder-[#999] border border-[#bbb] dark:border-[#444]
           focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
-        style={{ fontSize: '8px' }}
+        style={{ fontSize: '12px' }}
       />
       {showRegister && (
         <input
@@ -95,7 +95,7 @@ export default function LoginForm({ onAuthSuccess }) {
             bg-white dark:bg-[#1a1a1a] text-black dark:text-white
             placeholder-[#999] border border-[#bbb] dark:border-[#444]
             focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
-          style={{ fontSize: '8px' }}
+          style={{ fontSize: '12px' }}
         />
       )}
       <input
@@ -109,10 +109,10 @@ export default function LoginForm({ onAuthSuccess }) {
           bg-white dark:bg-[#1a1a1a] text-black dark:text-white
           placeholder-[#999] border border-[#bbb] dark:border-[#444]
           focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
-        style={{ fontSize: '8px' }}
+        style={{ fontSize: '12px' }}
       />
       {authError && (
-        <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#ef4444', textAlign: 'center' }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: '#ef4444', textAlign: 'center' }}>
           {authError}
         </span>
       )}
@@ -123,7 +123,7 @@ export default function LoginForm({ onAuthSuccess }) {
               onClick={handleLogin}
               disabled={authLoading}
               className="flex-1 py-1 font-semibold bg-[#555] hover:bg-[#444] text-white transition-colors disabled:opacity-50"
-              style={{ fontSize: '8px' }}
+              style={{ fontSize: '12px' }}
             >
               {authLoading ? '...' : 'Login'}
             </button>
@@ -131,7 +131,7 @@ export default function LoginForm({ onAuthSuccess }) {
               onClick={() => { setShowRegister(true); setAuthError(null) }}
               disabled={authLoading}
               className="flex-1 py-1 font-semibold bg-[#888] hover:bg-[#777] text-white transition-colors disabled:opacity-50"
-              style={{ fontSize: '8px' }}
+              style={{ fontSize: '12px' }}
             >
               Register
             </button>
@@ -142,7 +142,7 @@ export default function LoginForm({ onAuthSuccess }) {
               onClick={handleRegister}
               disabled={authLoading}
               className="flex-1 py-1 font-semibold bg-[#555] hover:bg-[#444] text-white transition-colors disabled:opacity-50"
-              style={{ fontSize: '8px' }}
+              style={{ fontSize: '12px' }}
             >
               {authLoading ? '...' : 'Create Account'}
             </button>
@@ -150,7 +150,7 @@ export default function LoginForm({ onAuthSuccess }) {
               onClick={() => { setShowRegister(false); setAuthError(null) }}
               disabled={authLoading}
               className="flex-1 py-1 font-semibold bg-[#888] hover:bg-[#777] text-white transition-colors disabled:opacity-50"
-              style={{ fontSize: '8px' }}
+              style={{ fontSize: '12px' }}
             >
               Back
             </button>

@@ -1,5 +1,6 @@
 import { useTheme } from '../lib/theme'
 import { TYPE_COLORS } from '../game/types.js'
+import { TIER_BASE_POWER } from '../game/typeMoves.js'
 
 // TM node: the player picks one Pokémon to raise its move by one tier (cap at Tier 4).
 export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
@@ -50,6 +51,8 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
             const move = pokemon.move
             const tier = move?.tier ?? 1
             const maxed = tier >= 4
+            // Power gained by upgrading one tier (0 if maxed).
+            const powerGain = maxed ? 0 : (TIER_BASE_POWER[tier + 1] - TIER_BASE_POWER[tier])
             return (
               <div
                 key={i}
@@ -86,6 +89,13 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                     </span>
                   </div>
                 </div>
+                {/* Power gain indicator */}
+                <span style={{
+                  fontFamily: 'Upheaval', fontSize: '11px', flexShrink: 0, textAlign: 'right', minWidth: '54px',
+                  color: maxed ? mutedColor : '#22c55e',
+                }}>
+                  {maxed ? 'Max' : `+${powerGain} PWR`}
+                </span>
                 {/* Upgrade button */}
                 <button
                   disabled={maxed}

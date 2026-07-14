@@ -8,12 +8,16 @@ import SettingsPanel from './SettingsPanel'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
+import settingsIcon from '../assets/whiteSettingsIcon.png'
+import resetIcon from '../assets/reset.png'
 import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
-const RESET_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fluffy-tail.png'
-const SETTINGS_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/town-map.png'
+// Skip-map icon kept for the (now hidden) skip button — see below.
+// eslint-disable-next-line no-unused-vars
 const SKIP_MAP_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png'
 
+// onSkipMap is still accepted (skip flow kept in code); its button is hidden.
+// eslint-disable-next-line no-unused-vars
 export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen }) {
   const { dark, toggle } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
@@ -80,18 +84,21 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
         >
           Auto
         </button>
+        {/* Skip-map button hidden per design. Kept here (commented) so the
+            onSkipMap flow can be re-enabled without rewiring.
         {onSkipMap && (
           <button onClick={onSkipMap} className="hover:opacity-60 transition-opacity" title="Skip to next map">
             <img src={SKIP_MAP_ICON} alt="Next map" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
           </button>
         )}
+        */}
         {onRestart && (
           <button onClick={onRestart} className="hover:opacity-60 transition-opacity" title="Restart run">
-            <img src={RESET_ICON} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+            <img src={resetIcon} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
           </button>
         )}
         <button onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
-          <img src={SETTINGS_ICON} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+          <img src={settingsIcon} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
         </button>
       </div>
     </>

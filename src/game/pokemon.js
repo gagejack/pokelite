@@ -197,6 +197,8 @@ export async function checkEvolution(instance, newLevel) {
       spriteBack: shiny ? evolvedBase.shinySpriteBack : evolvedBase.spriteBack,
       stats: { ...evolved.stats, hp: evolvedHp },
       move: getTypeMove(evolvedBase.types[0], preservedTier),
+      // Carry the held item through evolution (buildPokemonInstance omits it).
+      heldItem: instance.heldItem ?? null,
       fainted: instance.fainted,
     }
   } catch {

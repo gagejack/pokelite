@@ -246,29 +246,29 @@ function MapSvg({
                 whiteSpace: 'nowrap',
                 zIndex: 10,
               }}>
-                <div style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize' }}>{title}</div>
+                <div style={{ fontFamily: 'Orange Kid', fontSize: '18px', color: dark ? '#DBDBDB' : '#333', textTransform: 'capitalize' }}>{title}</div>
                 {Array.isArray(sub)
                   ? sub.map((line, i) => typeof line === 'object'
                     // Boss Pokémon: type chip to the left of the name + level.
                     ? (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', lineHeight: '1.4' }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', lineHeight: '1.5' }}>
                         {line.type && (
                           <span style={{
-                            fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                            fontFamily: 'Upheaval', fontSize: '10px', color: '#fff',
                             backgroundColor: TYPE_COLORS[line.type] ?? '#888',
-                            padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
+                            padding: '2px 6px', textTransform: 'capitalize', flexShrink: 0,
                           }}>
                             {line.type}
                           </span>
                         )}
-                        <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', textTransform: 'capitalize' }}>
+                        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', textTransform: 'capitalize' }}>
                           {line.name} lv.{line.level}
                         </span>
                       </div>
                     )
-                    : <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', lineHeight: '1.4' }}>{line}</div>
+                    : <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', lineHeight: '1.5' }}>{line}</div>
                   )
-                  : <div style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', marginTop: '1px' }}>{sub}</div>
+                  : <div style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', marginTop: '2px' }}>{sub}</div>
                 }
               </div>
             )}
@@ -604,7 +604,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const pools = config.trainerSpeciesPools ?? []
       const pool = pools[Math.min(mapIndex, pools.length - 1)] ?? []
       const types = [...new Set(pool.map(id => cachedType(id)).filter(Boolean))]
-      const sub = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : '+2 LVL'
+      const typeLine = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : null
+      // Types line (if known), then the level-reward line.
+      const sub = [...(typeLine ? [typeLine] : []), '+2 levels to all mon']
       return { title: node.trainer ?? 'Trainer', sub }
     }
     if (node.type === NODE_TYPES.BOSS) {
