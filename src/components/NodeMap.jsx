@@ -9,6 +9,7 @@ import ItemNode from './ItemNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
 import EvolutionNotice from './EvolutionNotice'
 import BadgeList from './BadgeList'
+import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
@@ -284,6 +285,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
   const [movingItem, setMovingItem] = useState(null)
+  // Mobile: a bag item tapped to view its info popup. { item, index } | null.
+  const [infoItem, setInfoItem] = useState(null)
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
   const mapConfig = config.maps[mapIndex]
@@ -737,8 +740,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                           draggable
                           onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
                           onDragEnd={() => setMovingItem(null)}
-                          onClick={e => { e.stopPropagation(); setMovingItem(picked ? null : { item, from: { kind: 'bag', index: i } }) }}
-                          title={`${item.name} — drag onto a Pokémon or click to move`}
+                          // Click opens the item's info popup (with an Equip action);
+                          // dragging still equips directly onto a Pokémon.
+                          onClick={e => { e.stopPropagation(); setInfoItem({ item, index: i }) }}
+                          title={`${item.name} — drag onto a Pokémon or click for info`}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px',
                             cursor: 'grab', borderRadius: '2px',
@@ -834,7 +839,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                     draggable
                     onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
                     onDragEnd={() => setMovingItem(null)}
-                    onClick={e => { e.stopPropagation(); setMovingItem(picked ? null : { item, from: { kind: 'bag', index: i } }) }}
+                    // Tap opens the item's info popup (which has an Equip action);
+                    // dragging still equips directly onto a Pokémon.
+                    onClick={e => { e.stopPropagation(); setInfoItem({ item, index: i }) }}
                     style={{
                       width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'grab',
                       outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,
@@ -870,6 +877,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             Cancel
           </button>
         </div>
+      )}
+
+      {/* Item info popup — mobile bag tap. Equip enters the move-targeting flow. */}
+      {infoItem && (
+        <ItemInfoCard
+          item={infoItem.item}
+          onEquip={() => {
+            setMovingItem({ item: infoItem.item, from: { kind: 'bag', index: infoItem.index } })
+            setInfoItem(null)
+          }}
+          onClose={() => setInfoItem(null)}
+        />
       )}
 
       {pendingBattle && (

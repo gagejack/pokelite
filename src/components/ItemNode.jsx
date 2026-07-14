@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 
 export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const [stage, setStage] = useState('pick')
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [hoveredOffer, setHoveredOffer] = useState(null)
@@ -167,9 +169,9 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
         backgroundColor: bg,
         border: borderStyle,
         boxShadow: shadowStyle,
-        padding: '24px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
-        maxWidth: '560px', width: '94vw',
+        padding: isDesktop ? '29px' : '24px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isDesktop ? '24px' : '20px',
+        maxWidth: isDesktop ? '672px' : '560px', width: '94vw',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
@@ -190,7 +192,7 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
         </div>
 
         {/* 3 item cards */}
-        <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+        <div style={{ display: 'flex', gap: isDesktop ? '10px' : '8px', width: '100%' }}>
           {offered.map((item, i) => {
             const isHovered = hoveredOffer === i
             const rarity = tierColor(item)
@@ -210,8 +212,8 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     : 'none',
                   transform: isHovered ? 'translateY(-2px)' : 'none',
                   transition: 'transform 0.1s, box-shadow 0.1s',
-                  padding: 'clamp(8px, 2vw, 14px) clamp(6px, 1.5vw, 10px)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                  padding: isDesktop ? '17px 12px' : 'clamp(8px, 2vw, 14px) clamp(6px, 1.5vw, 10px)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isDesktop ? '8px' : '6px',
                   flex: '1 1 0',
                   minWidth: 0,
                   cursor: 'pointer',
@@ -220,12 +222,12 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 <img
                   src={itemIconUrl(item)}
                   alt={item.name}
-                  style={{ width: '56px', height: '56px', imageRendering: 'pixelated' }}
+                  style={{ width: isDesktop ? '68px' : '56px', height: isDesktop ? '68px' : '56px', imageRendering: 'pixelated' }}
                 />
-                <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(9px, 3vw, 15px)', color: textColor, textAlign: 'center' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '18px' : 'clamp(9px, 3vw, 15px)', color: textColor, textAlign: 'center' }}>
                   {item.name}
                 </span>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(8px, 2vw, 14px)', color: mutedColor, textAlign: 'center', lineHeight: 1.3 }}>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '17px' : 'clamp(8px, 2vw, 14px)', color: mutedColor, textAlign: 'center', lineHeight: 1.3 }}>
                   {item.description}
                 </span>
               </button>
