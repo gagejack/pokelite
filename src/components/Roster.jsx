@@ -5,7 +5,7 @@ import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 
-export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem }) {
+export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem, onShowItemInfo }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [selectedIndex, setSelectedIndex] = useState(null)
@@ -191,6 +191,11 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
             if (selected.heldItem) onMoveHeldItem(selected.heldItem, selectedIndex)
             closePopup()
           } : undefined}
+          // Clicking the held item opens its info popup (same as the bag).
+          onShowHeldItemInfo={onShowItemInfo ? () => {
+            if (selected.heldItem) onShowItemInfo(selected.heldItem, selectedIndex)
+            closePopup()
+          } : undefined}
         />
       )}
     </>
@@ -274,7 +279,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   )
 }
 
-function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mutedColor, onClose, onMoveHeldItem }) {
+function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mutedColor, onClose, onMoveHeldItem, onShowHeldItemInfo }) {
   const isDesktop = useIsDesktop()
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
@@ -344,31 +349,35 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
               ))}
             </div>
           </div>
-          {/* Held item — to the right of level + type. Click to move it. */}
-          {pokemon.heldItem && (
-            <div
-              onClick={onMoveHeldItem}
-              title={onMoveHeldItem ? `${pokemon.heldItem.name} — click to move` : pokemon.heldItem.name}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
-                flexShrink: 0, alignSelf: 'stretch', justifyContent: 'center',
-                cursor: onMoveHeldItem ? 'pointer' : 'default',
-              }}
-            >
-              <img
-                src={itemIconUrl(pokemon.heldItem)}
-                alt={pokemon.heldItem.name}
+          {/* Held item — to the right of level + type. Click to view its info
+              (description + Equip), same popup as clicking a bag item. */}
+          {pokemon.heldItem && (() => {
+            const itemAction = onShowHeldItemInfo || onMoveHeldItem
+            return (
+              <div
+                onClick={itemAction}
+                title={itemAction ? `${pokemon.heldItem.name} — click for info` : pokemon.heldItem.name}
                 style={{
-                  width: s(32), height: s(32), imageRendering: 'pixelated',
-                  border: onMoveHeldItem ? '2px solid #facc15' : 'none',
-                  padding: s(2),
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
+                  flexShrink: 0, alignSelf: 'stretch', justifyContent: 'center',
+                  cursor: itemAction ? 'pointer' : 'default',
                 }}
-              />
-              {onMoveHeldItem && (
-                <span style={{ fontFamily: 'Upheaval', fontSize: s(6), color: '#facc15' }}>MOVE</span>
-              )}
-            </div>
-          )}
+              >
+                <img
+                  src={itemIconUrl(pokemon.heldItem)}
+                  alt={pokemon.heldItem.name}
+                  style={{
+                    width: s(32), height: s(32), imageRendering: 'pixelated',
+                    border: itemAction ? '2px solid #facc15' : 'none',
+                    padding: s(2),
+                  }}
+                />
+                {itemAction && (
+                  <span style={{ fontFamily: 'Upheaval', fontSize: s(6), color: '#facc15' }}>INFO</span>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Divider */}

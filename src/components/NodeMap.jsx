@@ -285,7 +285,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
   const [movingItem, setMovingItem] = useState(null)
-  // Mobile: a bag item tapped to view its info popup. { item, index } | null.
+  // An item clicked to view its info popup (from the bag or a Pokémon's held
+  // slot). { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } | null.
   const [infoItem, setInfoItem] = useState(null)
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
@@ -710,7 +711,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                 onSwap={swapRoster}
                 itemTargeting={isMovingItem}
                 onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
-                onMoveHeldItem={(item, pokeIndex) => setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+                onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
               />
               {/* Bag — drag an item onto a Pokémon to equip it. During an item
                   move, the whole panel is a drop target for stowing back to bag. */}
@@ -742,7 +743,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                           onDragEnd={() => setMovingItem(null)}
                           // Click opens the item's info popup (with an Equip action);
                           // dragging still equips directly onto a Pokémon.
-                          onClick={e => { e.stopPropagation(); setInfoItem({ item, index: i }) }}
+                          onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
                           title={`${item.name} — drag onto a Pokémon or click for info`}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px',
@@ -809,7 +810,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })}
               itemTargeting={isMovingItem}
               onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
-              onMoveHeldItem={(item, pokeIndex) => setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+              onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
             />
             {/* Bag — drag an item onto a Pokémon to equip (as on desktop), or tap
                 to pick it up then tap a Pokémon. Drop here to stow back. */}
@@ -841,7 +842,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                     onDragEnd={() => setMovingItem(null)}
                     // Tap opens the item's info popup (which has an Equip action);
                     // dragging still equips directly onto a Pokémon.
-                    onClick={e => { e.stopPropagation(); setInfoItem({ item, index: i }) }}
+                    onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
                     style={{
                       width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'grab',
                       outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,
@@ -879,12 +880,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         </div>
       )}
 
-      {/* Item info popup — mobile bag tap. Equip enters the move-targeting flow. */}
+      {/* Item info popup — opened by clicking a bag item or a Pokémon's held
+          item. Equip enters the move-targeting flow from that same source. */}
       {infoItem && (
         <ItemInfoCard
           item={infoItem.item}
           onEquip={() => {
-            setMovingItem({ item: infoItem.item, from: { kind: 'bag', index: infoItem.index } })
+            setMovingItem({ item: infoItem.item, from: infoItem.from })
             setInfoItem(null)
           }}
           onClose={() => setInfoItem(null)}
