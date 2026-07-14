@@ -3,6 +3,7 @@ import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
 import { supabase } from '../lib/supabase'
 import Pokedex from './Pokedex'
+import Stats from './Stats'
 import SettingsPanel from './SettingsPanel'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
@@ -17,6 +18,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const { dark, toggle } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [username, setUsername] = useState(null)
 
   // Show the logged-in player's username in the center of the nav bar.
@@ -52,7 +54,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       <button onClick={() => setPokedexOpen(true)} className="hover:opacity-60 transition-opacity">
         <img src={pokedexIcon} alt="Pokedex" style={{ width: '22px', height: '22px' }} />
       </button>
-      <button className="hover:opacity-60 transition-opacity">
+      <button onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
         <img src={statsIcon} alt="Stats" style={{ width: '22px', height: '22px' }} />
       </button>
       <button
@@ -130,6 +132,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
         {children}
       </div>
       {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
+      {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   )

@@ -93,11 +93,17 @@ export async function fetchPokemonBase(idOrName) {
     learnset: data.moves,
     sprite: data.sprites.front_default,
     spriteBack: data.sprites.back_default ?? data.sprites.front_default,
+    shinySprite: data.sprites.front_shiny ?? data.sprites.front_default,
+    shinySpriteBack: data.sprites.back_shiny ?? data.sprites.back_default ?? data.sprites.front_shiny ?? data.sprites.front_default,
   }
   baseCache.set(idOrName, result)
   baseCache.set(result.pokeId, result)
   return result
 }
+
+// Shiny encounter rate. Every spawned Pokémon rolls once — so a caught wild or
+// legendary can be shiny (and shiny enemies just look shiny in battle).
+export const SHINY_ODDS = 1 / 512
 
 // Build a full battle-ready Pokémon instance from base data + level.
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
@@ -105,13 +111,15 @@ export function buildPokemonInstance(base, level, isStarter = false) {
   const boost = isStarter ? 1.3 : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
   const move = getTypeMove(base.types[0], tierForLevel(level))
+  const shiny = Math.random() < SHINY_ODDS
   return {
     pokeId:     base.pokeId,
     name:       base.name,
     types:      base.types,
     level,
-    sprite:     base.sprite,
-    spriteBack: base.spriteBack,
+    shiny,
+    sprite:     shiny ? base.shinySprite : base.sprite,
+    spriteBack: shiny ? base.shinySpriteBack : base.spriteBack,
     stats: {
       maxHp:   hp,
       hp,
@@ -180,8 +188,13 @@ export async function checkEvolution(instance, newLevel) {
     // Preserve the Pokémon's current move tier across evolution (set via TM nodes,
     // not by level), using the evolved Pokémon's primary type.
     const preservedTier = instance.move?.tier ?? tierForLevel(newLevel)
+    // Shininess carries through evolution — keep the flag and the matching sprites.
+    const shiny = !!instance.shiny
     return {
       ...evolved,
+      shiny,
+      sprite:     shiny ? evolvedBase.shinySprite : evolvedBase.sprite,
+      spriteBack: shiny ? evolvedBase.shinySpriteBack : evolvedBase.spriteBack,
       stats: { ...evolved.stats, hp: evolvedHp },
       move: getTypeMove(evolvedBase.types[0], preservedTier),
       fainted: instance.fainted,

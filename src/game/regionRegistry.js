@@ -46,3 +46,11 @@ const REGION_CONFIGS = {
 export function getRegionConfig(regionName) {
   return REGION_CONFIGS[regionName] ?? null
 }
+
+// Every legendary species id across all regions (for the stats "Legendaries"
+// box — a caught species is "legendary" if it's in any region's pool).
+export function allLegendaryIds() {
+  const ids = new Set()
+  Object.values(REGION_CONFIGS).forEach(cfg => (cfg.legendaryIds ?? []).forEach(id => ids.add(id)))
+  return ids
+}

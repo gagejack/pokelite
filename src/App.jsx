@@ -93,6 +93,24 @@ export default function App() {
     recordSpeciesOwned(pokemonId)
   }
 
+  // Record a catch (wild or legendary), non-deduped, so the stats screen can
+  // count how many times each species — and each shiny — was caught. One row
+  // per catch. Fire-and-forget; never blocks the run.
+  //   Expected schema (create in Supabase):
+  //     table catches (id bigserial pk, user_id uuid, region text,
+  //                    species_id int4, name text, shiny bool, caught_at timestamptz default now())
+  async function recordCatch(pokemon) {
+    if (!user || !pokemon || !selectedRegion) return
+    const { error } = await supabase.from('catches').insert({
+      user_id: user.id,
+      region: selectedRegion.name,
+      species_id: pokemon.pokeId,
+      name: pokemon.name,
+      shiny: !!pokemon.shiny,
+    })
+    if (error) console.warn('recordCatch failed:', error.message)
+  }
+
   // Add a species to the Pokédex "owned" set (for greying/un-greying) without
   // counting it as a wild catch. Used for the starter and for evolutions —
   // both are species the player has owned, but neither is a Pokéball catch.
@@ -264,6 +282,7 @@ export default function App() {
           onAdvanceMap={advanceMap}
           onEnterEliteFour={() => setScreen('elitefour')}
           onPokemonCaught={handlePokemonCaught}
+          onCatchRecorded={recordCatch}
           onSpeciesOwned={recordSpeciesOwned}
           onSpeciesSeen={recordSpeciesSeen}
           caughtSet={caughtSet}

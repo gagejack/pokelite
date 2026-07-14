@@ -641,6 +641,8 @@ export const unovaConfig = {
   characters: CHARACTERS,
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
+  // Flat set of every legendary species id (for the stats "Legendaries" box).
+  legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
   badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
