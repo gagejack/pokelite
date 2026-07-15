@@ -22,6 +22,7 @@ import { swapInRoster } from '../game/roster.js'
 // The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
 // a filename can't be imported, since "?" is the query separator in a specifier.)
 import mysteryIcon from '../assets/Icons/mysteryIcon2.png'
+import pokecenterIcon from '../assets/pokecenter.png'
 
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
@@ -31,7 +32,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.MASTER_BALL]:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
-  [NODE_TYPES.POKECENTER]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
+  [NODE_TYPES.POKECENTER]:    pokecenterIcon,
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.MYSTERY]:       mysteryIcon,
 }
@@ -156,7 +157,7 @@ function MapSvg({
             <line key={i}
               x1={from.x} y1={from.y + NODE_SIZE / 2}
               x2={to.x} y2={to.y + NODE_SIZE / 2}
-              stroke={active ? '#22c55e' : 'rgba(0,0,0,0.5)'}
+              stroke={active ? '#15803d' : 'rgba(0,0,0,0.8)'}
               strokeWidth={active ? 2.5 : 1.5}
               strokeDasharray={active ? 'none' : '4 3'}
             />

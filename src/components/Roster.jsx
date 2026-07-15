@@ -5,6 +5,17 @@ import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 
+// Two-tone bar fill: the light shade on the top half, a darker shade of the same
+// hue on the bottom half (hard 50/50 split), matching the stats-screen bars.
+function twoTone(light, dark) {
+  return `linear-gradient(to bottom, ${light} 0%, ${light} 50%, ${dark} 50%, ${dark} 100%)`
+}
+// Darker partner shades. HP uses the same green/yellow/red thresholds as
+// hpColor(); STAT_BAR is the stat bars' blue.
+const HP_DARK = { '#22c55e': '#15803d', '#facc15': '#a16207', '#ef4444': '#991b1b' }
+const STAT_BAR_LIGHT = '#6890F0'
+const STAT_BAR_DARK = '#3b5aa8'
+
 export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem, onShowItemInfo }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
@@ -318,7 +329,8 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: s(220),
+          width: s(260),
+          maxWidth: '92vw',
           border: borderStyle,
           boxShadow: shadowStyle,
           backgroundColor: cardBg,
@@ -402,7 +414,10 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
             <div style={{
               height: '100%', borderRadius: '1px',
               width: `${Math.max(0, (stats.hp / stats.maxHp) * 100)}%`,
-              backgroundColor: hpColor(stats.hp, stats.maxHp),
+              background: twoTone(
+                hpColor(stats.hp, stats.maxHp),
+                HP_DARK[hpColor(stats.hp, stats.maxHp)],
+              ),
             }} />
           </div>
         </div>
@@ -421,7 +436,7 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
                 <div style={{
                   height: '100%', borderRadius: '1px',
                   width: `${(value / maxStat) * 100}%`,
-                  backgroundColor: '#6890F0',
+                  background: twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK),
                 }} />
               </div>
               <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
