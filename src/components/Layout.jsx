@@ -8,7 +8,7 @@ import SettingsPanel from './SettingsPanel'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
-import settingsIcon from '../assets/whiteSettingsIcon.png'
+import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
 import resetIcon from '../assets/reset.png'
 import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
@@ -19,7 +19,7 @@ const SKIP_MAP_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/
 // onSkipMap is still accepted (skip flow kept in code); its button is hidden.
 // eslint-disable-next-line no-unused-vars
 export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen }) {
-  const { dark, toggle } = useTheme()
+  const { dark } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
@@ -60,15 +60,6 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       </button>
       <button onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
         <img src={statsIcon} alt="Stats" style={{ width: '22px', height: '22px' }} />
-      </button>
-      <button
-        onClick={toggle}
-        style={{
-          fontFamily: 'Upheaval', fontSize: '9px', color: textColor,
-          border: borderStyle, padding: '4px 6px', backgroundColor: bg, cursor: 'pointer',
-        }}
-      >
-        {dark ? 'Light' : 'Dark'}
       </button>
       <div style={{ marginLeft: row ? 'auto' : undefined, display: 'flex', gap: '12px', alignItems: 'center' }}>
         <button

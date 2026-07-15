@@ -73,6 +73,95 @@ import Sabrina1 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina
 import Sabrina2 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina 2.webp'
 import Sabrina3 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina 3.webp'
 
+import { buildRows } from '../nodeMap.js'
+import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
+import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES } from './kanto.teams.js'
+
+// --- Map + misc assets ---
+import bgRock from '../../assets/regions/Kanto/Maps/Rock.png'
+import bgWater from '../../assets/regions/Kanto/Maps/Water.png'
+import bgElectric from '../../assets/regions/Kanto/Maps/Electric.png'
+import bgGrass from '../../assets/regions/Kanto/Maps/Grass.png'
+import bgPoison from '../../assets/regions/Kanto/Maps/Poison.png'
+import bgPsychic from '../../assets/regions/Kanto/Maps/Psychic.png'
+import bgFire from '../../assets/regions/Kanto/Maps/Fire.png'
+import bgGround from '../../assets/regions/Kanto/Maps/Ground.png'
+import grassIcon from '../../assets/regions/Kanto/kantoGrass.png'
+
+// Gym badges — one per map (index 0–7), earned by beating that map's gym leader.
+import badgeBoulder from '../../assets/regions/Kanto/Badges/Boulder_Badge.webp'
+import badgeCascade from '../../assets/regions/Kanto/Badges/Cascade_Badge.webp'
+import badgeThunder from '../../assets/regions/Kanto/Badges/Thunder_Badge.webp'
+import badgeRainbow from '../../assets/regions/Kanto/Badges/Rainbow_Badge.webp'
+import badgeSoul from '../../assets/regions/Kanto/Badges/Soul_Badge.webp'
+import badgeMarsh from '../../assets/regions/Kanto/Badges/Marsh_Badge.webp'
+import badgeVolcano from '../../assets/regions/Kanto/Badges/Volcano_Badge.webp'
+import badgeEarth from '../../assets/regions/Kanto/Badges/Earth_Badge.webp'
+
+// Route-trainer overworld sprites (node icons)
+import owBugCatcher from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Bug Catcher.webp'
+import owLass1 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lass 1.webp'
+import owLass2 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lass 2.webp'
+import owCamper from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Camper.webp'
+import owPicnicker from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Picnicker.webp'
+import owFisherman from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Fisherman.webp'
+import owBirdKeeper from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Bird Keeper.webp'
+import owGambler from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Gambler.webp'
+import owRocker from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Rocker.webp'
+import owHiker from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Hiker.webp'
+import owLady from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lady.webp'
+import owGentleman1 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Gentleman 1.webp'
+import owGentleman2 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Gentleman 2.webp'
+import owJuggler from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Juggler.webp'
+import owPokeManiac from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Poke Maniac.webp'
+import owRuinManiac from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Ruin Maniac.webp'
+import owPsychic from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Psychic.webp'
+import owChanneler from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Channeler.webp'
+import owBurglar from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Burglar.webp'
+import owAceTrainer1 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Ace Trainer 1.webp'
+import owAceTrainer2 from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Ace Trainer 2.webp'
+import owBlackBelt from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Black Belt.webp'
+import owCrushGirl from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Crush Girl.webp'
+// Gym leader + Elite Four overworld sprites (node icons)
+import owBrock from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Brock 1.webp'
+import owMisty from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Misty 1.webp'
+import owLtSurge from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lt. Surge 1.webp'
+import owErika from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Erika 1.webp'
+import owKoga from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Koga 1.webp'
+import owSabrina from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Sabrina 1.webp'
+import owBlaine from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Blaine 1.webp'
+import owGiovanni from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Giovanni 1.webp'
+import owLorelei from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lorelei 2.webp'
+import owBruno from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Bruno 1.webp'
+import owAgatha from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Agatha 1.webp'
+import owLance from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Lance 1.webp'
+import owBlue from '../../assets/regions/Kanto/Kanto Trainer Overworlds/Blue 1.webp'
+
+// Route-trainer full battle sprites
+import fullBugCatcher from '../../assets/regions/Kanto/Kanto Trainer Sprites/Bug Catcher.webp'
+import fullLass1 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Lass 1.webp'
+import fullLass2 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Lass 2.webp'
+import fullCamper from '../../assets/regions/Kanto/Kanto Trainer Sprites/Camper.webp'
+import fullPicnicker from '../../assets/regions/Kanto/Kanto Trainer Sprites/Picnicker.webp'
+import fullFisherman from '../../assets/regions/Kanto/Kanto Trainer Sprites/Fisherman.webp'
+import fullBirdKeeper from '../../assets/regions/Kanto/Kanto Trainer Sprites/Bird Keeper.webp'
+import fullGambler from '../../assets/regions/Kanto/Kanto Trainer Sprites/Gambler.webp'
+import fullRocker from '../../assets/regions/Kanto/Kanto Trainer Sprites/Rocker.webp'
+import fullHiker from '../../assets/regions/Kanto/Kanto Trainer Sprites/Hiker.webp'
+import fullLady from '../../assets/regions/Kanto/Kanto Trainer Sprites/Lady.webp'
+import fullGentleman1 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Gentleman 1.webp'
+import fullGentleman2 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Gentleman 2.webp'
+import fullJuggler from '../../assets/regions/Kanto/Kanto Trainer Sprites/Juggler.webp'
+import fullPokeManiac from '../../assets/regions/Kanto/Kanto Trainer Sprites/Poke Maniac.webp'
+import fullRuinManiac from '../../assets/regions/Kanto/Kanto Trainer Sprites/Ruin Maniac.webp'
+import fullPsychic from '../../assets/regions/Kanto/Kanto Trainer Sprites/Psychic.webp'
+import fullChanneler from '../../assets/regions/Kanto/Kanto Trainer Sprites/Channeler.webp'
+import fullBurglar from '../../assets/regions/Kanto/Kanto Trainer Sprites/Burglar.webp'
+import fullAceTrainer1 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Ace Trainer 1.webp'
+import fullAceTrainer2 from '../../assets/regions/Kanto/Kanto Trainer Sprites/Ace Trainer 2.webp'
+import fullBlackBelt from '../../assets/regions/Kanto/Kanto Trainer Sprites/Black Belt.webp'
+import fullCrushGirl from '../../assets/regions/Kanto/Kanto Trainer Sprites/Crush Girl.webp'
+
 const CHARACTERS = [
   { id: 'Agatha 1',   name: 'Agatha',    sprite: Agatha1 },
   { id: 'Agatha 2',   name: 'Agatha',    sprite: Agatha2 },
@@ -150,11 +239,227 @@ const CHARACTERS = [
   { id: 'Sabrina 3',  name: 'Sabrina',   sprite: Sabrina3 },
 ]
 
+// --- Trainer node icons (overworld) — keyed by the name used in pools/teams ---
+const TRAINER_SPRITES = {
+  // Route trainers
+  'Bug Catcher':   owBugCatcher,
+  'Lass 1':        owLass1,
+  'Lass 2':        owLass2,
+  'Camper':        owCamper,
+  'Picnicker':     owPicnicker,
+  'Fisherman':     owFisherman,
+  'Bird Keeper':   owBirdKeeper,
+  'Gambler':       owGambler,
+  'Rocker':        owRocker,
+  'Hiker':         owHiker,
+  'Lady':          owLady,
+  'Gentleman 1':   owGentleman1,
+  'Gentleman 2':   owGentleman2,
+  'Juggler':       owJuggler,
+  'Poke Maniac':   owPokeManiac,
+  'Ruin Maniac':   owRuinManiac,
+  'Psychic':       owPsychic,
+  'Channeler':     owChanneler,
+  'Burglar':       owBurglar,
+  'Ace Trainer 1': owAceTrainer1,
+  'Ace Trainer 2': owAceTrainer2,
+  'Black Belt':    owBlackBelt,
+  'Crush Girl':    owCrushGirl,
+  // Gym leaders + Elite Four (keyed by the clean name used in BOSS_TEAMS/eliteFour)
+  'Brock':         owBrock,
+  'Misty':         owMisty,
+  'Lt. Surge':     owLtSurge,
+  'Erika':         owErika,
+  'Koga':          owKoga,
+  'Sabrina':       owSabrina,
+  'Blaine':        owBlaine,
+  'Giovanni':      owGiovanni,
+  'Lorelei':       owLorelei,
+  'Bruno':         owBruno,
+  'Agatha':        owAgatha,
+  'Lance':         owLance,
+  'Blue':          owBlue,
+}
+
+// --- Trainer full battle sprites (BattleCard) — same keys as TRAINER_SPRITES ---
+const TRAINER_FULL_SPRITES = {
+  // Route trainers
+  'Bug Catcher':   fullBugCatcher,
+  'Lass 1':        fullLass1,
+  'Lass 2':        fullLass2,
+  'Camper':        fullCamper,
+  'Picnicker':     fullPicnicker,
+  'Fisherman':     fullFisherman,
+  'Bird Keeper':   fullBirdKeeper,
+  'Gambler':       fullGambler,
+  'Rocker':        fullRocker,
+  'Hiker':         fullHiker,
+  'Lady':          fullLady,
+  'Gentleman 1':   fullGentleman1,
+  'Gentleman 2':   fullGentleman2,
+  'Juggler':       fullJuggler,
+  'Poke Maniac':   fullPokeManiac,
+  'Ruin Maniac':   fullRuinManiac,
+  'Psychic':       fullPsychic,
+  'Channeler':     fullChanneler,
+  'Burglar':       fullBurglar,
+  'Ace Trainer 1': fullAceTrainer1,
+  'Ace Trainer 2': fullAceTrainer2,
+  'Black Belt':    fullBlackBelt,
+  'Crush Girl':    fullCrushGirl,
+  // Gym leaders + Elite Four (reuse the character full sprites imported above)
+  'Brock':         Brock1,
+  'Misty':         Misty1,
+  'Lt. Surge':     LtSurge1,
+  'Erika':         Erika1,
+  'Koga':          Koga1,
+  'Sabrina':       Sabrina1,
+  'Blaine':        Blaine1,
+  'Giovanni':      Giovanni1,
+  'Lorelei':       Lorelei2,
+  'Bruno':         Bruno1,
+  'Agatha':        Agatha1,
+  'Lance':         Lance1,
+  'Blue':          Blue1,
+}
+
+// All three Kanto starters map to Brock (Pewter Gym) — Kanto has no
+// starter-branched first gym like Unova's Striaton brothers.
+// Bulbasaur(1), Charmander(4), Squirtle(7) → Brock.
+const STARTER_BOSS = { 1: 'Brock', 4: 'Brock', 7: 'Brock' }
+
+// --- Catch pools per map ---
+// Each entry is { id, rarity }. Pokéball nodes draw 3 by rarity weight. Pools
+// are evolution-gated by band (base forms early, evolved forms possible late —
+// the catch-node evolution roll picks a stage the map's level can reach). Each
+// species appears on only one map; rarity mirrors the item system (60/25/10/5).
+// The single 'legendary'-rarity entry per map is that map's chase mon.
+const CATCH_POOLS = [
+  // Map 1 — Pewter / Routes 1–3 (base forms)
+  [{ id: 16, rarity: 'common' }, { id: 19, rarity: 'common' }, { id: 10, rarity: 'common' }, { id: 13, rarity: 'common' }, { id: 21, rarity: 'common' }, { id: 29, rarity: 'common' }, { id: 32, rarity: 'common' }, { id: 129, rarity: 'rare' }, { id: 56, rarity: 'epic' }, { id: 25, rarity: 'legendary' }],
+  // Map 2 — Cerulean / Routes 4, 24–25
+  [{ id: 17, rarity: 'common' }, { id: 43, rarity: 'common' }, { id: 69, rarity: 'common' }, { id: 60, rarity: 'common' }, { id: 118, rarity: 'common' }, { id: 120, rarity: 'common' }, { id: 79, rarity: 'rare' }, { id: 54, rarity: 'rare' }, { id: 63, rarity: 'epic' }, { id: 58, rarity: 'legendary' }],
+  // Map 3 — Vermilion / Routes 5–6, 11
+  [{ id: 20, rarity: 'common' }, { id: 81, rarity: 'common' }, { id: 100, rarity: 'common' }, { id: 50, rarity: 'common' }, { id: 66, rarity: 'common' }, { id: 27, rarity: 'common' }, { id: 46, rarity: 'rare' }, { id: 84, rarity: 'rare' }, { id: 26, rarity: 'epic' }, { id: 133, rarity: 'legendary' }],
+  // Map 4 — Celadon / Routes 7–8
+  [{ id: 44, rarity: 'common' }, { id: 70, rarity: 'common' }, { id: 37, rarity: 'common' }, { id: 96, rarity: 'common' }, { id: 52, rarity: 'common' }, { id: 102, rarity: 'common' }, { id: 61, rarity: 'rare' }, { id: 64, rarity: 'rare' }, { id: 45, rarity: 'epic' }, { id: 123, rarity: 'legendary' }],
+  // Map 5 — Fuchsia / Routes 12–15 (Safari)
+  [{ id: 48, rarity: 'common' }, { id: 88, rarity: 'common' }, { id: 109, rarity: 'common' }, { id: 33, rarity: 'common' }, { id: 30, rarity: 'common' }, { id: 42, rarity: 'common' }, { id: 49, rarity: 'rare' }, { id: 24, rarity: 'rare' }, { id: 110, rarity: 'epic' }, { id: 113, rarity: 'legendary' }],
+  // Map 6 — Saffron
+  [{ id: 64, rarity: 'common' }, { id: 97, rarity: 'common' }, { id: 122, rarity: 'common' }, { id: 80, rarity: 'common' }, { id: 62, rarity: 'common' }, { id: 99, rarity: 'common' }, { id: 124, rarity: 'rare' }, { id: 106, rarity: 'rare' }, { id: 107, rarity: 'epic' }, { id: 137, rarity: 'legendary' }],
+  // Map 7 — Cinnabar (fire)
+  [{ id: 58, rarity: 'common' }, { id: 38, rarity: 'common' }, { id: 78, rarity: 'common' }, { id: 126, rarity: 'common' }, { id: 112, rarity: 'common' }, { id: 101, rarity: 'common' }, { id: 89, rarity: 'rare' }, { id: 91, rarity: 'rare' }, { id: 59, rarity: 'epic' }, { id: 142, rarity: 'legendary' }],
+  // Map 8 — Viridian / Victory Road (finale)
+  [{ id: 34, rarity: 'common' }, { id: 31, rarity: 'common' }, { id: 51, rarity: 'common' }, { id: 76, rarity: 'common' }, { id: 28, rarity: 'common' }, { id: 68, rarity: 'common' }, { id: 130, rarity: 'rare' }, { id: 94, rarity: 'rare' }, { id: 148, rarity: 'epic' }, { id: 143, rarity: 'legendary' }],
+]
+
+// --- Legendary pools per map (Master Ball nodes) ---
+// Fixed levels per species, tiered weakest→strongest so a Lv70 Mewtwo can't
+// appear while the player's team is still low level.
+const LEG_BIRDS = [
+  { id: 144, level: 45 }, // Articuno
+  { id: 145, level: 45 }, // Zapdos
+  { id: 146, level: 45 }, // Moltres
+]
+const LEG_MYTHIC = [
+  { id: 151, level: 60 }, // Mew
+  { id: 150, level: 70 }, // Mewtwo
+]
+const LEGENDARY_POOLS = [
+  [], [], [],                      // Maps 1–3 — none
+  LEG_BIRDS, LEG_BIRDS, LEG_BIRDS, // Maps 4–6
+  [...LEG_BIRDS, ...LEG_MYTHIC],   // Map 7
+  [...LEG_BIRDS, ...LEG_MYTHIC],   // Map 8
+]
+
+// --- Trainer node pools per map (which route-trainer icons can appear) ---
+const TRAINER_POOLS = [
+  ['Bug Catcher', 'Lass 1', 'Camper', 'Picnicker'],
+  ['Lass 2', 'Camper', 'Picnicker', 'Fisherman', 'Bird Keeper'],
+  ['Fisherman', 'Gambler', 'Rocker', 'Hiker'],
+  ['Lady', 'Gentleman 1', 'Lady', 'Gambler'],
+  ['Juggler', 'Bird Keeper', 'Poke Maniac', 'Ruin Maniac'],
+  ['Psychic', 'Channeler', 'Juggler', 'Gentleman 2'],
+  ['Burglar', 'Ace Trainer 1', 'Ace Trainer 2', 'Black Belt'],
+  ['Ace Trainer 1', 'Ace Trainer 2', 'Ruin Maniac', 'Black Belt', 'Crush Girl'],
+]
+
+// Fixed boss per map (Map 1 is starter-assigned → handled in generate()).
+const MAP_BOSSES = [null, 'Misty', 'Lt. Surge', 'Erika', 'Koga', 'Sabrina', 'Blaine', 'Giovanni']
+
+// Shared edge layout (same node structure for all maps) — mirrors Unova.
+const MAP_EDGES = [
+  [0, 1], [0, 2],
+  [1, 3], [1, 4], [2, 4], [2, 5],
+  [3, 6], [3, 7], [4, 7], [4, 8], [5, 8], [5, 9],
+  [6, 10], [7, 10], [7, 11], [8, 11], [8, 12], [9, 12],
+  [10, 13], [10, 14], [11, 14], [11, 15], [12, 15], [12, 16],
+  [13, 17], [14, 17], [14, 18], [15, 18], [15, 19], [16, 19],
+  [17, 20], [18, 20], [18, 21], [19, 21],
+  [20, 22], [21, 22],
+]
+
+// The 8 maps are Kanto's gym cities, in order (display-only labels).
+const MAP_NAMES = [
+  'Pewter City', 'Cerulean City', 'Vermilion City', 'Celadon City',
+  'Fuchsia City', 'Saffron City', 'Cinnabar Island', 'Viridian City',
+]
+
+// One map image per city (thematic match to each gym's type).
+const MAP_BACKGROUNDS = [bgRock, bgWater, bgElectric, bgGrass, bgPoison, bgPsychic, bgFire, bgGround]
+
+// Gym badges in map order (index i earned by beating map i's gym leader).
+const BADGES = [
+  { name: 'Boulder Badge', icon: badgeBoulder },
+  { name: 'Cascade Badge', icon: badgeCascade },
+  { name: 'Thunder Badge', icon: badgeThunder },
+  { name: 'Rainbow Badge', icon: badgeRainbow },
+  { name: 'Soul Badge',    icon: badgeSoul },
+  { name: 'Marsh Badge',   icon: badgeMarsh },
+  { name: 'Volcano Badge', icon: badgeVolcano },
+  { name: 'Earth Badge',   icon: badgeEarth },
+]
+
+// --- Region config ---
 export const kantoConfig = {
   name: 'Kanto',
   damageMultiplier: 2,
-  trainerSprites: {},
-  trainerFullSprites: {},
+  trainerSprites: TRAINER_SPRITES,
+  trainerFullSprites: TRAINER_FULL_SPRITES,
   characters: CHARACTERS,
-  maps: [],
+  catchPools: CATCH_POOLS,
+  legendaryPools: LEGENDARY_POOLS,
+  legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
+  badges: BADGES,
+  // Battle data (see kanto.teams.js) — read by the generic loop via config.
+  trainerSpeciesPools: TRAINER_SPECIES_POOLS,
+  bossTeams: BOSS_TEAMS,
+  eliteFourTeams: ELITE_FOUR_TEAMS,
+  mapLevelRanges: MAP_LEVEL_RANGES,
+  // Catch tuning + generic draw algorithm (game/catch.js).
+  catchTierBudget: CATCH_TIER_BUDGET,
+  pickCatchOffer,
+  // Map-1 boss depends on the chosen starter (all → Brock); fallback is Brock.
+  starterBoss: STARTER_BOSS,
+  // Species used when a map's catch/grass pool is empty (region-safe default).
+  fallbackSpeciesId: 19,
+  // Elite Four stage — a linear gauntlet after the 8th gym; beating the
+  // champion wins the run. Teams live in ELITE_FOUR_TEAMS (kanto.teams.js).
+  eliteFour: [
+    { name: 'Lorelei', type: 'ice',      sprite: owLorelei, fullSprite: Lorelei2 },
+    { name: 'Bruno',   type: 'fighting', sprite: owBruno,   fullSprite: Bruno1 },
+    { name: 'Agatha',  type: 'ghost',    sprite: owAgatha,  fullSprite: Agatha1 },
+    { name: 'Lance',   type: 'dragon',   sprite: owLance,   fullSprite: Lance1 },
+    { name: 'Blue',    type: 'champion', sprite: owBlue,    fullSprite: Blue1, champion: true },
+  ],
+  maps: MAP_BACKGROUNDS.map((background, i) => ({
+    name: MAP_NAMES[i],
+    generate: (starter) => {
+      const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Brock') : MAP_BOSSES[i]
+      return { region: 'Kanto', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss, i) }
+    },
+    edges: MAP_EDGES,
+    background,
+    grassIcon,
+  })),
 }

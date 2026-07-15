@@ -32,10 +32,14 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
   const cardBarTrack = dark ? '#2e2e2e' : '#ddd'
   const cardBarFill = dark ? '#888' : '#999'
 
+  // Show only the offensive stat the Pokémon actually uses — the one matching
+  // its move's damage class (special → Sp. Atk, physical → Attack).
+  const isSpecial = pokemon.move?.damageClass === 'special'
   // Non-HP stat bars fill against statMax; the HP bar always renders full.
   const rows = pokemon.stats && [
-    [pokemon.stats.spAtk >= pokemon.stats.attack ? 'SP.ATK' : 'ATK',
-     pokemon.stats.spAtk >= pokemon.stats.attack ? pokemon.stats.spAtk : pokemon.stats.attack, statMax],
+    isSpecial
+      ? ['SP.ATK', pokemon.stats.spAtk,   statMax]
+      : ['ATK',    pokemon.stats.attack,  statMax],
     ['SPD',    pokemon.stats.speed,   statMax],
     ['DEF',    pokemon.stats.defense, statMax],
     ['SP. D',  pokemon.stats.spDef,   statMax],

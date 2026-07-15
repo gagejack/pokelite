@@ -4,7 +4,7 @@ import { useSettings } from '../lib/settings'
 const SPEEDS = [1, 1.5, 2, 2.5, 3]
 
 export default function SettingsPanel({ onClose }) {
-  const { dark, cards } = useTheme()
+  const { dark, cards, toggle } = useTheme()
   const { battleSpeed, setSpeed } = useSettings()
 
   const borderStyle = cards ? '2px solid #121212' : '2px solid #666666'
@@ -45,6 +45,25 @@ export default function SettingsPanel({ onClose }) {
           <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>
             Settings
           </span>
+        </div>
+
+        {/* Theme row */}
+        <div style={{
+          padding: '14px', borderBottom: borderStyle,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
+            Theme
+          </span>
+          <button
+            onClick={toggle}
+            style={{
+              fontFamily: 'Upheaval', fontSize: '9px', color: textColor,
+              border: borderStyle, padding: '4px 10px', backgroundColor: innerBg, cursor: 'pointer',
+            }}
+          >
+            {dark ? 'Light' : 'Dark'}
+          </button>
         </div>
 
         {/* Battle Speed row */}

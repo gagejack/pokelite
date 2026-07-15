@@ -289,11 +289,16 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
   const k = isDesktop ? 1.7 : 1
   const s = px => `${Math.round(px * k)}px`
 
+  // A Pokémon uses only one offensive stat — the one matching its move's damage
+  // class (special → Sp. Atk, physical → Attack). Show just that one so the card
+  // doesn't display a stat the Pokémon can never use.
+  const isSpecial = move?.damageClass === 'special'
   const statRows = [
     { label: 'HP',      value: stats.maxHp },
-    { label: 'ATK',     value: stats.attack },
+    isSpecial
+      ? { label: 'SP.ATK', value: stats.spAtk }
+      : { label: 'ATK',    value: stats.attack },
     { label: 'DEF',     value: stats.defense },
-    { label: 'SP.ATK',  value: stats.spAtk },
     { label: 'SP.DEF',  value: stats.spDef },
     { label: 'SPD',     value: stats.speed },
   ]
