@@ -9,7 +9,7 @@ import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
 import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
-import resetIcon from '../assets/reset.png'
+import resetIcon from '../assets/Icons/reset.png'
 import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
 // Skip-map icon kept for the (now hidden) skip button — see below.

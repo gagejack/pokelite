@@ -18,6 +18,22 @@ const REGION_RANGES = {
   Unova:  { offset: 493, limit: 156 },
 }
 
+// Per-region completion-bar color, drawn from each region's version-game
+// identity. Each is one hue in two monochrome shades: `light` fills the bar,
+// `dark` shades its lower half for a two-tone look.
+//   Kanto  — Red version red
+//   Johto  — Gold version gold
+//   Hoenn  — Emerald green
+//   Sinnoh — Diamond/Pearl icy blue
+//   Unova  — Black/White deep slate
+const REGION_COLORS = {
+  Kanto:  { light: '#ef4444', dark: '#991b1b' },
+  Johto:  { light: '#facc15', dark: '#a16207' },
+  Hoenn:  { light: '#10b981', dark: '#065f46' },
+  Sinnoh: { light: '#38bdf8', dark: '#0369a1' },
+  Unova:  { light: '#64748b', dark: '#1e293b' },
+}
+
 export default function Stats({ onClose }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -179,7 +195,16 @@ export default function Stats({ onClose }) {
                       <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor }}>{r.have}/{r.total} · {r.pct}%</span>
                     </div>
                     <div style={{ height: '12px', backgroundColor: innerBg, border: panelBorder }}>
-                      <div style={{ width: `${r.pct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
+                      <div style={{
+                        width: `${r.pct}%`, height: '100%', transition: 'width 0.3s',
+                        // Two-tone monochrome fill: light shade on top, dark on
+                        // bottom (hard 50/50 split), colored by the region.
+                        background: `linear-gradient(to bottom,
+                          ${(REGION_COLORS[r.name] ?? { light: '#22c55e' }).light} 0%,
+                          ${(REGION_COLORS[r.name] ?? { light: '#22c55e' }).light} 50%,
+                          ${(REGION_COLORS[r.name] ?? { dark: '#15803d' }).dark} 50%,
+                          ${(REGION_COLORS[r.name] ?? { dark: '#15803d' }).dark} 100%)`,
+                      }} />
                     </div>
                   </div>
                 ))}

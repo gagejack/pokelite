@@ -7,6 +7,23 @@ export const NODE_TYPES = {
   POWER_UPGRADE: 'power_upgrade',
   POKECENTER: 'pokecenter',
   BOSS: 'boss',
+  MYSTERY: 'mystery',
+}
+
+// The concrete node types a Mystery ("?") node can resolve into, each equally
+// likely. Excludes gym leaders / Elite Four (boss), Pokémon Centers, and TM
+// upgrades — only the "encounter/reward" nodes the design calls for.
+const MYSTERY_OUTCOMES = [
+  NODE_TYPES.GRASS,
+  NODE_TYPES.TRAINER,
+  NODE_TYPES.POKEBALL,
+  NODE_TYPES.ITEM,
+  NODE_TYPES.MASTER_BALL,
+]
+
+// Resolve a Mystery node into one of its outcome types, equally weighted.
+export function resolveMysteryType() {
+  return pick(MYSTERY_OUTCOMES)
 }
 
 // Chance (0..1) that a Pokéball node is upgraded to a rare Master Ball
@@ -25,11 +42,12 @@ export function masterBallChance(mapIndex) {
 
 // % chance for each node type (must sum to 100)
 const NODE_TYPE_CHANCES = [
-  { type: NODE_TYPES.GRASS,         chance: 30 },
-  { type: NODE_TYPES.TRAINER,       chance: 30 },
-  { type: NODE_TYPES.POKEBALL,      chance: 20 },
-  { type: NODE_TYPES.ITEM,          chance: 15 },
+  { type: NODE_TYPES.GRASS,         chance: 28 },
+  { type: NODE_TYPES.TRAINER,       chance: 28 },
+  { type: NODE_TYPES.POKEBALL,      chance: 19 },
+  { type: NODE_TYPES.ITEM,          chance: 14 },
   { type: NODE_TYPES.POWER_UPGRADE, chance: 5  },
+  { type: NODE_TYPES.MYSTERY,       chance: 6  },
 ]
 
 export function pick(pool) {

@@ -364,7 +364,9 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
                 title={itemAction ? `${pokemon.heldItem.name} — click for info` : pokemon.heldItem.name}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
-                  flexShrink: 0, alignSelf: 'stretch', justifyContent: 'center',
+                  // Nudge down so the icon clears the name (was centered against
+                  // the whole header, which overlapped under the name).
+                  flexShrink: 0, alignSelf: 'flex-start', marginTop: s(30),
                   cursor: itemAction ? 'pointer' : 'default',
                 }}
               >

@@ -10,14 +10,18 @@ import PowerUpgradeNode from './PowerUpgradeNode'
 import EvolutionNotice from './EvolutionNotice'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
-import { NODE_TYPES, pick } from '../game/nodeMap.js'
-import { pickThreeItems, itemIconUrl } from '../game/items.js'
+import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
+import { pickThreeItems, itemIconUrl, BONUS_TIER_BUDGET } from '../game/items.js'
+import { BONUS_CATCH_TIER_BUDGET } from '../game/catch.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, resolveEvolutionLine } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { swapInRoster } from '../game/roster.js'
+// The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
+// a filename can't be imported, since "?" is the query separator in a specifier.)
+import mysteryIcon from '../assets/Icons/mysteryIcon2.png'
 
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
@@ -29,6 +33,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
   [NODE_TYPES.POKECENTER]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
+  [NODE_TYPES.MYSTERY]:       mysteryIcon,
 }
 
 const NODE_SIZE = 100
@@ -43,6 +48,13 @@ const BOSS_SCALE = 1.4
 const ROW_HEIGHT = 200
 const COL_WIDTH = 200
 const PADDING_TOP = 150
+// Per-row horizontal spread multipliers (keyed by row index from the top),
+// applied symmetrically so the bottom mirrors the top. Rows not listed default
+// to 1 (the plain grid). This loosens the strict angular grid a touch. The
+// spread scales each node's offset from center by this factor, so a row's
+// CENTER node (offset 0) stays put while the outer nodes move outward. The map
+// has 9 rows (0..8): row 1 mirrors row 7, and row 2 (3 nodes) mirrors row 6.
+const ROW_SPREAD = { 1: 1.6, 7: 1.6, 2: 1.35, 6: 1.35 }
 // Top/bottom breathing room (px) around the desktop map card so it doesn't
 // touch the nav bar or the window's bottom edge (matches the old py-4).
 const MAP_PAD_Y = 16
@@ -353,8 +365,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const nodePositions = {}
   mapData.rows.forEach((row, rowIndex) => {
     const totalCols = row.length
+    const spread = ROW_SPREAD[rowIndex] ?? 1
     row.forEach((node, colIndex) => {
-      const x = (colIndex - (totalCols - 1) / 2) * COL_WIDTH
+      const x = (colIndex - (totalCols - 1) / 2) * COL_WIDTH * spread
       const y = rowIndex * ROW_HEIGHT + PADDING_TOP
       nodePositions[node.id] = { x, y, node }
     })
@@ -473,8 +486,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // by node position.
     const level = pickLevel(mapLevelRange(config.mapLevelRanges, mapIndex), positionWeight)
 
-    // Draw 3 distinct species weighted by rarity tier (common/rare/epic/legendary).
-    const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
+    // Draw distinct species weighted by rarity tier. A mystery-node catch gives
+    // a bonus offer: one extra species (4 not 3) and boosted higher-rarity odds.
+    const count = node.fromMystery ? 4 : 3
+    const tierBudget = node.fromMystery ? BONUS_CATCH_TIER_BUDGET : config.catchTierBudget
+    const chosen = config.pickCatchOffer(pool, count, tierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       // Roll which evolution stage of this line to offer. The pool entry names a
@@ -493,8 +509,35 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return offered
   }
 
-  const handleNodeClick = async (node) => {
-    if (clearedNodes.has(node.id) || !isReachable(node.id)) return
+  // A Mystery ("?") node reveals a random encounter/reward on click. Resolve it
+  // to a concrete node (grass / trainer / pokeball / item / legendary), equally
+  // weighted, then run the normal click flow for that type. If it becomes a
+  // trainer, borrow a trainer name from another trainer node on this map (which
+  // was drawn from the region's route pool) so the sprite + species pool
+  // resolve correctly — never a gym leader.
+  const resolveMysteryNode = (node) => {
+    const type = resolveMysteryType()
+    // Tag the resolved node so the item / catch flows give a "bonus" offer:
+    // one extra choice and boosted rarity odds.
+    if (type === NODE_TYPES.TRAINER) {
+      const trainerNode = mapData.rows.flat().find(
+        n => n.type === NODE_TYPES.TRAINER && n.trainer
+      )
+      const trainer = trainerNode?.trainer
+        ?? Object.keys(config.trainerSprites ?? {})[0]
+      return { ...node, type, trainer, fromMystery: true }
+    }
+    return { ...node, type, fromMystery: true }
+  }
+
+  const handleNodeClick = async (rawNode) => {
+    if (clearedNodes.has(rawNode.id) || !isReachable(rawNode.id)) return
+
+    // Reveal a Mystery node before dispatching (keeps the same id, so
+    // reachability/clearing still work).
+    const node = rawNode.type === NODE_TYPES.MYSTERY
+      ? resolveMysteryNode(rawNode)
+      : rawNode
 
     const isBattle = node.type === NODE_TYPES.TRAINER
       || node.type === NODE_TYPES.BOSS
@@ -524,7 +567,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setCurrentNode(node.id)
       }
     } else if (node.type === NODE_TYPES.ITEM) {
-      const offered = pickThreeItems()
+      // A mystery-node item gives a bonus offer: one extra item (4 not 3) and
+      // boosted higher-rarity odds.
+      const offered = node.fromMystery
+        ? pickThreeItems(4, BONUS_TIER_BUDGET)
+        : pickThreeItems()
       setPendingItem({ node, offered })
     } else if (node.type === NODE_TYPES.POKECENTER) {
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
@@ -673,6 +720,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: 'Select an item' }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: 'Upgrade a move' }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
+      case NODE_TYPES.MYSTERY:       return { title: 'Mystery', sub: '???' }
       default:                       return { title: node.type, sub: '' }
     }
   }

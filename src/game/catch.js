@@ -7,6 +7,11 @@
 // tier. Regions may override with config.catchTierBudget.
 export const CATCH_TIER_BUDGET = { common: 60, rare: 25, epic: 10, legendary: 5 }
 
+// Boosted catch budget for the bonus offer from a Mystery ("?") node: commons
+// roughly halved, that weight pushed into higher tiers, so a mystery catch is
+// much likelier to offer a rare/epic/legendary species.
+export const BONUS_CATCH_TIER_BUDGET = { common: 30, rare: 35, epic: 25, legendary: 10 }
+
 // Draw `count` distinct species from a map's catch pool, weighted by rarity.
 // Returns an array of { id, rarity }.
 export function pickCatchOffer(pool, count = 3, tierBudget = CATCH_TIER_BUDGET) {
