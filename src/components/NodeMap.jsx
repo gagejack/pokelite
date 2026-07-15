@@ -292,7 +292,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, pokedexOpen, setPokedexOpen }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -304,16 +304,40 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const config = getRegionConfig(region.name)
   const mapConfig = config.maps[mapIndex]
 
-  const mapData = useMemo(() => mapConfig.generate(starter), [mapConfig])
+  // Use the restored layout when resuming a saved run (its generate() is random,
+  // so re-generating would give a DIFFERENT map). Only reuse it if it's for this
+  // same map index, otherwise generate fresh.
+  const mapData = useMemo(
+    () => (initialMapData && initialMapData.mapIndex === mapIndex)
+      ? initialMapData
+      : mapConfig.generate(starter),
+    [mapConfig] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const edges = mapConfig.edges
 
-  const [clearedNodes, setClearedNodes] = useState(new Set([0]))
-  const [currentNode, setCurrentNode] = useState(0)
+  // Seed node progress from a resumed run when it matches this map (else fresh).
+  const resumeMatches = initialMapData && initialMapData.mapIndex === mapIndex
+  const [clearedNodes, setClearedNodes] = useState(
+    () => resumeMatches && initialClearedNodes ? new Set(initialClearedNodes) : new Set([0])
+  )
+  const [currentNode, setCurrentNode] = useState(
+    () => resumeMatches && initialCurrentNode != null ? initialCurrentNode : 0
+  )
   const [pendingBattle, setPendingBattle] = useState(null)
   const [pendingPokeball, setPendingPokeball] = useState(null)
   const [pendingLegendary, setPendingLegendary] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
+
+  // Keep the parent's snapshot of this map's progress current, so hitting Home
+  // can save exactly where the player is (layout + cleared nodes + position).
+  useEffect(() => {
+    onProgressChange?.({
+      mapData,
+      clearedNodes: [...clearedNodes],
+      currentNode,
+    })
+  }, [mapData, clearedNodes, currentNode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loadingNode, setLoadingNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
   const [evolutionNotices, setEvolutionNotices] = useState([])

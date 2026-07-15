@@ -9,6 +9,7 @@ import EliteFour from './components/EliteFour'
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
 import { supabase } from './lib/supabase.js'
+import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
 // Character select is skipped for now — every run uses this default protagonist.
@@ -32,6 +33,30 @@ export default function App() {
   const pokemonCaught = useRef(0)
   const pokemonCaughtIds = useRef([])
   const pokemonSeenIds = useRef([])
+
+  // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
+  // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
+  // can persist exactly where the player is. `savedRunData` caches the loaded
+  // run so Resume can restore it without another fetch.
+  const [hasSavedRun, setHasSavedRun] = useState(false)
+  const mapProgress = useRef(null)
+  const savedRunData = useRef(null)
+  // True once the current run has ended (win/loss). A finished run must not be
+  // saved as resumable when the player then hits Home.
+  const runEnded = useRef(false)
+
+  // On load / auth change, check whether a saved run exists (logged in → the
+  // account, logged out → localStorage) so the menu can show "Resume Run".
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const run = await loadRun(user)
+      if (cancelled) return
+      savedRunData.current = run
+      setHasSavedRun(!!run)
+    })()
+    return () => { cancelled = true }
+  }, [user])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
@@ -72,10 +97,100 @@ export default function App() {
     setRoster([])
     resetRunStats()
     initRoster(starter)
+    // Starting a fresh run discards any previously saved one.
+    mapProgress.current = null
+    savedRunData.current = null
+    runEnded.current = false
+    setHasSavedRun(false)
+    clearRun(user)
     setScreen('nodemap')
   }
 
+  // Serialize the current run into a saved-run snapshot. Returns null if there's
+  // no meaningful run to save (no starter, or no live map progress yet).
+  function buildRunSnapshot() {
+    if (!selectedStarter || !selectedRegion || !mapProgress.current) return null
+    return {
+      region: selectedRegion,
+      starter: selectedStarter,
+      character: selectedCharacter,
+      roster,
+      bag,
+      mapIndex,
+      stats: {
+        mapsCleared: mapsCleared.current,
+        pokemonCaught: pokemonCaught.current,
+        pokemonCaughtIds: pokemonCaughtIds.current,
+        pokemonSeenIds: pokemonSeenIds.current,
+      },
+      map: mapProgress.current, // { mapData, clearedNodes, currentNode }
+      savedAt: Date.now(),
+    }
+  }
+
+  // Home mid-run: persist a snapshot (account if logged in, else localStorage),
+  // then return to the menu where "Resume Run" will appear. A finished run
+  // (win/loss) is never saved as resumable.
+  async function saveAndExitToMenu() {
+    const snapshot = runEnded.current ? null : buildRunSnapshot()
+    if (snapshot) {
+      savedRunData.current = snapshot
+      setHasSavedRun(true)
+      await saveRun(snapshot, user)
+    } else {
+      // Ended run (or nothing to save) → make sure no stale save lingers.
+      savedRunData.current = null
+      setHasSavedRun(false)
+      clearRun(user)
+    }
+    clearRunState()
+    setScreen('menu')
+  }
+
+  // Restore a saved run and jump back into it.
+  function resumeRun() {
+    const run = savedRunData.current
+    if (!run) return
+    setSelectedRegion(run.region)
+    setSelectedCharacter(run.character ?? DEFAULT_CHARACTER)
+    setSelectedStarter(run.starter)
+    setRoster(run.roster ?? [])
+    setBag(run.bag ?? [])
+    setMapIndex(run.mapIndex ?? 0)
+    mapsCleared.current = run.stats?.mapsCleared ?? 0
+    pokemonCaught.current = run.stats?.pokemonCaught ?? 0
+    pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
+    pokemonSeenIds.current = run.stats?.pokemonSeenIds ?? []
+    // Feed the current map's layout + node progress to NodeMap on mount.
+    mapProgress.current = run.map ?? null
+    runEnded.current = false
+    // A resumed run is no longer "saved" — it's active again. Clear the store so
+    // it doesn't linger if the tab is refreshed mid-run without hitting Home.
+    savedRunData.current = null
+    setHasSavedRun(false)
+    clearRun(user)
+    // Prewarm sprites for the region, then show the map.
+    const config = getRegionConfig(run.region.name)
+    if (config) prewarmCache(config)
+    setScreen('nodemap')
+  }
+
+  // Clear only the in-memory run STATE (not the persisted save). Used when
+  // leaving to the menu after a save, and by resetRun below.
+  function clearRunState() {
+    setSelectedRegion(null)
+    setSelectedCharacter(DEFAULT_CHARACTER)
+    setSelectedStarter(null)
+    setRoster([])
+    setBag([])
+    setMapIndex(0)
+    mapProgress.current = null
+  }
+
   async function recordRunEnd(result) {
+    // The run is over — it must not be saved as resumable (even for guests, who
+    // don't get a `runs` row but still shouldn't keep a dead localStorage save).
+    runEnded.current = true
     if (!user) return
     const payload = {
       user_id: user.id,
@@ -199,16 +314,6 @@ export default function App() {
     })
   }
 
-  function resetRun() {
-    setSelectedRegion(null)
-    setSelectedCharacter(DEFAULT_CHARACTER)
-    setSelectedStarter(null)
-    setRoster([])
-    setBag([])
-    setMapIndex(0)
-    setScreen('menu')
-  }
-
   function restartRun() {
     if (!selectedStarter) return
     // The run is already saved at the moment of defeat (BattleCard onDefeat),
@@ -219,6 +324,9 @@ export default function App() {
     setMapIndex(0)
     resetRunStats()
     initRoster(selectedStarter)
+    // Fresh run: drop any resumable save + reset the ended flag.
+    mapProgress.current = null
+    runEnded.current = false
     setScreen('restarting')
     setTimeout(() => setScreen('nodemap'), 0)
     setTimeout(() => setResetting(false), 300)
@@ -237,6 +345,8 @@ export default function App() {
       {screen === 'menu' && (
         <MainMenu
           onPlay={() => setScreen('region')}
+          hasSavedRun={hasSavedRun}
+          onResume={resumeRun}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -277,7 +387,7 @@ export default function App() {
           onItemKeepInBag={handleItemKeepInBag}
           onMoveItem={moveItem}
           mapIndex={mapIndex}
-          onBack={resetRun}
+          onBack={saveAndExitToMenu}
           onRestart={restartRun}
           onAdvanceMap={advanceMap}
           onEnterEliteFour={() => setScreen('elitefour')}
@@ -289,6 +399,10 @@ export default function App() {
           onMapCleared={handleMapCleared}
           onBadgeEarned={recordBadgeEarned}
           onRunEnd={recordRunEnd}
+          onProgressChange={p => { mapProgress.current = p }}
+          initialMapData={mapProgress.current?.mapData}
+          initialClearedNodes={mapProgress.current?.clearedNodes}
+          initialCurrentNode={mapProgress.current?.currentNode}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -299,7 +413,7 @@ export default function App() {
           character={selectedCharacter}
           roster={roster}
           setRoster={setRoster}
-          onBack={resetRun}
+          onBack={saveAndExitToMenu}
           onRestart={restartRun}
           onMapCleared={handleMapCleared}
           onRunEnd={recordRunEnd}

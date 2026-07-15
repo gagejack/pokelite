@@ -5,7 +5,7 @@ import LoginForm from './LoginForm'
 import MainPlayButton from '../assets/collage.webp'
 import { supabase } from '../lib/supabase'
 
-export default function MainMenu({ onPlay, pokedexOpen, setPokedexOpen }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const [loggedIn, setLoggedIn] = useState(false)
 
@@ -56,6 +56,23 @@ export default function MainMenu({ onPlay, pokedexOpen, setPokedexOpen }) {
             <span style={{ fontSize: '26px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>PLAY</span>
           </div>
         </button>
+
+        {/* Resume Run — same green box as Play, shown only when a run is saved. */}
+        {hasSavedRun && (
+          <button
+            onClick={onResume}
+            className="hover:scale-105 active:scale-95 transition-transform duration-150"
+            style={{
+              width: '320px', maxWidth: '100%', height: '40px',
+              backgroundColor: '#22c55e',
+              border: borderStyle,
+              boxShadow: shadowStyle,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: '22px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>RESUME RUN</span>
+          </button>
+        )}
 
         {/* Auth card — hidden once logged in */}
         {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
