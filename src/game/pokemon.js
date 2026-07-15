@@ -34,6 +34,8 @@ export async function prewarmCache(regionConfig) {
   regionConfig.catchPools?.forEach(pool => pool.forEach(m => ids.add(m.id)))
   // Trainer pools (per-map arrays of ids)
   regionConfig.trainerSpeciesPools?.forEach(pool => pool.forEach(id => ids.add(id)))
+  // Themed per-class trainer pools ({ [trainerName]: [baseFormId] })
+  Object.values(regionConfig.trainerTypePools ?? {}).forEach(pool => pool.forEach(id => ids.add(id)))
   // Boss teams + Elite Four teams (keyed by trainer name → [{ id, level }])
   Object.values(regionConfig.bossTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   Object.values(regionConfig.eliteFourTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
@@ -225,6 +227,31 @@ export async function resolveEvolutionLine(pokeId) {
     node = nextNode
   }
   return stages
+}
+
+// Given a base-form species id and a level, return the id of the evolution stage
+// to actually use. Resolves the full line, keeps stages whose evolution level is
+// ≤ level, and picks one weighted toward the most-evolved (weight = stage index
+// + 1). Falls back to the original id if the line can't be resolved. Shared by
+// catch nodes (offered wild Pokémon) and themed trainer teams so both gate
+// evolution by level identically.
+export async function rollStageForLevel(id, level) {
+  let stages
+  try {
+    stages = await resolveEvolutionLine(id)
+  } catch {
+    return id
+  }
+  if (!stages || stages.length === 0) return id
+  const eligible = stages.filter(s => s.minLevel <= level)
+  if (eligible.length === 0) return stages[0].id
+  const total = eligible.reduce((s, _, i) => s + (i + 1), 0)
+  let roll = Math.random() * total
+  for (let i = 0; i < eligible.length; i++) {
+    roll -= i + 1
+    if (roll <= 0) return eligible[i].id
+  }
+  return eligible[eligible.length - 1].id
 }
 
 // Check if a Pokémon should evolve after reaching newLevel.

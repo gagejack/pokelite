@@ -582,6 +582,35 @@ const LEGENDARY_POOLS = [
 ]
 
 // --- Trainer pools per map ---
+// --- Themed trainer pools (per class) ---
+// Keys match the trainer names in TRAINER_POOLS. Base forms only — the engine
+// rolls the evolution stage by the mon's level. Classes not listed fall back to
+// the map route pool (Schoolkid M/F, Ace Trainer M/F, Veteran M/F stay generic).
+const TRAINER_TYPE_POOLS = {
+  'Youngster':        [504, 506, 519],                     // Patrat, Lillipup, Pidove
+  'Lass':             [506, 509, 572, 531],                // Lillipup, Purrloin, Minccino, Audino
+  'Preschooler M':    [504, 519, 517, 527],                // Patrat, Pidove, Munna, Woobat
+  'Preschooler F':    [504, 519, 517, 527],
+  'Backpacker M':     [551, 524, 529, 557],                // Sandile, Roggenrola, Drilbur, Dwebble
+  'Backpacker F':     [551, 524, 529, 557],
+  'Janitor':          [572, 522, 568],                     // Minccino, Blitzle, Trubbish
+  'Nursery Aide':     [531, 517, 546, 548],                // Audino, Munna, Cottonee, Petilil
+  'Twins':            [572, 548, 546, 527],                // Minccino, Petilil, Cottonee, Woobat
+  'Hiker':            [524, 529, 551, 557],                // Roggenrola, Drilbur, Sandile, Dwebble
+  'Worker M':         [532, 529, 524, 599],                // Timburr, Drilbur, Roggenrola, Klink
+  'Worker F':         [532, 529, 524, 599],
+  'Roughneck':        [559, 509, 543, 568],                // Scraggy, Purrloin, Venipede, Trubbish
+  'Cyclist M':        [522, 587, 595],                     // Blitzle, Emolga, Joltik
+  'Cyclist F':        [522, 587, 595],
+  'Biker':            [543, 559, 568, 624],                // Venipede, Scraggy, Trubbish, Pawniard
+  'Depot Agent':      [599, 595, 522, 602],                // Klink, Joltik, Blitzle, Tynamo
+  'Pokemon Ranger M': [540, 546, 548, 585, 590],           // Sewaddle, Cottonee, Petilil, Deerling, Foongus
+  'Pokemon Ranger F': [540, 546, 548, 585, 590],
+  'Pilot':            [519, 527, 580, 627],                // Pidove, Woobat, Ducklett, Rufflet
+  'Black Belt':       [532, 538, 539, 619],                // Timburr, Throh, Sawk, Mienfoo
+  'Battle Girl':      [532, 619, 559],                     // Timburr, Mienfoo, Scraggy
+}
+
 const TRAINER_POOLS = [
   ['Youngster', 'Lass', 'Preschooler M', 'Preschooler F', 'Schoolkid M', 'Schoolkid F', 'Backpacker M', 'Backpacker F', 'Janitor'],
   ['Nursery Aide', 'Youngster', 'Lass', 'Twins', 'Backpacker M', 'Backpacker F'],
@@ -646,6 +675,7 @@ export const unovaConfig = {
   badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
+  trainerTypePools: TRAINER_TYPE_POOLS,
   bossTeams: BOSS_TEAMS,
   eliteFourTeams: ELITE_FOUR_TEAMS,
   mapLevelRanges: MAP_LEVEL_RANGES,

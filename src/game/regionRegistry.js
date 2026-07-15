@@ -21,7 +21,10 @@ import { sinnohConfig } from './regions/sinnoh.js'
 //   legendaryPools:     [ [{ id, level }] ],           // per-map Master Ball pools
 //   catchTierBudget:    { common, rare, epic, legendary },
 //   pickCatchOffer:     (pool, count, tierBudget) => [{ id, rarity }],
-//   trainerSpeciesPools:[ [id] ],                      // per-map (8) trainer pools
+//   trainerSpeciesPools:[ [id] ],                      // per-map (8) trainer pools (fallback)
+//   trainerTypePools:   { [name]: [baseFormId] },      // optional per-class themed pool
+//                                                      // (base forms; stage rolled by level).
+//                                                      // Missing key → uses trainerSpeciesPools.
 //   mapLevelRanges:     [ [min, max] ],                // per-map (8) level bands
 //   bossTeams:          { [name]: [{ id, level }] },   // gym leaders
 //   eliteFourTeams:     { [name]: [{ id, level }] },   // E4 + champion

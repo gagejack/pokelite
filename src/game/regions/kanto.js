@@ -328,6 +328,35 @@ const TRAINER_FULL_SPRITES = {
 // Bulbasaur(1), Charmander(4), Squirtle(7) → Brock.
 const STARTER_BOSS = { 1: 'Brock', 4: 'Brock', 7: 'Brock' }
 
+// --- Themed trainer pools (per class) ---
+// Keys match the trainer names in TRAINER_POOLS. Each is BASE FORMS only — the
+// engine rolls the evolution stage by the mon's level (early maps → base, late
+// maps → evolved). Classes not listed fall back to the map's route pool
+// (TRAINER_SPECIES_POOLS): Ace Trainer 1/2 stay "anything goes".
+const TRAINER_TYPE_POOLS = {
+  'Bug Catcher':  [10, 13, 46, 48],                 // Caterpie, Weedle, Paras, Venonat
+  'Fisherman':    [129, 60, 118, 120, 116],         // Magikarp, Poliwag, Goldeen, Staryu, Horsea
+  'Bird Keeper':  [16, 21, 84, 41, 83],             // Pidgey, Spearow, Doduo, Zubat, Farfetch'd
+  'Hiker':        [74, 95, 27, 50, 66],             // Geodude, Onix, Sandshrew, Diglett, Machop
+  'Camper':       [27, 104, 32, 74],                // Sandshrew, Cubone, Nidoran♂, Geodude
+  'Picnicker':    [43, 69, 19, 29],                 // Oddish, Bellsprout, Rattata, Nidoran♀
+  'Lass 1':       [19, 35, 39, 52, 25],             // Rattata, Clefairy, Jigglypuff, Meowth, Pikachu
+  'Lass 2':       [19, 35, 39, 52, 25],
+  'Rocker':       [100, 81, 25, 125],               // Voltorb, Magnemite, Pikachu, Electabuzz
+  'Gambler':      [58, 37, 100, 77],                // Growlithe, Vulpix, Voltorb, Ponyta
+  'Psychic':      [63, 79, 96, 122],                // Abra, Slowpoke, Drowzee, Mr. Mime
+  'Channeler':    [92, 92, 104],                    // Gastly (→ Haunter/Gengar via roll), Cubone
+  'Juggler':      [96, 63, 100, 122],               // Drowzee, Abra, Voltorb, Mr. Mime
+  'Burglar':      [58, 37, 77, 126],                // Growlithe, Vulpix, Ponyta, Magmar
+  'Black Belt':   [66, 56, 106, 107],               // Machop, Mankey, Hitmonlee, Hitmonchan
+  'Crush Girl':   [66, 56, 60],                     // Machop, Mankey, Poliwag
+  'Poke Maniac':  [104, 111, 79, 131, 115],         // Cubone, Rhyhorn, Slowpoke, Lapras, Kangaskhan
+  'Ruin Maniac':  [74, 95, 111, 104],               // Geodude, Onix, Rhyhorn, Cubone
+  'Lady':         [52, 35, 58, 37, 25],             // Meowth, Clefairy, Growlithe, Vulpix, Pikachu
+  'Gentleman 1':  [52, 35, 58, 37, 25],
+  'Gentleman 2':  [52, 35, 58, 37, 25],
+}
+
 // --- Catch pools per map ---
 // Each entry is { id, rarity }. Pokéball nodes draw 3 by rarity weight. Pools
 // are evolution-gated by band (base forms early, evolved forms possible late —
@@ -433,6 +462,7 @@ export const kantoConfig = {
   badges: BADGES,
   // Battle data (see kanto.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
+  trainerTypePools: TRAINER_TYPE_POOLS,
   bossTeams: BOSS_TEAMS,
   eliteFourTeams: ELITE_FOUR_TEAMS,
   mapLevelRanges: MAP_LEVEL_RANGES,

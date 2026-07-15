@@ -21,9 +21,15 @@ const MYSTERY_OUTCOMES = [
   NODE_TYPES.MASTER_BALL,
 ]
 
-// Resolve a Mystery node into one of its outcome types, equally weighted.
-export function resolveMysteryType() {
-  return pick(MYSTERY_OUTCOMES)
+// Resolve a Mystery node into one of its outcome types, equally weighted among
+// the AVAILABLE outcomes. On maps with no legendary pool a Master Ball outcome
+// would produce an empty battle (the node would silently do nothing), so pass
+// allowLegendary=false there to drop it from the roll.
+export function resolveMysteryType({ allowLegendary = true } = {}) {
+  const outcomes = allowLegendary
+    ? MYSTERY_OUTCOMES
+    : MYSTERY_OUTCOMES.filter(t => t !== NODE_TYPES.MASTER_BALL)
+  return pick(outcomes)
 }
 
 // Chance (0..1) that a Pokéball node is upgraded to a rare Master Ball

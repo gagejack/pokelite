@@ -14,7 +14,7 @@ import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl, BONUS_TIER_BUDGET } from '../game/items.js'
 import { BONUS_CATCH_TIER_BUDGET } from '../game/catch.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, resolveEvolutionLine } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
@@ -448,9 +448,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       specs = pool.length > 0 ? [pick(pool)] : []
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
-      const pool = config.trainerSpeciesPools?.[Math.min(mapIndex, (config.trainerSpeciesPools?.length ?? 1) - 1)] ?? []
       const band = mapLevelRange(config.mapLevelRanges, mapIndex)
+      // Prefer a pool themed to this trainer's class (e.g. Fisherman → Water);
+      // themed pools are authored as base forms, so we roll each mon's evolution
+      // stage by its level (same gating as catch nodes). Classes with no themed
+      // pool fall back to the map's shared species pool (uniform, no roll).
+      const themed = config.trainerTypePools?.[node.trainer]
+      const pool = themed?.length
+        ? themed
+        : config.trainerSpeciesPools?.[Math.min(mapIndex, (config.trainerSpeciesPools?.length ?? 1) - 1)] ?? []
       specs = buildTrainerTeamSpec(pool, band, count, positionWeight)
+      if (themed?.length) {
+        specs = await Promise.all(
+          specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level) }))
+        )
+      }
     } else {
       // Grass: one wild Pokémon from this map's catch pool, a few levels below
       // the map's trainers, scaled by node position. Grass ignores rarity —
@@ -476,31 +488,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return { team, trainerSprite }
   }
 
-  // Given a pool species id and a catch-node level, return the id of the
-  // evolution stage to actually offer. Resolves the full line, keeps stages
-  // whose evolution level is ≤ catchLevel, and picks one weighted toward the
-  // most-evolved (weight = stage index + 1). Falls back to the original id if
-  // the line can't be resolved. See fetchOfferedPokemon for the design.
-  async function rollCatchStage(id, catchLevel) {
-    let stages
-    try {
-      stages = await resolveEvolutionLine(id)
-    } catch {
-      return id
-    }
-    if (!stages || stages.length === 0) return id
-    const eligible = stages.filter(s => s.minLevel <= catchLevel)
-    if (eligible.length === 0) return stages[0].id
-    // Favor most-evolved: later eligible stages get proportionally more weight.
-    const total = eligible.reduce((s, _, i) => s + (i + 1), 0)
-    let roll = Math.random() * total
-    for (let i = 0; i < eligible.length; i++) {
-      roll -= i + 1
-      if (roll <= 0) return eligible[i].id
-    }
-    return eligible[eligible.length - 1].id
-  }
-
   async function fetchOfferedPokemon(node) {
     const pool = config.catchPools?.[mapIndex] ?? []
     if (pool.length === 0) return []
@@ -524,7 +511,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // eligible (early maps → base forms only; late maps → any stage). Odds
       // favor the most-evolved eligible stage. Rarity stays the pool's. Grass
       // and trainers don't call this, so they're unaffected.
-      const speciesId = await rollCatchStage(id, level)
+      const speciesId = await rollStageForLevel(id, level)
       const base = await fetchPokemonBase(speciesId)
       const instance = buildPokemonInstance(base, level)
       return { ...instance, level, rarity }
@@ -541,7 +528,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // was drawn from the region's route pool) so the sprite + species pool
   // resolve correctly — never a gym leader.
   const resolveMysteryNode = (node) => {
-    const type = resolveMysteryType()
+    // Only allow a legendary (Master Ball) outcome where this map actually has a
+    // legendary pool — otherwise it would resolve to an empty battle and the
+    // node would appear to do nothing.
+    const hasLegendary = (config.legendaryPools?.[mapIndex]?.length ?? 0) > 0
+    const type = resolveMysteryType({ allowLegendary: hasLegendary })
     // Tag the resolved node so the item / catch flows give a "bonus" offer:
     // one extra choice and boosted rarity odds.
     if (type === NODE_TYPES.TRAINER) {
@@ -706,11 +697,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function getNodeLabel(node) {
     if (node.type === NODE_TYPES.TRAINER) {
-      // Trainer teams are drawn from the map's species pool at battle time, so
-      // the exact team isn't known here — show the route's typical variety.
+      // Trainer teams are drawn at battle time, so the exact team isn't known
+      // here — show the class's typical variety. A themed class shows its own
+      // pool's types (usually one clean chip); others show the map pool's mix.
       // Types come from the prewarmed base cache (see prewarmCache/cachedType).
+      const themed = config.trainerTypePools?.[node.trainer]
       const pools = config.trainerSpeciesPools ?? []
-      const pool = pools[Math.min(mapIndex, pools.length - 1)] ?? []
+      const pool = themed?.length ? themed : (pools[Math.min(mapIndex, pools.length - 1)] ?? [])
       const types = [...new Set(pool.map(id => cachedType(id)).filter(Boolean))]
       const typeLine = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : null
       // Types line (if known), then the level-reward line.
