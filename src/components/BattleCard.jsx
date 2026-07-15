@@ -19,6 +19,11 @@ const PROJECTILE_DURATION = PROJECTILE_MS / 1000
 // the next Pokémon. Matches the AnimatedHpBar 0.6s width transition.
 const FAINT_DRAIN_MS = 650
 
+// Natural (unscaled) size of the mobile battle card. The card is rendered at
+// this fixed size then transform-scaled to fit the viewport below the navbar.
+const MOBILE_CARD_W = 380
+const MOBILE_CARD_H = 640
+
 export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -100,6 +105,26 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const playerActiveRef = useRef(null)
   const enemyActiveRef = useRef(null)
   const [mobileFx, setMobileFx] = useState(null) // { orbFrom, orbTo, animAt } in arena-local px
+
+  // Mobile: proportionally scale the fixed-size card so it fits entirely in the
+  // area below the navbar and above the bottom (like the node-map scaling).
+  const [fitScale, setFitScale] = useState(1)
+  const [navH, setNavH] = useState(0)
+  useEffect(() => {
+    if (isDesktop) return
+    const compute = () => {
+      const h = document.querySelector('[data-navbar]')?.getBoundingClientRect().height ?? 0
+      const pad = 12 // breathing room around the card
+      const availW = window.innerWidth - pad * 2
+      const availH = window.innerHeight - h - pad * 2
+      const s = Math.min(availW / MOBILE_CARD_W, availH / MOBILE_CARD_H, 1)
+      setNavH(h)
+      setFitScale(s > 0 ? s : 1)
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [isDesktop])
 
   useEffect(() => {
     if (phase !== 'battle') return
@@ -370,10 +395,17 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       <div onClick={e => e.stopPropagation()} style={{
         position: 'fixed', inset: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        // Reserve the navbar so the card centers in the area below it.
+        paddingTop: `${navH}px`, boxSizing: 'border-box',
         backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100,
       }}>
         <div style={{
-          width: '380px', height: '640px', maxHeight: '94vh',
+          // Rendered at natural size, then proportionally scaled to fit the
+          // area below the navbar and above the bottom — the whole card, sprites
+          // and text included, shrinks together.
+          width: `${MOBILE_CARD_W}px`, height: `${MOBILE_CARD_H}px`,
+          transform: `scale(${fitScale})`, transformOrigin: 'center center',
+          flexShrink: 0,
           border: borderStyle, boxShadow: shadowStyle, backgroundColor: cardBg,
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
@@ -1030,9 +1062,9 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
   } : {}
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{
-        width: '100%', borderBottom: borderStyle,
+        width: '100%', borderBottom: borderStyle, flexShrink: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '6px 4px 3px', gap: '2px',
       }}>

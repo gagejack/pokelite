@@ -140,17 +140,39 @@ export function buildPokemonInstance(base, level, isStarter = false) {
 // stage. One chain fetch fills the whole evolutionary line, so repeat
 // checkEvolution calls after every battle cost zero network.
 const evoCache = new Map()
+// Raw evolution-chain root (the PokéAPI `chain` tree) cached per species id, so
+// checkEvolution and resolveEvolutionLine share a single network fetch per line.
+const chainCache = new Map()
 
-// Fetch a Pokémon's evolution chain and cache the outcome for every species
-// in it. Failures leave the cache unset so a later call can retry.
-async function loadEvolutionLine(pokeId) {
+// Fetch a Pokémon's raw evolution-chain tree and cache the root node for every
+// species id in it. Returns the root, or null on failure (leaves cache unset so
+// a later call can retry).
+async function loadEvolutionChain(pokeId) {
+  if (chainCache.has(pokeId)) return chainCache.get(pokeId)
   const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${pokeId}`)
-  if (!speciesRes.ok) return
+  if (!speciesRes.ok) return null
   const species = await speciesRes.json()
 
   const chainRes = await fetch(species.evolution_chain.url)
-  if (!chainRes.ok) return
+  if (!chainRes.ok) return null
   const chainData = await chainRes.json()
+
+  // Cache the shared root under every species id in the line so any member
+  // resolves without another fetch.
+  const register = node => {
+    const id = Number(node.species.url.match(/\/(\d+)\/?$/)?.[1])
+    if (id) chainCache.set(id, chainData.chain)
+    node.evolves_to.forEach(register)
+  }
+  register(chainData.chain)
+  return chainData.chain
+}
+
+// Fetch a Pokémon's evolution chain and cache the (next-stage) outcome for every
+// species in it. Failures leave the cache unset so a later call can retry.
+async function loadEvolutionLine(pokeId) {
+  const chain = await loadEvolutionChain(pokeId)
+  if (!chain) return
 
   const walk = node => {
     const id = Number(node.species.url.match(/\/(\d+)\/?$/)?.[1])
@@ -166,7 +188,43 @@ async function loadEvolutionLine(pokeId) {
     }
     node.evolves_to.forEach(walk)
   }
-  walk(chainData.chain)
+  walk(chain)
+}
+
+// Resolve a species' full evolutionary line as an ordered list of stages, from
+// the base form forward. Each stage is { id, minLevel } where minLevel is the
+// cumulative level a caught Pokémon must be to legitimately be at that stage
+// (base = 1). Branches are followed randomly (see `walk`), matching the "random
+// branch" catch-node design. Returns [] on failure (caller falls back to the
+// pool's own id). Used only by catch nodes — grass/trainers are untouched.
+export async function resolveEvolutionLine(pokeId) {
+  const root = await loadEvolutionChain(pokeId)
+  if (!root) return []
+
+  const idOf = node => Number(node.species.url.match(/\/(\d+)\/?$/)?.[1])
+  const stages = []
+  let node = root
+  let cumulativeLevel = 1
+  while (node) {
+    const id = idOf(node)
+    if (!id) break
+    stages.push({ id, minLevel: cumulativeLevel })
+    // Pick a random branch among level-up evolutions; a stage is only reachable
+    // by catching if it evolves by level (item/trade evolutions are skipped so
+    // we never offer a form the player couldn't have leveled into).
+    const branches = node.evolves_to.filter(n =>
+      n.evolution_details.some(d => d.trigger.name === 'level-up' && d.min_level != null)
+    )
+    if (branches.length === 0) break
+    const nextNode = branches[Math.floor(Math.random() * branches.length)]
+    const minLevel = nextNode.evolution_details.find(d =>
+      d.trigger.name === 'level-up' && d.min_level != null
+    ).min_level
+    // Cumulative: a later stage can't be reached below its own evolution level.
+    cumulativeLevel = Math.max(cumulativeLevel, minLevel)
+    node = nextNode
+  }
+  return stages
 }
 
 // Check if a Pokémon should evolve after reaching newLevel.

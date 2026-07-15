@@ -13,7 +13,7 @@ import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, resolveEvolutionLine } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
@@ -438,6 +438,31 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return { team, trainerSprite }
   }
 
+  // Given a pool species id and a catch-node level, return the id of the
+  // evolution stage to actually offer. Resolves the full line, keeps stages
+  // whose evolution level is ≤ catchLevel, and picks one weighted toward the
+  // most-evolved (weight = stage index + 1). Falls back to the original id if
+  // the line can't be resolved. See fetchOfferedPokemon for the design.
+  async function rollCatchStage(id, catchLevel) {
+    let stages
+    try {
+      stages = await resolveEvolutionLine(id)
+    } catch {
+      return id
+    }
+    if (!stages || stages.length === 0) return id
+    const eligible = stages.filter(s => s.minLevel <= catchLevel)
+    if (eligible.length === 0) return stages[0].id
+    // Favor most-evolved: later eligible stages get proportionally more weight.
+    const total = eligible.reduce((s, _, i) => s + (i + 1), 0)
+    let roll = Math.random() * total
+    for (let i = 0; i < eligible.length; i++) {
+      roll -= i + 1
+      if (roll <= 0) return eligible[i].id
+    }
+    return eligible[eligible.length - 1].id
+  }
+
   async function fetchOfferedPokemon(node) {
     const pool = config.catchPools?.[mapIndex] ?? []
     if (pool.length === 0) return []
@@ -452,7 +477,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
-      const base = await fetchPokemonBase(id)
+      // Roll which evolution stage of this line to offer. The pool entry names a
+      // stage, but catch nodes present a random stage of its whole line: only
+      // stages whose evolution level is at/below this node's catch level are
+      // eligible (early maps → base forms only; late maps → any stage). Odds
+      // favor the most-evolved eligible stage. Rarity stays the pool's. Grass
+      // and trainers don't call this, so they're unaffected.
+      const speciesId = await rollCatchStage(id, level)
+      const base = await fetchPokemonBase(speciesId)
       const instance = buildPokemonInstance(base, level)
       return { ...instance, level, rarity }
     }))

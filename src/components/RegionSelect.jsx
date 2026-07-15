@@ -50,10 +50,12 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
           backgroundColor: '#1a1a1a',
         }}
       >
-        {/* Battle-scene backdrop, darkened ~55% */}
-        <img src={DayBattleBackground} alt="" style={{
+        {/* Region map backdrop — blurred + darkened so the legendaries and text
+            stay legible over it. */}
+        <img src={region.map} alt="" style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'cover', filter: available ? 'brightness(0.45)' : 'brightness(0.28) grayscale(0.5)',
+          objectFit: 'cover', transform: 'scale(1.05)',
+          filter: available ? 'blur(1.5px) brightness(0.75)' : 'blur(1.5px) brightness(0.3) grayscale(0.5)',
         }} />
         {/* Legendary duo — fills the box as the background */}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

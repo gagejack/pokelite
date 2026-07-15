@@ -113,7 +113,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
     }}>
-      <div style={{
+      <div data-navbar style={{
         position: 'relative',
         display: 'flex', alignItems: 'center', gap: '16px',
         padding: '8px 12px',
