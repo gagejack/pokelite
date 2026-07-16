@@ -3,6 +3,7 @@ import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
 import { displayName } from '../game/pokemon.js'
+import { POKEMON_TYPES } from '../game/pokemonTypes.js'
 import { supabase } from '../lib/supabase'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
@@ -68,33 +69,19 @@ export default function Pokedex({ onClose }) {
     const { offset, limit } = GEN_RANGES[selectedGen]
     const ac = new AbortController()
     setLoadingPokemon(true)
+    // Only the names list needs a fetch; types come from the static
+    // POKEMON_TYPES table (no per-mon detail requests — this used to fire up to
+    // 649 in a burst on the "All" tab).
     fetch(`https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`, { signal: ac.signal })
       .then(r => r.json())
       .then(data => {
-        const base = data.results.map((p, i) => ({ name: displayName(p.name), id: offset + i + 1, types: null }))
-        setPokemon(base)
-        setLoadingPokemon(false)
-        // Fetch types in parallel, update each as it arrives. Cache the gen
-        // only once every detail has resolved — an aborted (tab switch) or
-        // partly failed pass is simply not cached and refetches next time.
-        const complete = [...base]
-        let resolved = 0
-        base.forEach((p, i) => {
-          fetch(`https://pokeapi.co/api/v2/pokemon/${p.id}`, { signal: ac.signal })
-            .then(r => r.json())
-            .then(detail => {
-              const types = detail.types.map(t => t.type.name)
-              complete[i] = { ...complete[i], types }
-              resolved += 1
-              if (resolved === base.length) genCache.set(selectedGen, complete)
-              setPokemon(prev => {
-                const next = [...prev]
-                next[i] = { ...next[i], types }
-                return next
-              })
-            })
-            .catch(() => {})
+        const complete = data.results.map((p, i) => {
+          const id = offset + i + 1
+          return { name: displayName(p.name), id, types: POKEMON_TYPES[id] ?? [] }
         })
+        setPokemon(complete)
+        setLoadingPokemon(false)
+        genCache.set(selectedGen, complete)
       })
       .catch(() => {})
     return () => ac.abort()

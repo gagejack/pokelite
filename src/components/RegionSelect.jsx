@@ -3,11 +3,14 @@ import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { getRegionConfig } from '../game/regionRegistry'
 import Layout from './Layout'
-import KantoMap from '../assets/regions/KantoMap.png'
-import JohtoMap from '../assets/regions/JohtoMap.png'
-import HoennMap from '../assets/regions/HoennMap.png'
-import SinnohMap from '../assets/regions/SinnohMap.png'
-import UnovaMap from '../assets/regions/UnovaMap.png'
+// Card-background thumbnails (800px JPEG) — the full-res source PNGs were
+// 0.8–8.3 MB each and only ever render blurred/darkened here, so they were
+// downscaled + recompressed (~14 MB → ~1 MB total).
+import KantoMap from '../assets/regions/KantoMap.jpg'
+import JohtoMap from '../assets/regions/JohtoMap.jpg'
+import HoennMap from '../assets/regions/HoennMap.jpg'
+import SinnohMap from '../assets/regions/SinnohMap.jpg'
+import UnovaMap from '../assets/regions/UnovaMap.jpg'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`

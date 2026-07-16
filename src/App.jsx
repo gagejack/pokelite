@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { ThemeProvider } from './lib/theme'
 import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
 import RegionSelect from './components/RegionSelect'
 import StarterSelect from './components/StarterSelect'
-import NodeMap from './components/NodeMap'
-import EliteFour from './components/EliteFour'
+// NodeMap (pulls in the whole battle stack: BattleCard, MoveAnimation + its 78
+// animation sheets, framer-motion) and EliteFour are only needed once a run
+// starts, so they load on demand instead of bloating the initial chunk.
+const NodeMap = lazy(() => import('./components/NodeMap'))
+const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig } from './game/regionRegistry.js'
 import { supabase } from './lib/supabase.js'
@@ -342,6 +345,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <SettingsProvider>
+    <Suspense fallback={<div style={{ position: 'fixed', inset: 0 }} />}>
       {screen === 'menu' && (
         <MainMenu
           onPlay={() => setScreen('region')}
@@ -426,6 +430,7 @@ export default function App() {
       {resetting && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 200, pointerEvents: 'none' }} />
       )}
+    </Suspense>
     </SettingsProvider>
     </ThemeProvider>
   )

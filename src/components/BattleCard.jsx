@@ -335,35 +335,23 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           Battle starting...
         </span>
       )}
-      {battleResult && (
+      {/* On a win, show Victory + Continue. On a loss the DefeatScreen overlay
+          takes over (no in-card button). */}
+      {battleResult === 'win' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '20px', color: battleResult === 'win' ? '#22c55e' : '#ef4444' }}>
-            {battleResult === 'win' ? 'Victory!' : 'Defeated...'}
+          <span style={{ fontFamily: 'Upheaval', fontSize: '20px', color: '#22c55e' }}>
+            Victory!
           </span>
-          {battleResult === 'loss' && onRestart ? (
-            <button
-              onClick={onRestart}
-              style={{
-                fontFamily: 'Upheaval', fontSize: '12px', color: '#1a1a1a',
-                border: 'none', backgroundColor: '#facc15',
-                padding: '6px 20px', cursor: 'pointer',
-                boxShadow: '-2px 3px 0 0 #b89d0a',
-              }}
-            >
-              Play Again
-            </button>
-          ) : (
-            <button
-              onClick={handleContinue}
-              style={{
-                fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
-                border: borderStyle, backgroundColor: innerBg,
-                padding: '6px 20px', cursor: 'pointer',
-              }}
-            >
-              Continue
-            </button>
-          )}
+          <button
+            onClick={handleContinue}
+            style={{
+              fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+              border: borderStyle, backgroundColor: innerBg,
+              padding: '6px 20px', cursor: 'pointer',
+            }}
+          >
+            Continue
+          </button>
         </div>
       )}
     </div>
@@ -389,6 +377,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     activeSpriteRef: enemyActiveRef,
   }
 
+  // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
+  // in place of an in-card button.
+  const defeatOverlay = battleResult === 'loss' ? (
+    <DefeatScreen roster={battleRoster} faintedArr={playerFainted} dark={dark} onRestart={onRestart} />
+  ) : null
+
   // ── MOBILE layout ──
   if (!isDesktop) {
     return (
@@ -399,6 +393,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
         paddingTop: `${navH}px`, boxSizing: 'border-box',
         backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100,
       }}>
+        {defeatOverlay}
         <div style={{
           // Rendered at natural size, then proportionally scaled to fit the
           // area below the navbar and above the bottom — the whole card, sprites
@@ -487,15 +482,16 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // ── DESKTOP layout: cinematic 16:9 card ──
   return (
     <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+      {defeatOverlay}
 
-      {/* Victory / Defeat text above the card */}
-      {battleResult && (
+      {/* Victory text above the card (defeat now shows the DefeatScreen overlay) */}
+      {battleResult === 'win' && (
         <span style={{
           fontFamily: 'Upheaval', fontSize: '32px',
-          color: battleResult === 'win' ? '#22c55e' : '#ef4444',
+          color: '#22c55e',
           textShadow: '2px 2px 0 #000',
         }}>
-          {battleResult === 'win' ? 'Victory!' : 'Defeated...'}
+          Victory!
         </span>
       )}
 
@@ -742,40 +738,112 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             </div>
           )}
 
-          {/* Continue / Play Again inside card at top */}
-          {battleResult && (
+          {/* Continue inside card at top (win only — defeat shows the
+              DefeatScreen overlay instead). */}
+          {battleResult === 'win' && (
             <div style={{
               position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)',
               zIndex: 20,
             }}>
-              {battleResult === 'loss' && onRestart ? (
-                <button
-                  onClick={onRestart}
-                  style={{
-                    fontFamily: 'Upheaval', fontSize: '14px', color: '#1a1a1a',
-                    border: 'none', backgroundColor: '#facc15',
-                    padding: '8px 28px', cursor: 'pointer',
-                    boxShadow: '-2px 3px 0 0 #b89d0a',
-                  }}
-                >
-                  Play Again
-                </button>
-              ) : (
-                <button
-                  onClick={handleContinue}
-                  style={{
-                    fontFamily: 'Upheaval', fontSize: '14px', color: '#fff',
-                    border: '2px solid #fff', backgroundColor: 'rgba(0,0,0,0.6)',
-                    padding: '8px 28px', cursor: 'pointer',
-                  }}
-                >
-                  Continue
-                </button>
-              )}
+              <button
+                onClick={handleContinue}
+                style={{
+                  fontFamily: 'Upheaval', fontSize: '14px', color: '#fff',
+                  border: '2px solid #fff', backgroundColor: 'rgba(0,0,0,0.6)',
+                  padding: '8px 28px', cursor: 'pointer',
+                }}
+              >
+                Continue
+              </button>
             </div>
           )}
 
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Shown when the player is defeated: the final team as a 2×3 card grid, with a
+// Play Again button below. Replaces the in-card "Play Again" button so the
+// battle card itself keeps all its space for the roster.
+function DefeatScreen({ roster, faintedArr, dark, onRestart }) {
+  const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
+  const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  const textColor = dark ? '#DBDBDB' : '#333333'
+
+  return (
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 120,
+        backgroundColor: 'rgba(0,0,0,0.82)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px', boxSizing: 'border-box',
+      }}
+    >
+      <div style={{
+        backgroundColor: cardBg, border: borderStyle, boxShadow: shadowStyle,
+        padding: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+        width: '100%', maxWidth: '440px', maxHeight: '90dvh', overflowY: 'auto',
+      }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: '#ef4444', textShadow: '2px 2px 0 #000' }}>
+          Defeated...
+        </span>
+
+        {/* 2 columns × 3 rows of the final team. */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', width: '100%',
+        }}>
+          {roster.map((p, i) => (
+            <div key={i} style={{
+              backgroundColor: cellBg, border: borderStyle,
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: '3px', padding: '8px 4px',
+              opacity: faintedArr[i] ? 0.4 : 1,
+            }}>
+              <img src={p.sprite} alt={p.name} style={{
+                width: '52px', height: '52px', imageRendering: 'pixelated',
+                filter: faintedArr[i] ? 'grayscale(1)' : 'none',
+              }} />
+              <span style={{
+                fontFamily: 'Orange Kid', fontSize: '17px', color: textColor,
+                textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden',
+                textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center',
+              }}>
+                {p.name} <span style={{ color: '#facc15', fontSize: '13px' }}>LV {p.level}</span>
+              </span>
+              {/* Type chips below the name/level. */}
+              <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {(p.types ?? []).map(t => (
+                  <span key={t} style={{
+                    fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                    backgroundColor: TYPE_COLORS[t] ?? '#888',
+                    padding: '2px 5px', textTransform: 'capitalize',
+                  }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {onRestart && (
+          <button
+            onClick={onRestart}
+            style={{
+              fontFamily: 'Upheaval', fontSize: '16px', color: '#1a1a1a',
+              border: 'none', backgroundColor: '#facc15',
+              padding: '10px 40px', cursor: 'pointer',
+              boxShadow: '-3px 4px 0 0 #b89d0a',
+            }}
+          >
+            Play Again
+          </button>
+        )}
       </div>
     </div>
   )

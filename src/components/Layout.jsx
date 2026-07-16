@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
 import { supabase } from '../lib/supabase'
-import Pokedex from './Pokedex'
-import Stats from './Stats'
-import SettingsPanel from './SettingsPanel'
+// Modals load on demand — none is needed for the initial render, and the
+// Pokédex/Stats pull in their own data + layout weight.
+const Pokedex = lazy(() => import('./Pokedex'))
+const Stats = lazy(() => import('./Stats'))
+const SettingsPanel = lazy(() => import('./SettingsPanel'))
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
@@ -12,12 +14,51 @@ import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
 import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
-// Skip-map icon kept for the (now hidden) skip button — see below.
-// eslint-disable-next-line no-unused-vars
-const SKIP_MAP_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png'
-
 // onSkipMap is still accepted (skip flow kept in code); its button is hidden.
 // eslint-disable-next-line no-unused-vars
+// Nav bar buttons. Defined at MODULE scope (not nested in Layout) so its
+// component identity is stable — nesting it re-created the component every
+// Layout render (theme toggle, username load, any popup), remounting the whole
+// nav and re-decoding the icons each time.
+function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClose, setAutoClose, onRestart, setSettingsOpen, bg, borderStyle, textColor }) {
+  return (
+    <>
+      <button onClick={onHome} className="hover:opacity-60 transition-opacity">
+        <img src={homeIcon} alt="Home" style={{ width: '22px', height: '22px' }} />
+      </button>
+      <button onClick={() => setPokedexOpen(true)} className="hover:opacity-60 transition-opacity">
+        <img src={pokedexIcon} alt="Pokedex" style={{ width: '22px', height: '22px' }} />
+      </button>
+      <button onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
+        <img src={statsIcon} alt="Stats" style={{ width: '22px', height: '22px' }} />
+      </button>
+      <div style={{ marginLeft: row ? 'auto' : undefined, display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <button
+          onClick={() => setAutoClose(!autoClose)}
+          title={autoClose ? 'Auto-close battle: ON' : 'Auto-close battle: OFF'}
+          style={{
+            fontFamily: 'Upheaval', fontSize: '9px',
+            color: autoClose ? '#1a1a1a' : textColor,
+            border: borderStyle, padding: '4px 6px',
+            backgroundColor: autoClose ? '#facc15' : bg,
+            cursor: 'pointer',
+          }}
+        >
+          Auto
+        </button>
+        {onRestart && (
+          <button onClick={onRestart} className="hover:opacity-60 transition-opacity" title="Restart run">
+            <img src={resetIcon} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+          </button>
+        )}
+        <button onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
+          <img src={settingsIcon} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+        </button>
+      </div>
+    </>
+  )
+}
+
 export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
@@ -50,51 +91,6 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
   const textColor = dark ? '#DBDBDB' : '#666666'
 
-  const NavButtons = ({ row = false }) => (
-    <>
-      <button onClick={onHome} className="hover:opacity-60 transition-opacity">
-        <img src={homeIcon} alt="Home" style={{ width: '22px', height: '22px' }} />
-      </button>
-      <button onClick={() => setPokedexOpen(true)} className="hover:opacity-60 transition-opacity">
-        <img src={pokedexIcon} alt="Pokedex" style={{ width: '22px', height: '22px' }} />
-      </button>
-      <button onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
-        <img src={statsIcon} alt="Stats" style={{ width: '22px', height: '22px' }} />
-      </button>
-      <div style={{ marginLeft: row ? 'auto' : undefined, display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <button
-          onClick={() => setAutoClose(!autoClose)}
-          title={autoClose ? 'Auto-close battle: ON' : 'Auto-close battle: OFF'}
-          style={{
-            fontFamily: 'Upheaval', fontSize: '9px',
-            color: autoClose ? '#1a1a1a' : textColor,
-            border: borderStyle, padding: '4px 6px',
-            backgroundColor: autoClose ? '#facc15' : bg,
-            cursor: 'pointer',
-          }}
-        >
-          Auto
-        </button>
-        {/* Skip-map button hidden per design. Kept here (commented) so the
-            onSkipMap flow can be re-enabled without rewiring.
-        {onSkipMap && (
-          <button onClick={onSkipMap} className="hover:opacity-60 transition-opacity" title="Skip to next map">
-            <img src={SKIP_MAP_ICON} alt="Next map" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
-          </button>
-        )}
-        */}
-        {onRestart && (
-          <button onClick={onRestart} className="hover:opacity-60 transition-opacity" title="Restart run">
-            <img src={resetIcon} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
-          </button>
-        )}
-        <button onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
-          <img src={settingsIcon} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
-        </button>
-      </div>
-    </>
-  )
-
   return (
     <div style={{
       height: '100dvh', display: 'flex', flexDirection: 'column',
@@ -114,7 +110,19 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
         flexShrink: 0,
         zIndex: 150,
       }}>
-        <NavButtons row />
+        <NavButtons
+          row
+          onHome={onHome}
+          setPokedexOpen={setPokedexOpen}
+          setStatsOpen={setStatsOpen}
+          autoClose={autoClose}
+          setAutoClose={setAutoClose}
+          onRestart={onRestart}
+          setSettingsOpen={setSettingsOpen}
+          bg={bg}
+          borderStyle={borderStyle}
+          textColor={textColor}
+        />
         {username && (
           <span style={{
             position: 'absolute', left: '50%', top: '50%',
@@ -129,9 +137,11 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
       </div>
-      {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
-      {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
-      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      <Suspense fallback={null}>
+        {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
+        {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      </Suspense>
     </div>
   )
 }

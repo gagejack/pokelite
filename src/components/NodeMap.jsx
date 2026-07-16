@@ -98,6 +98,7 @@ function MapSvg({
       className="relative overflow-hidden"
       style={{ flex: 1, minHeight: 0, border: borderStyle, boxShadow: shadowStyle }}
     >
+      <style>{`@keyframes nodeSpin { to { transform: rotate(360deg); } }`}</style>
       <img
         src={background}
         alt="map background"
@@ -216,7 +217,10 @@ function MapSvg({
         const { px, py } = toPixel(x, y)
         const size = NODE_SIZE * mapScale * NODE_SCALE * (node.type === NODE_TYPES.BOSS ? BOSS_SCALE : 1)
         const isHovered = hoveredNode?.id === node.id
-        const { title, sub } = getNodeLabel(node)
+        // Only the hovered node shows a tooltip, so only it needs the label
+        // (which does boss-team cachedType/cachedName lookups). Skip the work
+        // for every other node on every render.
+        const { title, sub } = isHovered ? getNodeLabel(node) : { title: null, sub: null }
         return (
           <button
             key={node.id}
@@ -247,6 +251,21 @@ function MapSvg({
               WebkitTapHighlightColor: 'transparent',
             }}
           >
+            {loadingNode === node.id && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                pointerEvents: 'none', zIndex: 12,
+              }}>
+                <div style={{
+                  width: size * 0.42, height: size * 0.42,
+                  border: `${Math.max(2, size * 0.06)}px solid rgba(0,0,0,0.25)`,
+                  borderTopColor: '#facc15',
+                  borderRadius: '50%',
+                  animation: 'nodeSpin 0.7s linear infinite',
+                }} />
+              </div>
+            )}
             {isHovered && (
               <div style={{
                 position: 'absolute',
@@ -789,6 +808,58 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
   const cancelItemMove = () => setMovingItem(null)
 
+  // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
+  // Distinguishes a tap (→ info popup) from a drag (→ equip): a drag begins once
+  // the finger moves past a small threshold; on release, the roster slot under
+  // the finger (data-slot-index) receives the item. `dragGhost` is a
+  // finger-following icon so the drag reads visually.
+  const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
+  const [dragGhost, setDragGhost] = useState(null) // { x, y, item } | null
+  const DRAG_THRESHOLD = 8
+
+  function slotIndexAt(x, y) {
+    const el = document.elementFromPoint(x, y)
+    const slotEl = el?.closest('[data-slot-index]')
+    return slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
+  }
+
+  function bagTouchStart(item, from) {
+    return (e) => {
+      const t = e.touches[0]
+      bagTouch.current = { item, from, startX: t.clientX, startY: t.clientY, dragging: false }
+    }
+  }
+  function bagTouchMove(e) {
+    const st = bagTouch.current
+    if (!st) return
+    const t = e.touches[0]
+    if (!st.dragging) {
+      if (Math.hypot(t.clientX - st.startX, t.clientY - st.startY) < DRAG_THRESHOLD) return
+      st.dragging = true // promote to a drag
+      // Enter item-placing mode so the roster highlights as drop targets.
+      setMovingItem({ item: st.item, from: st.from })
+    }
+    e.preventDefault() // stop the page scrolling while dragging
+    setDragGhost({ x: t.clientX, y: t.clientY, item: st.item })
+  }
+  function bagTouchEnd(e) {
+    const st = bagTouch.current
+    bagTouch.current = null
+    setDragGhost(null)
+    if (!st?.dragging) return // a plain tap — let onClick open the info popup
+    const t = e.changedTouches[0]
+    const idx = slotIndexAt(t.clientX, t.clientY)
+    if (idx != null) {
+      onMoveItem?.({ item: st.item, from: st.from, to: { kind: 'pokemon', pokeIndex: idx } })
+    }
+    setMovingItem(null) // clear placing mode whether or not it landed on a slot
+  }
+  const bagTouchProps = (item, from) => ({
+    onTouchStart: bagTouchStart(item, from),
+    onTouchMove: bagTouchMove,
+    onTouchEnd: bagTouchEnd,
+  })
+
   // Skip directly to the next map (mirrors the boss-clear advance). On the
   // last map, skip into the Elite Four stage when the region has one.
   const handleSkipMap = config.maps[mapIndex + 1]
@@ -840,14 +911,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                           onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
                           onDragEnd={() => setMovingItem(null)}
                           // Click opens the item's info popup (with an Equip action);
-                          // dragging still equips directly onto a Pokémon.
+                          // dragging (mouse OR touch) equips directly onto a Pokémon.
                           onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
+                          {...bagTouchProps(item, { kind: 'bag', index: i })}
                           title={`${item.name} — drag onto a Pokémon or click for info`}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 2px',
                             cursor: 'grab', borderRadius: '2px',
                             outline: picked ? '2px solid #facc15' : 'none',
                             opacity: picked ? 0.6 : 1,
+                            touchAction: 'none',
                           }}
                         >
                           <img src={itemIconUrl(item)} alt={item.name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated', flexShrink: 0, pointerEvents: 'none' }} />
@@ -939,11 +1012,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                     onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
                     onDragEnd={() => setMovingItem(null)}
                     // Tap opens the item's info popup (which has an Equip action);
-                    // dragging still equips directly onto a Pokémon.
+                    // dragging (mouse OR touch) equips directly onto a Pokémon.
                     onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
+                    {...bagTouchProps(item, { kind: 'bag', index: i })}
                     style={{
                       width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'grab',
                       outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,
+                      // Override the global `img { pointer-events: none }` so this
+                      // bag item receives taps + touch-drag.
+                      touchAction: 'none', pointerEvents: 'auto',
                     }}
                   />
                 )
@@ -955,6 +1032,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             <BadgeList badges={config.badges ?? []} earned={mapIndex} layout="horizontal" />
           </div>
         </div>
+      )}
+
+      {/* Finger-following icon while touch-dragging a bag item. */}
+      {dragGhost && (
+        <img
+          src={itemIconUrl(dragGhost.item)}
+          alt=""
+          style={{
+            position: 'fixed', left: dragGhost.x, top: dragGhost.y,
+            transform: 'translate(-50%, -50%)',
+            width: '34px', height: '34px', imageRendering: 'pixelated',
+            pointerEvents: 'none', zIndex: 300,
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+          }}
+        />
       )}
 
       {/* Item-move targeting banner — shown while placing an item. */}

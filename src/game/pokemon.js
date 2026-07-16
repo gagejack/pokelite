@@ -42,12 +42,27 @@ export async function prewarmCache(regionConfig) {
   // Legendary (Master Ball) pools (per-map arrays of { id, level })
   regionConfig.legendaryPools?.forEach(pool => pool.forEach(({ id }) => ids.add(id)))
 
+  // Species that get an evolution-stage roll at click time (catch nodes + themed
+  // trainer pools). Warming their whole line up front means late-map clicks
+  // never block on a live chain fetch + evolved-form base fetch.
+  const stageRolled = new Set()
+  regionConfig.catchPools?.forEach(pool => pool.forEach(m => stageRolled.add(m.id)))
+  Object.values(regionConfig.trainerTypePools ?? {}).forEach(pool => pool.forEach(id => stageRolled.add(id)))
+
+  // First warm the directly-referenced bases.
   await Promise.all([...ids].map(async id => {
+    try { await fetchPokemonBase(id) } catch { /* live-fetch fallback */ }
+  }))
+
+  // Then warm each stage-rolled line: the evolution chain (side effect of
+  // allSpeciesInLine) plus every evolved-form base in the tree.
+  await Promise.all([...stageRolled].map(async id => {
     try {
-      await fetchPokemonBase(id)
-    } catch {
-      // Non-fatal — node will fall back to live fetch
-    }
+      const lineIds = await allSpeciesInLine(id)
+      await Promise.all(lineIds.map(async lid => {
+        try { await fetchPokemonBase(lid) } catch { /* live-fetch fallback */ }
+      }))
+    } catch { /* non-fatal — node falls back to live fetch */ }
   }))
 }
 
@@ -92,7 +107,6 @@ export async function fetchPokemonBase(idOrName) {
       spDef:   data.stats.find(s => s.stat.name === 'special-defense').base_stat,
       speed:   data.stats.find(s => s.stat.name === 'speed').base_stat,
     },
-    learnset: data.moves,
     sprite: data.sprites.front_default,
     spriteBack: data.sprites.back_default ?? data.sprites.front_default,
     shinySprite: data.sprites.front_shiny ?? data.sprites.front_default,
@@ -199,6 +213,23 @@ async function loadEvolutionLine(pokeId) {
 // (base = 1). Branches are followed randomly (see `walk`), matching the "random
 // branch" catch-node design. Returns [] on failure (caller falls back to the
 // pool's own id). Used only by catch nodes — grass/trainers are untouched.
+// Every species id in a Pokémon's full evolution tree (all branches), warming
+// chainCache as a side effect. Used by prewarmCache to fetch evolved-form bases
+// up front so late-map node clicks never block on a live fetch. Returns [] on
+// failure (the base id is still usable on its own).
+export async function allSpeciesInLine(pokeId) {
+  const root = await loadEvolutionChain(pokeId)
+  if (!root) return []
+  const ids = []
+  const walk = node => {
+    const id = Number(node.species.url.match(/\/(\d+)\/?$/)?.[1])
+    if (id) ids.push(id)
+    node.evolves_to.forEach(walk)
+  }
+  walk(root)
+  return ids
+}
+
 export async function resolveEvolutionLine(pokeId) {
   const root = await loadEvolutionChain(pokeId)
   if (!root) return []
