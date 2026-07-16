@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { TYPE_COLORS } from '../game/types.js'
-import { TIER_COLORS } from '../game/items.js'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
 
@@ -15,14 +14,9 @@ const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master
 //   selected   — yellow border/glow (catch card's "team full → swap" state)
 //   spriteGlow — apply the yellow saturate/drop-shadow filter on the sprite
 //   caught     — show a Poké Ball icon top-left (species caught before)
-//   rarity     — 'common'|'rare'|'epic'|'legendary'; sets a rarity-colored
-//                border (common gets none, matching the item rarity system)
-export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false, rarity }) {
+export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false }) {
   const { dark } = useTheme()
   const [hovered, setHovered] = useState(false)
-
-  // Rarity border — skip common (no color) so only rare/epic/legendary stand out.
-  const rarityColor = rarity && rarity !== 'common' ? TIER_COLORS[rarity] : null
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const cardBg = dark ? '#1a1a1a' : '#ffffff'
@@ -32,14 +26,10 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
   const cardBarTrack = dark ? '#2e2e2e' : '#ddd'
   const cardBarFill = dark ? '#888' : '#999'
 
-  // Show only the offensive stat the Pokémon actually uses — the one matching
-  // its move's damage class (special → Sp. Atk, physical → Attack).
-  const isSpecial = pokemon.move?.damageClass === 'special'
   // Non-HP stat bars fill against statMax; the HP bar always renders full.
   const rows = pokemon.stats && [
-    isSpecial
-      ? ['SP.ATK', pokemon.stats.spAtk,   statMax]
-      : ['ATK',    pokemon.stats.attack,  statMax],
+    [pokemon.stats.spAtk >= pokemon.stats.attack ? 'SP.ATK' : 'ATK',
+     pokemon.stats.spAtk >= pokemon.stats.attack ? pokemon.stats.spAtk : pokemon.stats.attack, statMax],
     ['SPD',    pokemon.stats.speed,   statMax],
     ['DEF',    pokemon.stats.defense, statMax],
     ['SP. D',  pokemon.stats.spDef,   statMax],
@@ -54,10 +44,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
       style={{
         position: 'relative',
         backgroundColor: cardBg,
-        border: selected ? '2px solid #facc15'
-          : hovered ? '2px solid #ffffff'
-          : rarityColor ? `2px solid ${rarityColor}`
-          : borderStyle,
+        border: selected ? '2px solid #facc15' : hovered ? '2px solid #ffffff' : borderStyle,
         boxShadow: selected
           ? '0 0 8px 2px rgba(250,204,21,0.45)'
           : hovered
@@ -96,7 +83,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
         Lv. {pokemon.level}
       </span>
 
-      <div style={{ display: 'flex', gap: '0px', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {pokemon.types.map(type => (
           <span key={type} style={{
             fontFamily: 'Orange Kid', fontSize: '12px', color: '#fff',
@@ -114,7 +101,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           {rows.map(([label, val, max]) => {
             const isHp = label === 'HP'
             return (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 11px)', color: cardStatLabel, width: '22px', flexShrink: 0, textAlign: 'left', lineHeight: 1 }}>{label}</span>
                 <div style={{
                   flex: 1, height: isHp ? '7px' : '4px',
