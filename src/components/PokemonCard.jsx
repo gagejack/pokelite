@@ -96,7 +96,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
         Lv. {pokemon.level}
       </span>
 
-      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '0px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {pokemon.types.map(type => (
           <span key={type} style={{
             fontFamily: 'Orange Kid', fontSize: '12px', color: '#fff',
@@ -114,7 +114,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           {rows.map(([label, val, max]) => {
             const isHp = label === 'HP'
             return (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 11px)', color: cardStatLabel, width: '22px', flexShrink: 0, textAlign: 'left', lineHeight: 1 }}>{label}</span>
                 <div style={{
                   flex: 1, height: isHp ? '7px' : '4px',

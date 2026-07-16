@@ -24,6 +24,10 @@ const FAINT_DRAIN_MS = 650
 const MOBILE_CARD_W = 380
 const MOBILE_CARD_H = 640
 
+// 1px black outline for yellow "LV" text (8-direction text-shadow — crisper on
+// pixel fonts than -webkit-text-stroke, which eats thin glyphs).
+const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
+
 export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -770,8 +774,10 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 function DefeatScreen({ roster, faintedArr, dark, onRestart }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  // Light theme keeps DARK grey strokes/shadows — the lighter #666 wash out
+  // against the light card fills.
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #444444'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #444444'
   const textColor = dark ? '#DBDBDB' : '#333333'
 
   return (
@@ -813,7 +819,7 @@ function DefeatScreen({ roster, faintedArr, dark, onRestart }) {
                 textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden',
                 textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center',
               }}>
-                {p.name} <span style={{ color: '#facc15', fontSize: '13px' }}>LV {p.level}</span>
+                {p.name} <span style={{ color: '#facc15', fontSize: '13px', textShadow: LV_OUTLINE }}>LV {p.level}</span>
               </span>
               {/* Type chips below the name/level. */}
               <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1216,7 +1222,7 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
         textTransform: 'capitalize', whiteSpace: 'nowrap',
         overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center',
       }}>
-        {pokemon.name} <span style={{ color: '#facc15', fontSize: '12px', fontFamily: 'Orange Kid' }}>LV {pokemon.level}</span>
+        {pokemon.name} <span style={{ color: '#facc15', fontSize: '12px', fontFamily: 'Orange Kid', textShadow: LV_OUTLINE }}>LV {pokemon.level}</span>
       </span>
       <AnimatedHpBar hp={hp} maxHp={pokemon.stats.maxHp} barWidth="80%" height="3px" />
       <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>

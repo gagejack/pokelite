@@ -269,7 +269,10 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       }}>
         {pokemon.name}
       </span>
-      <span style={{ fontFamily: 'Pokemon Classic', fontSize: '6px', color: '#facc15', pointerEvents: 'none' }}>
+      <span style={{
+        fontFamily: 'Pokemon Classic', fontSize: '6px', color: '#facc15', pointerEvents: 'none',
+        textShadow: '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
+      }}>
         LVL {pokemon.level}
       </span>
       <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width={barW} height="3px" />

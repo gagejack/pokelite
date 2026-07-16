@@ -56,7 +56,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
         </div>
 
         {/* Offered Pokémon */}
-        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '4px', width: '100%', justifyContent: 'center' }}>
           {offered.map((poke, i) => (
             <PokemonCard
               key={i}
