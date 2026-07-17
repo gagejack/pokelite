@@ -248,8 +248,8 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
             className="hover:opacity-70 transition-opacity"
             style={{
               fontFamily: 'Upheaval', fontSize: '13px',
-              color: textColor, border: borderStyle, boxShadow: shadowStyle,
-              backgroundColor: bg, padding: '8px 20px',
+              color: '#ffffff', border: borderStyle, boxShadow: shadowStyle,
+              backgroundColor: '#ef4444', padding: '8px 20px',
               cursor: rerollsLeft <= 0 ? 'default' : 'pointer',
               opacity: rerollsLeft <= 0 ? 0.4 : 1,
             }}
@@ -258,8 +258,11 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
           </button>
         )}
 
-        {/* Roster row */}
-        <div style={{ display: 'flex', gap: '6px', width: '100%', justifyContent: 'center' }}>
+        {/* Roster — flat row on desktop, 3×2 grid on mobile */}
+        <div style={isDesktop
+          ? { display: 'flex', gap: '6px', width: '100%', justifyContent: 'center' }
+          : { display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: '6px', justifyContent: 'center' }
+        }>
           {Array.from({ length: 6 }).map((_, i) => {
             const pokemon = roster[i]
             if (!pokemon) {

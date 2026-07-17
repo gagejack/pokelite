@@ -22,6 +22,7 @@ import { rolldown } from 'rolldown'
 import { writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { slimChain, speciesIdFromUrl } from '../src/game/evolutionChain.js'
 
 const ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const API = 'https://pokeapi.co/api/v2'
@@ -100,27 +101,6 @@ async function mapPool(items, workers, fn) {
   }))
 }
 
-const speciesIdFromUrl = url => Number(url.match(/\/(\d+)\/?$/)?.[1])
-
-// Prune a raw PokéAPI chain node to the shape the game consumes
-// (src/game/pokemon.js): only level-up evolutions with a min_level survive.
-//   { id, evolvesTo: [{ id, minLevel, evolvesTo: [...] }] }
-function pruneChain(node) {
-  const id = speciesIdFromUrl(node.species.url)
-  const evolvesTo = []
-  for (const child of node.evolves_to ?? []) {
-    const detail = (child.evolution_details ?? []).find(d =>
-      d.trigger?.name === 'level-up' && d.min_level != null)
-    if (!detail) continue
-    evolvesTo.push({
-      id: speciesIdFromUrl(child.species.url),
-      minLevel: detail.min_level,
-      evolvesTo: pruneChain(child).evolvesTo,
-    })
-  }
-  return { id, evolvesTo }
-}
-
 // ── Main ─────────────────────────────────────────────────────────────────
 const { configs, starters } = await loadGameData()
 const referenced = collectIds(configs, starters)
@@ -146,7 +126,7 @@ async function resolveLine(id) {
       const root = chainData.chain
       chainByUrl.set(chainUrl, root)
       const rootId = speciesIdFromUrl(root.species.url)
-      chains[rootId] = pruneChain(root)
+      chains[rootId] = slimChain(root)
       const register = node => {
         const sid = speciesIdFromUrl(node.species.url)
         if (sid) { speciesToRoot[sid] = rootId; closure.add(sid) }

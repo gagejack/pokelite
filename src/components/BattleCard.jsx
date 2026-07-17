@@ -353,10 +353,10 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
         }}>
           <div ref={arenaRef} style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
             <div style={{ width: '50%', backgroundColor: innerBg, borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
-              <BattleColumn {...playerColumnProps} spriteSize={72} spriteH={100} />
+              <BattleColumn {...playerColumnProps} spriteSize={52} spriteH={60} />
             </div>
             <div style={{ width: '50%', backgroundColor: innerBg, borderLeft: borderStyle, display: 'flex', flexDirection: 'column' }}>
-              <BattleColumn {...enemyColumnProps} spriteSize={72} spriteH={100} />
+              <BattleColumn {...enemyColumnProps} spriteSize={52} spriteH={60} />
             </div>
 
             {/* Projectile orb — travels from the attacking sprite to the defending sprite */}
@@ -1145,7 +1145,7 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
       <div style={{
         width: '100%', borderBottom: borderStyle, flexShrink: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '6px 4px 3px', gap: '2px',
+        padding: '4px 4px 2px', gap: '2px',
       }}>
         {characterSprite
           ? <img src={characterSprite} alt={characterName} style={{ width: `${spriteSize}px`, height: `${spriteH}px`, objectFit: 'contain', objectPosition: 'bottom', imageRendering: 'pixelated' }} />
@@ -1153,7 +1153,9 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
         }
         <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: mutedColor }}>{label}</span>
       </div>
-      <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: '2px', padding: '6px' }}>
+      {/* Slots flow top-down: slot 0 pins to the top regardless of roster
+          size (was space-evenly, which centered small rosters vertically). */}
+      <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: '2px', padding: '6px' }}>
         {roster.map((p, i) => (
           <div
             key={i}
@@ -1188,7 +1190,7 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
       transition={{ type: 'spring', stiffness: 400, damping: 18 }}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: '2px', padding: '3px 2px',
+        gap: '2px', padding: '2px 2px',
         opacity: fainted ? 0.35 : 1,
         outline: active ? '1px solid #888888' : 'none',
         borderRadius: '1px',
@@ -1218,7 +1220,7 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
           )}
         </AnimatePresence>
         <img ref={spriteRef} src={pokemon.sprite} alt={pokemon.name} style={{
-          width: '44px', height: '44px', imageRendering: 'pixelated',
+          width: '40px', height: '40px', imageRendering: 'pixelated',
           filter: fainted ? 'grayscale(1)' : 'none',
         }} />
       </div>
@@ -1229,10 +1231,16 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
       }}>
         {pokemon.name} <span style={{ color: '#facc15', fontSize: '12px', fontFamily: 'Orange Kid', textShadow: LV_OUTLINE }}>LV {pokemon.level}</span>
       </span>
-      <AnimatedHpBar hp={hp} maxHp={pokemon.stats.maxHp} barWidth="80%" height="3px" />
-      <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>
-        {fainted ? 'FNT' : `${hp}/${pokemon.stats.maxHp}`}
-      </span>
+      {/* HP number LEFT of the bar (one row instead of two) — saves a line per
+          slot so all six roster slots fit the mobile card without scrolling. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, flexShrink: 0 }}>
+          {fainted ? 'FNT' : `${hp}/${pokemon.stats.maxHp}`}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <AnimatedHpBar hp={hp} maxHp={pokemon.stats.maxHp} barWidth="100%" height="3px" />
+        </div>
+      </div>
     </motion.div>
   )
 }
