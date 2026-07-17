@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider } from './lib/theme'
 import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
@@ -358,6 +359,7 @@ export default function App() {
     <ThemeProvider>
     <SettingsProvider>
     <Suspense fallback={<div style={{ position: 'fixed', inset: 0 }} />}>
+      <Analytics />
       {screen === 'menu' && (
         <MainMenu
           onPlay={() => setScreen('region')}
