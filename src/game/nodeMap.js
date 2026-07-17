@@ -26,6 +26,11 @@ const MYSTERY_OUTCOMES = [
   NODE_TYPES.MASTER_BALL,
 ]
 
+// Number of times a Mystery-node item/catch offer can be rerolled. The reroll
+// button IS the mystery bonus (replacing the old "extra choice + boosted
+// odds" bonus) — the offer itself is drawn at normal odds like any other node.
+export const MYSTERY_REROLLS = 2
+
 // Resolve a Mystery node into one of its outcome types, equally weighted among
 // the AVAILABLE outcomes. On maps with no legendary pool a Master Ball outcome
 // would produce an empty battle (the node would silently do nothing), so pass

@@ -11,8 +11,7 @@ import EvolutionNotice from './EvolutionNotice'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
-import { pickThreeItems, itemIconUrl, BONUS_TIER_BUDGET } from '../game/items.js'
-import { BONUS_CATCH_TIER_BUDGET } from '../game/catch.js'
+import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
 import { getTypeMove } from '../game/typeMoves.js'
@@ -350,6 +349,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingLegendary, setPendingLegendary] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
+  const [rerolling, setRerolling] = useState(false)
 
   // Keep the parent's snapshot of this map's progress current, so hitting Home
   // can save exactly where the player is (layout + cleared nodes + position).
@@ -526,11 +526,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // by node position.
     const level = pickLevel(mapLevelRange(config.mapLevelRanges, mapIndex), positionWeight)
 
-    // Draw distinct species weighted by rarity tier. A mystery-node catch gives
-    // a bonus offer: one extra species (4 not 3) and boosted higher-rarity odds.
-    const count = node.fromMystery ? 4 : 3
-    const tierBudget = node.fromMystery ? BONUS_CATCH_TIER_BUDGET : config.catchTierBudget
-    const chosen = config.pickCatchOffer(pool, count, tierBudget)
+    // Draw distinct species weighted by rarity tier.
+    const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       // Roll which evolution stage of this line to offer. The pool entry names a
@@ -561,8 +558,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // node would appear to do nothing.
     const hasLegendary = (config.legendaryPools?.[mapIndex]?.length ?? 0) > 0
     const type = resolveMysteryType({ allowLegendary: hasLegendary })
-    // Tag the resolved node so the item / catch flows give a "bonus" offer:
-    // one extra choice and boosted rarity odds.
+    // Tag the resolved node so the item / catch offer screens enable the
+    // reroll button (MYSTERY_REROLLS uses) — the mystery bonus.
     if (type === NODE_TYPES.TRAINER) {
       const trainerNode = mapData.rows.flat().find(
         n => n.type === NODE_TYPES.TRAINER && n.trainer
@@ -612,12 +609,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setCurrentNode(node.id)
       }
     } else if (node.type === NODE_TYPES.ITEM) {
-      // A mystery-node item gives a bonus offer: one extra item (4 not 3) and
-      // boosted higher-rarity odds.
-      const offered = node.fromMystery
-        ? pickThreeItems(4, BONUS_TIER_BUDGET)
-        : pickThreeItems()
-      setPendingItem({ node, offered })
+      setPendingItem({ node, offered: pickThreeItems() })
     } else if (node.type === NODE_TYPES.POKECENTER) {
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
@@ -683,6 +675,23 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       onRunEnd?.('loss')
       setPendingBattle(null)
     }
+  }
+
+  // Reroll a Mystery-node offer (the mystery bonus — MYSTERY_REROLLS uses per
+  // offer, enforced by the offer components). The catch reroll re-runs the
+  // full offer pipeline (fresh species draw, level, and evolution-stage
+  // rolls); the item reroll simply redraws three items.
+  async function rerollPokeballOffer() {
+    if (!pendingPokeball || rerolling) return
+    setRerolling(true)
+    const offered = await fetchOfferedPokemon(pendingPokeball.node)
+    setRerolling(false)
+    // Keep the old offer if the redraw somehow came up empty (empty pool).
+    if (offered.length > 0) setPendingPokeball(prev => ({ ...prev, offered }))
+  }
+
+  function rerollItemOffer() {
+    setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems() } : prev)
   }
 
   function handlePokeballPick({ pokemon, swapIndex }) {
@@ -1137,6 +1146,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           offered={pendingPokeball.offered}
           roster={roster}
           caughtSet={caughtSet}
+          onReroll={pendingPokeball.node.fromMystery ? rerollPokeballOffer : null}
+          rerolling={rerolling}
           onPick={handlePokeballPick}
           onClose={() => {
             setClearedNodes(prev => new Set([...prev, pendingPokeball.node.id]))
@@ -1165,6 +1176,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         <ItemNode
           offered={pendingItem.offered}
           roster={roster}
+          onReroll={pendingItem.node.fromMystery ? rerollItemOffer : null}
           onAssign={(item, pokemonIndex, swapBackItem) => {
             onItemAssign(item, pokemonIndex, swapBackItem)
             setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))

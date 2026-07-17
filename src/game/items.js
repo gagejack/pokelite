@@ -22,16 +22,6 @@ export const TIER_BUDGET = {
   legendary:  5, // game-changing, jackpot
 }
 
-// Boosted budget used for the bonus item offer from a Mystery ("?") node:
-// commons are roughly halved and that weight is pushed into the higher tiers,
-// so a mystery item is much likelier to be rare/epic/legendary.
-export const BONUS_TIER_BUDGET = {
-  common:    30,
-  rare:      35,
-  epic:      25,
-  legendary: 10,
-}
-
 // Rarity glow color per tier (used by the item-selection card border).
 export const TIER_COLORS = {
   common:    '#9ca3af', // grey
@@ -122,7 +112,7 @@ export function itemIconUrl(item) {
 
 // Effective draw weight for an item: its tier's budget split equally among all
 // items in that tier. An item in an unknown/empty tier gets weight 0. The tier
-// budget can be overridden (e.g. BONUS_TIER_BUDGET for mystery-node offers).
+// budget can be overridden via `tierBudget` to bias rarity for special draws.
 export function itemWeight(item, tierBudget = TIER_BUDGET) {
   const budget = tierBudget[item.tier] ?? 0
   const count = ITEMS.filter(i => i.tier === item.tier).length
@@ -132,7 +122,7 @@ export function itemWeight(item, tierBudget = TIER_BUDGET) {
 // Draw `count` distinct items, weighted by tier (without replacement). At most
 // one type-boost plate is offered per node — once a plate is drawn, the rest
 // are removed from the pool for the remaining picks. `tierBudget` can be
-// overridden to bias rarity (BONUS_TIER_BUDGET for mystery-node bonus offers).
+// overridden to bias rarity for special draws.
 export function pickThreeItems(count = 3, tierBudget = TIER_BUDGET) {
   const result = []
   const remaining = [...ITEMS]

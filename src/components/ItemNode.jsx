@@ -3,13 +3,16 @@ import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
+import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 
-export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose }) {
+// Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
+export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose, onReroll = null }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [stage, setStage] = useState('pick')
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [hoveredOffer, setHoveredOffer] = useState(null)
+  const [rerollsLeft, setRerollsLeft] = useState(MYSTERY_REROLLS)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
@@ -232,6 +235,28 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
             )
           })}
         </div>
+
+        {/* Reroll (Mystery-node bonus) */}
+        {onReroll && (
+          <button
+            onClick={() => {
+              if (rerollsLeft <= 0) return
+              setRerollsLeft(n => n - 1)
+              onReroll()
+            }}
+            disabled={rerollsLeft <= 0}
+            className="hover:opacity-70 transition-opacity"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '13px',
+              color: textColor, border: borderStyle, boxShadow: shadowStyle,
+              backgroundColor: bg, padding: '8px 20px',
+              cursor: rerollsLeft <= 0 ? 'default' : 'pointer',
+              opacity: rerollsLeft <= 0 ? 0.4 : 1,
+            }}
+          >
+            Reroll ({rerollsLeft})
+          </button>
+        )}
 
         {/* Roster row */}
         <div style={{ display: 'flex', gap: '6px', width: '100%', justifyContent: 'center' }}>

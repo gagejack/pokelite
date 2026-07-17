@@ -2,13 +2,26 @@ import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import PokemonCard from './PokemonCard'
 import { TYPE_COLORS } from '../game/types.js'
+import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
 // If roster is full (6), shows current roster so player can swap.
-export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false }) {
+// Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
+export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false, onReroll = null, rerolling = false }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [swapTarget, setSwapTarget] = useState(null)
+  const [rerollsLeft, setRerollsLeft] = useState(MYSTERY_REROLLS)
+
+  async function handleReroll() {
+    if (rerollsLeft <= 0 || rerolling) return
+    setRerollsLeft(n => n - 1)
+    // The rerolled offer replaces the list — drop any selection made against
+    // the old one (indices would point at different Pokémon).
+    setSelected(null)
+    setSwapTarget(null)
+    await onReroll()
+  }
 
   const isFull = roster.length >= 6
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
@@ -124,6 +137,22 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
+          {onReroll && (
+            <button
+              onClick={handleReroll}
+              disabled={rerollsLeft <= 0 || rerolling}
+              className="hover:opacity-70 transition-opacity"
+              style={{
+                fontFamily: 'Upheaval', fontSize: '13px',
+                color: textColor, border: borderStyle, boxShadow: shadowStyle,
+                backgroundColor: bg, padding: '8px 20px',
+                cursor: rerollsLeft <= 0 || rerolling ? 'default' : 'pointer',
+                opacity: rerollsLeft <= 0 || rerolling ? 0.4 : 1,
+              }}
+            >
+              {rerolling ? 'Rerolling...' : `Reroll (${rerollsLeft})`}
+            </button>
+          )}
           {isFull && swapTarget !== null && (
             <button
               onClick={() => onPick({ pokemon: offered[selected], swapIndex: swapTarget })}

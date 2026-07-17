@@ -20,7 +20,7 @@ in `src/game/regions/*.js` from imported values to URL strings (move sprites to
 gains an async `loadRegionAssets(name)` called on region select, before
 `prewarmCache`. Biggest single win for load time.
 
-### 1.2 Bundle Pokémon base data locally instead of live PokéAPI calls
+### 1.2 Bundle Pokémon base data locally instead of live PokéAPI calls ✅ IMPLEMENTED
 Every run depends on runtime fetches to pokeapi.co — `prewarmCache` fires
 hundreds of requests on region select, and a hiccup mid-run stalls node
 clicks. The data used per species is tiny (id, name, types, 6 base stats, 4
@@ -31,6 +31,16 @@ ids referenced by the region configs + evolution lines and emits
 `src/game/pokemon.js` reads from that map first, falling back to the network
 for misses. Evolution chains get the same treatment (`evolutions.json`). Runs
 become offline-capable and node clicks become instant.
+
+> **Shipped:** `scripts/buildPokedex.mjs` (`npm run build:dex`) bundles the
+> region configs via rolldown (image imports stubbed), resolves the full
+> level-up evolution-line closure, and emits `public/data/pokedex.json`
+> (360 species, ~194 kB) + `public/data/evolutions.json` (159 pruned chains).
+> `pokemon.js` loads both lazily on first use and falls back to live PokéAPI
+> for anything uncovered. Evolution chains are pruned to level-up branches
+> only (`pruneChain`), and `checkEvolution` now resolves next stages by id.
+> `REGION_STARTERS` moved to `src/game/starters.js`. The Pokédex browser
+> overlay (`Pokedex.jsx`) still uses the live names-list endpoint by design.
 
 ### 1.3 Memoize map node rendering
 `NodeMap.jsx` keeps `hoveredNode` in top-level state, so every hover re-renders

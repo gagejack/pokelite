@@ -3,14 +3,7 @@ import { useTheme } from '../lib/theme'
 import Layout from './Layout'
 import PokemonCard from './PokemonCard'
 import { fetchPokemonBase, buildPokemonInstance } from '../game/pokemon.js'
-
-const REGION_STARTERS = {
-  Kanto:  [1, 4, 7],
-  Johto:  [152, 155, 158],
-  Hoenn:  [252, 255, 258],
-  Sinnoh: [387, 390, 393],
-  Unova:  [495, 498, 501],
-}
+import { REGION_STARTERS } from '../game/starters.js'
 
 export default function StarterSelect({ region, onBack, onSelectStarter, caughtSet, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
