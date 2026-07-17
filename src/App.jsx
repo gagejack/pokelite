@@ -190,7 +190,7 @@ export default function App() {
     mapProgress.current = null
   }
 
-  async function recordRunEnd(result) {
+  async function recordRunEnd(result, winRoster) {
     // The run is over — it must not be saved as resumable (even for guests, who
     // don't get a `runs` row but still shouldn't keep a dead localStorage save).
     runEnded.current = true
@@ -202,6 +202,18 @@ export default function App() {
       pokemon_caught: pokemonCaught.current,
       pokemon_caught_ids: pokemonCaughtIds.current,
       pokemon_seen_ids: pokemonSeenIds.current,
+    }
+    if (result === 'win' && winRoster?.length) {
+      payload.winning_roster = winRoster.map(p => ({
+        id: p.pokeId,
+        name: p.name,
+        level: p.level,
+        types: p.types,
+        move: p.move?.name ?? null,
+        item: p.heldItem?.name ?? null,
+        stats: { hp: p.stats.hp, maxHp: p.stats.maxHp },
+        shiny: !!p.shiny,
+      }))
     }
     await supabase.from('runs').insert(payload)
   }

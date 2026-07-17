@@ -38,3 +38,7 @@ npm run preview  # preview production build locally
 - Don't add dependencies without a clear reason; the stack is intentional
 - Don't put game rules or data (Pokémon pools, move lists, type charts) in React components — keep them in `src/game/`
 - Mobile layout is a top priority — design mobile-first, then scale up to desktop
+
+## Important Stuff
+IMPORTANT: if you're asking me to do follow up steps, please print out some type of large banner with # saying "YOUR ATTENTION IS REQUIRED SIR" with cool emoji output
+

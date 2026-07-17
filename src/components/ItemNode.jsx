@@ -171,24 +171,22 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
         boxShadow: shadowStyle,
         padding: isDesktop ? '29px' : '24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isDesktop ? '24px' : '20px',
-        maxWidth: isDesktop ? '672px' : '560px', width: '94vw',
+        maxWidth: isDesktop ? '740px' : '560px', width: '94vw',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Choose an Item</span>
-            <button
-              onClick={onClose}
-              className="hover:opacity-70 transition-opacity"
-              style={{ fontFamily: 'Upheaval', fontSize: '16px', color: mutedColor, background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
-            >
-              X
-            </button>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%', position: 'relative' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Choose an Item</span>
           <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor }}>
             Pick one item to keep
           </span>
+          <button
+            onClick={onClose}
+            className="hover:opacity-70 transition-opacity"
+            style={{ fontFamily: 'Upheaval', fontSize: '16px', color: mutedColor, background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', position: 'absolute', top: 0, right: 0 }}
+          >
+            X
+          </button>
         </div>
 
         {/* 3 item cards */}
@@ -231,6 +229,58 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                   {item.description}
                 </span>
               </button>
+            )
+          })}
+        </div>
+
+        {/* Roster row */}
+        <div style={{ display: 'flex', gap: '6px', width: '100%', justifyContent: 'center' }}>
+          {Array.from({ length: 6 }).map((_, i) => {
+            const pokemon = roster[i]
+            if (!pokemon) {
+              return (
+                <div key={i} style={{
+                  width: isDesktop ? '90px' : '72px',
+                  height: isDesktop ? '100px' : '80px',
+                  border: dark ? '2px dashed #333' : '2px dashed #bbb',
+                  backgroundColor: 'transparent',
+                  flexShrink: 0,
+                }} />
+              )
+            }
+            return (
+              <div key={i} style={{
+                backgroundColor: innerBg,
+                border: borderStyle,
+                padding: isDesktop ? '8px 4px' : '6px 2px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                width: isDesktop ? '90px' : '72px',
+                flexShrink: 0,
+                opacity: pokemon.fainted ? 0.5 : 1,
+              }}>
+                <img
+                  src={pokemon.sprite}
+                  alt={pokemon.name}
+                  style={{ width: '36px', height: '36px', imageRendering: 'pixelated' }}
+                />
+                <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: textColor, textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                  {pokemon.name}
+                </span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#facc15' }}>
+                  LVL {pokemon.level}
+                </span>
+                <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {pokemon.types?.map(t => (
+                    <span key={t} style={{
+                      fontFamily: 'Upheaval', fontSize: '6px', color: '#fff',
+                      backgroundColor: TYPE_COLORS[t] || '#888',
+                      padding: '1px 3px', textTransform: 'capitalize',
+                    }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )
           })}
         </div>

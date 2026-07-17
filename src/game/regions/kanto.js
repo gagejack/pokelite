@@ -73,7 +73,7 @@ import Sabrina1 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina
 import Sabrina2 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina 2.webp'
 import Sabrina3 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina 3.webp'
 
-import { buildRows } from '../nodeMap.js'
+import { buildRows, NODE_TYPES } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
 import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, MAP_LEVEL_RANGES } from './kanto.teams.js'
 
@@ -487,7 +487,11 @@ export const kantoConfig = {
     name: MAP_NAMES[i],
     generate: (starter) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Brock') : MAP_BOSSES[i]
-      return { region: 'Kanto', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss, i) }
+      const rows = buildRows(TRAINER_POOLS[i], boss, i)
+      if (i === 2) {
+        rows[4][1] = { id: rows[4][1].id, type: NODE_TYPES.RIVAL, trainer: 'Blue', rivalTeam: 'blueEarlyGame' }
+      }
+      return { region: 'Kanto', mapIndex: i, rows }
     },
     edges: MAP_EDGES,
     background,

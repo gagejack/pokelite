@@ -17,6 +17,7 @@ alter table public.runs
   add column if not exists pokemon_caught      integer not null default 0,
   add column if not exists pokemon_caught_ids  integer[] not null default '{}',
   add column if not exists pokemon_seen_ids    integer[] not null default '{}',
+  add column if not exists winning_roster      jsonb,
   add column if not exists created_at          timestamptz not null default now();
 
 -- 2. Row Level Security -------------------------------------------------------

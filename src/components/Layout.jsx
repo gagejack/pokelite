@@ -14,13 +14,8 @@ import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
 import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
-// onSkipMap is still accepted (skip flow kept in code); its button is hidden.
-// eslint-disable-next-line no-unused-vars
-// Nav bar buttons. Defined at MODULE scope (not nested in Layout) so its
-// component identity is stable — nesting it re-created the component every
-// Layout render (theme toggle, username load, any popup), remounting the whole
-// nav and re-decoding the icons each time.
-function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClose, setAutoClose, onRestart, setSettingsOpen, bg, borderStyle, textColor }) {
+// onSkipMap is accepted and shown when the user is an admin.
+function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClose, setAutoClose, onRestart, onSkipMap, setSettingsOpen, bg, borderStyle, textColor, role }) {
   return (
     <>
       <button onClick={onHome} className="hover:opacity-60 transition-opacity">
@@ -54,6 +49,15 @@ function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClo
         <button onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
           <img src={settingsIcon} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
         </button>
+        {role === 'admin' && onSkipMap && (
+          <button onClick={onSkipMap} className="hover:opacity-60 transition-opacity" title="Skip map (admin)">
+            <img
+              src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"
+              alt="Skip Map"
+              style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }}
+            />
+          </button>
+        )}
       </div>
     </>
   )
@@ -65,19 +69,23 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [username, setUsername] = useState(null)
+  const [role, setRole] = useState(null)
 
   // Show the logged-in player's username in the center of the nav bar.
   // Kept self-contained: Layout reads the session and profile itself.
   useEffect(() => {
     let cancelled = false
     async function loadUsername(user) {
-      if (!user) { if (!cancelled) setUsername(null); return }
+      if (!user) { if (!cancelled) { setUsername(null); setRole(null); } return }
       const { data } = await supabase
         .from('profiles')
-        .select('username')
+        .select('username, role')
         .eq('id', user.id)
         .maybeSingle()
-      if (!cancelled) setUsername(data?.username ?? null)
+      if (!cancelled) {
+        setUsername(data?.username ?? null)
+        setRole(data?.role ?? null)
+      }
     }
     supabase.auth.getUser().then(({ data }) => loadUsername(data.user))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -118,10 +126,12 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
           autoClose={autoClose}
           setAutoClose={setAutoClose}
           onRestart={onRestart}
+          onSkipMap={onSkipMap}
           setSettingsOpen={setSettingsOpen}
           bg={bg}
           borderStyle={borderStyle}
           textColor={textColor}
+          role={role}
         />
         {username && (
           <span style={{

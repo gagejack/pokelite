@@ -16,10 +16,145 @@ const HP_DARK = { '#22c55e': '#15803d', '#facc15': '#a16207', '#ef4444': '#991b1
 const STAT_BAR_LIGHT = '#6890F0'
 const STAT_BAR_DARK = '#3b5aa8'
 
-export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem, onShowItemInfo }) {
+function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor }) {
+  const isDesktop = useIsDesktop()
+  const { stats, move } = pokemon
+  const k = isDesktop ? 1.7 : 1
+  const s = px => `${Math.round(px * k)}px`
+  const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
+  const isSpecial = move?.damageClass === 'special'
+  const statRows = [
+    { label: 'HP',      value: stats.maxHp },
+    isSpecial
+      ? { label: 'SP.ATK', value: stats.spAtk }
+      : { label: 'ATK',    value: stats.attack },
+    { label: 'DEF',     value: stats.defense },
+    { label: 'SP.DEF',  value: stats.spDef },
+    { label: 'SPD',     value: stats.speed },
+  ]
+  const maxStat = Math.max(...statRows.map(s => s.value))
+
+  return (
+    <>
+      {/* Header */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(4) }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: s(25), color: textColor, textTransform: 'capitalize' }}>
+          {pokemon.name}
+        </span>
+        <img
+          src={pokemon.sprite}
+          alt={pokemon.name}
+          style={{ width: s(56), height: s(56), imageRendering: 'pixelated' }}
+        />
+        <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: mutedColor }}>
+          Lv. {pokemon.level}
+        </span>
+        <div style={{ display: 'flex', gap: s(4) }}>
+          {pokemon.types.map(t => (
+            <span key={t} style={{
+              fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
+              backgroundColor: TYPE_COLORS[t] || '#888',
+              padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
+            }}>
+              {t}
+            </span>
+          ))}
+        </div>
+        {pokemon.heldItem && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
+          }}>
+            <img
+              src={itemIconUrl(pokemon.heldItem)}
+              alt={pokemon.heldItem.name}
+              style={{ width: s(32), height: s(32), imageRendering: 'pixelated', padding: s(2) }}
+            />
+          </div>
+        )}
+      </div>
+      <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
+      {/* HP bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: s(3) }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>HP</span>
+          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: textColor }}>
+            {stats.hp}/{stats.maxHp}
+          </span>
+        </div>
+        <div style={{ width: '100%', height: s(6), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
+          <div style={{
+            height: '100%', borderRadius: '1px',
+            width: `${Math.max(0, (stats.hp / stats.maxHp) * 100)}%`,
+            background: twoTone(
+              hpColor(stats.hp, stats.maxHp),
+              HP_DARK[hpColor(stats.hp, stats.maxHp)],
+            ),
+          }} />
+        </div>
+      </div>
+      <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
+      {/* Stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: s(4) }}>
+        {statRows.filter(row => row.label !== 'HP').map(({ label, value }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: s(6) }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, width: s(40), flexShrink: 0 }}>
+              {label}
+            </span>
+            <div style={{ flex: 1, height: s(4), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
+              <div style={{
+                height: '100%', borderRadius: '1px',
+                width: `${(value / maxStat) * 100}%`,
+                background: twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK),
+              }} />
+            </div>
+            <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
+              {value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
+      {/* Move */}
+      <div style={{ backgroundColor: innerBg, border: borderStyle, padding: `${s(6)} ${s(8)}`, display: 'flex', flexDirection: 'column', gap: s(3) }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>MOVE</span>
+        {move ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: textColor, textTransform: 'capitalize' }}>
+                {move.name.replace(/-/g, ' ')}
+              </span>
+              <span style={{
+                fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
+                backgroundColor: TYPE_COLORS[move.type] || '#888',
+                padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
+              }}>
+                {move.type}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: s(10) }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>
+                PWR: <span style={{ color: textColor }}>{move.power ?? '—'}</span>
+              </span>
+              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, textTransform: 'capitalize' }}>
+                {move.damageClass}
+              </span>
+            </div>
+          </>
+        ) : (
+          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>No move yet</span>
+        )}
+      </div>
+    </>
+  )
+}
+
+export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem, onShowItemInfo, onStartHeldItemDrag }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const [selected, setSelected] = useState(null)
   const [selectedIndex, setSelectedIndex] = useState(null)
+  const [hoveredIndex, setHoveredIndex] = useState(null)
+  const hoverTimeout = useRef(null)
   const [dragFrom, setDragFrom] = useState(null)
   const [dragOver, setDragOver] = useState(null)
 
@@ -100,6 +235,17 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
     isDragging: dragFrom === i,
     // Highlight every slot as a drop target while placing an item.
     isDropTarget: itemTargeting || (dragOver === i && dragFrom !== i),
+    slotIndex: i,
+    onStartHeldItemDrag,
+    onMouseEnter: !itemTargeting ? () => {
+      if (!isDesktop) return
+      clearTimeout(hoverTimeout.current)
+      setHoveredIndex(i)
+    } : undefined,
+    onMouseLeave: !itemTargeting ? () => {
+      if (!isDesktop) return
+      hoverTimeout.current = setTimeout(() => setHoveredIndex(null), 150)
+    } : undefined,
   })
 
   const desktopSlots = (
@@ -113,7 +259,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           textColor={textColor}
           mutedColor={mutedColor}
           horizontal={false}
-          onClick={() => itemTargeting ? onPickTarget?.(i) : openPopup(pokemon, i)}
+          onClick={() => itemTargeting ? onPickTarget?.(i) : (isDesktop ? undefined : openPopup(pokemon, i))}
           {...slotProps(i)}
         />
       ))}
@@ -155,7 +301,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
               textColor={textColor}
               mutedColor={mutedColor}
               horizontal={true}
-              onClick={() => itemTargeting ? onPickTarget?.(i) : openPopup(pokemon, i)}
+          onClick={() => itemTargeting ? onPickTarget?.(i) : (isDesktop ? undefined : openPopup(pokemon, i))}
               {...slotProps(i)}
             />
           ))}
@@ -163,6 +309,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
       ) : (
         // Desktop: vertical sidebar
         <div style={{
+          position: 'relative',
           width: '90px',
           border: borderStyle,
           boxShadow: shadowStyle,
@@ -186,6 +333,29 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '0 4px 8px', width: '100%' }}>
             {desktopSlots}
           </div>
+          {hoveredIndex != null && roster[hoveredIndex] && (
+            <div
+              onMouseEnter={() => clearTimeout(hoverTimeout.current)}
+              onMouseLeave={() => { hoverTimeout.current = setTimeout(() => setHoveredIndex(null), 150) }}
+              style={{
+                position: 'absolute',
+                left: '100%',
+                top: '33px',
+                marginLeft: '8px',
+                zIndex: 100,
+                border: borderStyle,
+                boxShadow: shadowStyle,
+                backgroundColor: cardBg,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                padding: '0px 12px 12px',
+                width: '260px',
+              }}
+            >
+              <PokemonCardContent pokemon={roster[hoveredIndex]} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor} />
+            </div>
+          )}
         </div>
       )}
 
@@ -215,12 +385,12 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
 
 function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizontal, onClick,
   isDragging, isDropTarget, draggable, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd,
-  onTouchStart, onTouchMove, onTouchEnd, 'data-slot-index': slotIndex }) {
+  onTouchStart, onTouchMove, onTouchEnd, 'data-slot-index': slotIndex, onStartHeldItemDrag,
+  onMouseEnter, onMouseLeave }) {
   const isFainted = pokemon.fainted
   const spriteSize = horizontal ? '34px' : '40px'
   const barW = '50px'
-  const typeColor = TYPE_COLORS[pokemon.types?.[0]] || '#888'
-
+  
   return (
     <div
       data-slot-index={slotIndex}
@@ -234,6 +404,8 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         flex: horizontal ? 1 : undefined,
         width: horizontal ? undefined : '74px',
@@ -241,7 +413,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #666666') : undefined,
         border: isDropTarget
           ? '2px solid #facc15'
-          : horizontal ? undefined : `2px solid ${typeColor}`,
+          : horizontal ? undefined : borderStyle,
         outline: isDropTarget ? '1px solid #facc15' : undefined,
         backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
         display: 'flex',
@@ -277,12 +449,30 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       </span>
       <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width={barW} height="3px" />
       {pokemon.heldItem && (
-        <img
-          src={itemIconUrl(pokemon.heldItem)}
-          alt={pokemon.heldItem.name}
-          title={pokemon.heldItem.name}
-          style={{ width: '16px', height: '16px', imageRendering: 'pixelated', pointerEvents: 'none', flexShrink: 0 }}
-        />
+        <div
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            onStartHeldItemDrag?.(slotIndex, pokemon.heldItem);
+          }}
+          onDragEnd={() => onStartHeldItemDrag?.(null)}
+          onClick={(e) => e.stopPropagation()}
+          title={`${pokemon.heldItem.name} — drag to move`}
+          style={{
+            border: `2px solid ${dark ? '#535353' : '#999'}`,
+            borderRadius: '2px',
+            padding: '1px',
+            cursor: 'grab',
+            display: 'flex',
+            flexShrink: 0,
+          }}
+        >
+          <img
+            src={itemIconUrl(pokemon.heldItem)}
+            alt={pokemon.heldItem.name}
+            style={{ width: '14px', height: '14px', imageRendering: 'pixelated', pointerEvents: 'none' }}
+          />
+        </div>
       )}
       {isFainted && (
         <span style={{ fontFamily: 'Upheaval', fontSize: '6px', color: '#ef4444', position: 'absolute', top: '2px', right: '2px', pointerEvents: 'none' }}>
@@ -297,31 +487,13 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
   const isDesktop = useIsDesktop()
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
-  const { stats, move } = pokemon
-  // The card is a shared modal sized for mobile; on desktop scale it up so the
-  // level, type chips, stat rows, and move text are legible.
   const k = isDesktop ? 1.7 : 1
   const s = px => `${Math.round(px * k)}px`
-
-  // A Pokémon uses only one offensive stat — the one matching its move's damage
-  // class (special → Sp. Atk, physical → Attack). Show just that one so the card
-  // doesn't display a stat the Pokémon can never use.
-  const isSpecial = move?.damageClass === 'special'
-  const statRows = [
-    { label: 'HP',      value: stats.maxHp },
-    isSpecial
-      ? { label: 'SP.ATK', value: stats.spAtk }
-      : { label: 'ATK',    value: stats.attack },
-    { label: 'DEF',     value: stats.defense },
-    { label: 'SP.DEF',  value: stats.spDef },
-    { label: 'SPD',     value: stats.speed },
-  ]
-
-  const maxStat = Math.max(...statRows.map(s => s.value))
 
   return (
     <div
       onClick={onClose}
+      onMouseLeave={isDesktop ? onClose : undefined}
       style={{
         position: 'fixed', inset: 0,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -343,147 +515,7 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
           padding: s(12),
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: s(8) }}>
-          <img
-            src={pokemon.sprite}
-            alt={pokemon.name}
-            style={{ width: s(56), height: s(56), imageRendering: 'pixelated' }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: s(4), flex: 1, minWidth: 0 }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(25), color: textColor, textTransform: 'capitalize' }}>
-              {pokemon.name}
-            </span>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: mutedColor }}>
-              Lv. {pokemon.level}
-            </span>
-            <div style={{ display: 'flex', gap: s(4) }}>
-              {pokemon.types.map(t => (
-                <span key={t} style={{
-                  fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
-                  backgroundColor: TYPE_COLORS[t] || '#888',
-                  padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
-                }}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-          {/* Held item — to the right of level + type. Click to view its info
-              (description + Equip), same popup as clicking a bag item. */}
-          {pokemon.heldItem && (() => {
-            const itemAction = onShowHeldItemInfo || onMoveHeldItem
-            return (
-              <div
-                onClick={itemAction}
-                title={itemAction ? `${pokemon.heldItem.name} — click for info` : pokemon.heldItem.name}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
-                  // Nudge down so the icon clears the name (was centered against
-                  // the whole header, which overlapped under the name).
-                  flexShrink: 0, alignSelf: 'flex-start', marginTop: s(30),
-                  cursor: itemAction ? 'pointer' : 'default',
-                }}
-              >
-                <img
-                  src={itemIconUrl(pokemon.heldItem)}
-                  alt={pokemon.heldItem.name}
-                  style={{
-                    width: s(32), height: s(32), imageRendering: 'pixelated',
-                    border: itemAction ? '2px solid #facc15' : 'none',
-                    padding: s(2),
-                  }}
-                />
-                {itemAction && (
-                  <span style={{ fontFamily: 'Upheaval', fontSize: s(6), color: '#facc15' }}>INFO</span>
-                )}
-              </div>
-            )
-          })()}
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
-
-        {/* HP bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: s(3) }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>HP</span>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: textColor }}>
-              {stats.hp}/{stats.maxHp}
-            </span>
-          </div>
-          <div style={{ width: '100%', height: s(6), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
-            <div style={{
-              height: '100%', borderRadius: '1px',
-              width: `${Math.max(0, (stats.hp / stats.maxHp) * 100)}%`,
-              background: twoTone(
-                hpColor(stats.hp, stats.maxHp),
-                HP_DARK[hpColor(stats.hp, stats.maxHp)],
-              ),
-            }} />
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
-
-        {/* Stats */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: s(4) }}>
-          {statRows.filter(row => row.label !== 'HP').map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: s(6) }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, width: s(40), flexShrink: 0 }}>
-                {label}
-              </span>
-              <div style={{ flex: 1, height: s(4), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
-                <div style={{
-                  height: '100%', borderRadius: '1px',
-                  width: `${(value / maxStat) * 100}%`,
-                  background: twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK),
-                }} />
-              </div>
-              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
-                {value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
-
-        {/* Move */}
-        <div style={{ backgroundColor: innerBg, border: borderStyle, padding: `${s(6)} ${s(8)}`, display: 'flex', flexDirection: 'column', gap: s(3) }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>MOVE</span>
-          {move ? (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: textColor, textTransform: 'capitalize' }}>
-                  {move.name.replace(/-/g, ' ')}
-                </span>
-                <span style={{
-                  fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
-                  backgroundColor: TYPE_COLORS[move.type] || '#888',
-                  padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
-                }}>
-                  {move.type}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: s(10) }}>
-                <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>
-                  PWR: <span style={{ color: textColor }}>{move.power ?? '—'}</span>
-                </span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, textTransform: 'capitalize' }}>
-                  {move.damageClass}
-                </span>
-              </div>
-            </>
-          ) : (
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>No move yet</span>
-          )}
-        </div>
-
-        {/* Close */}
+        <PokemonCardContent pokemon={pokemon} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor} />
         <button
           onClick={onClose}
           style={{

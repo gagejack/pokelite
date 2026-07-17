@@ -5,7 +5,7 @@ import { TYPE_COLORS } from '../game/types.js'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
 // If roster is full (6), shows current roster so player can swap.
-export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet }) {
+export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [swapTarget, setSwapTarget] = useState(null)
@@ -39,9 +39,9 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
         backgroundColor: bg,
         border: borderStyle,
         boxShadow: shadowStyle,
-        padding: '24px',
+        padding: isLegendary ? '16px' : '24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
-        maxWidth: '560px', width: '94vw',
+        maxWidth: isLegendary ? '280px' : '560px', width: isLegendary ? 'auto' : '94vw',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
 

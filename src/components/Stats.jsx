@@ -45,6 +45,7 @@ export default function Stats({ onClose }) {
   const [reloadKey, setReloadKey] = useState(0)
   // Which detail popup is open: null | 'legendary' | 'shiny'
   const [detail, setDetail] = useState(null)
+  const [tab, setTab] = useState('stats')
 
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
@@ -64,7 +65,7 @@ export default function Stats({ onClose }) {
       setLoggedIn(true)
       const { data, error } = await supabase
         .from('runs')
-        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids')
+        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, winning_roster')
         .eq('user_id', user.id)
       if (cancelled) return
       const rows = (!error && data) ? data : []
@@ -109,7 +110,11 @@ export default function Stats({ onClose }) {
       const legendaries = [...legMap.values()].sort(byCountThenId)
       const shinies = [...shinyMap.values()].sort(byCountThenId)
 
-      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, regions, legendaries, shinies })
+      const winRosters = rows
+        .filter(r => r.result === 'win' && r.winning_roster)
+        .map(r => r.winning_roster)
+
+      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, regions, legendaries, shinies, winRosters })
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -143,7 +148,28 @@ export default function Stats({ onClose }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: panelBorder }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Stats</span>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => setTab('stats')}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'stats' ? textColor : mutedColor,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                borderBottom: tab === 'stats' ? `2px solid ${textColor}` : '2px solid transparent',
+              }}
+            >
+              Stats
+            </button>
+            <button
+              onClick={() => setTab('halloffame')}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'halloffame' ? textColor : mutedColor,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                borderBottom: tab === 'halloffame' ? `2px solid ${textColor}` : '2px solid transparent',
+              }}
+            >
+              Hall of Fame
+            </button>
+          </div>
           <button onClick={onClose} className="hover:opacity-70 transition-opacity"
             style={{ fontFamily: 'Upheaval', fontSize: '18px', color: textColor }}>X</button>
         </div>
@@ -171,6 +197,49 @@ export default function Stats({ onClose }) {
               >
                 Login
               </button>
+            </div>
+          ) : tab === 'halloffame' ? (
+            <div className="flex flex-col gap-6">
+              <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor, textAlign: 'center' }}>
+                Hall of Fame — Winning Teams
+              </span>
+              {(!stats?.winRosters || stats.winRosters.length === 0) ? (
+                <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
+                  No wins yet. Complete a run to see your team here!
+                </span>
+              ) : (
+                stats.winRosters.map((roster, i) => (
+                  <div key={i} style={{
+                    backgroundColor: innerBg, border: panelBorder,
+                    boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
+                    padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
+                  }}>
+                    <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15' }}>
+                      Win #{i + 1}
+                    </span>
+                    <div style={{ display: 'flex', gap: isDesktop ? '8px' : '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {roster.map(p => (
+                        <div key={p.id} style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          width: isDesktop ? '100px' : '80px',
+                        }}>
+                          <img
+                            src={SPRITE(p.id)}
+                            alt={p.name}
+                            style={{ width: isDesktop ? '52px' : '40px', height: isDesktop ? '52px' : '40px', imageRendering: 'pixelated' }}
+                          />
+                          <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>
+                            {p.name}
+                          </span>
+                          <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#facc15' }}>
+                            LVL {p.level}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-6">

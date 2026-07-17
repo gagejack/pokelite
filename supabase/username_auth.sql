@@ -50,3 +50,9 @@ $$;
 
 -- Allow anonymous (not-yet-logged-in) and authenticated callers to run it.
 grant execute on function public.get_email_for_username(text) to anon, authenticated;
+
+-- 4. Admin role column (run this ALTER if the table already exists) -------------
+alter table public.profiles add column if not exists role text not null default 'player';
+
+-- After running the ALTER, promote a user to admin:
+-- update public.profiles set role = 'admin' where lower(username) = 'jeblonski';

@@ -12,9 +12,7 @@ import { swapInRoster } from '../game/roster.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
-// the Champion, fought in order. Between battles the roster is fully healed
-// (applyBattleVictory fullHeal) and can be reordered on the next prep screen.
-// Beating the Champion wins the run.
+// the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
 export default function EliteFour({ region, character, roster, setRoster, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen }) {
@@ -64,20 +62,19 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     if (!pendingBattle) return
     const { index } = pendingBattle
     if (battleWon) {
-      // Between-battles full heal + revive per the design doc; reorder happens
-      // on the next member's prep screen.
+      // Levels gained per battle; reorder happens on the next member's prep screen.
       const { roster: updatedRoster, evolutionNotices: notices } =
-        await applyBattleVictory(finalPlayerTeam, { levelsGained: 2, fullHeal: true })
+        await applyBattleVictory(finalPlayerTeam, { levelsGained: 2, fullHeal: false })
       notices.forEach(n => onSpeciesOwned?.(n.pokeId))
       setRoster(updatedRoster)
       if (notices.length > 0) setEvolutionNotices(notices)
       setPendingBattle(null)
-      onMapCleared?.()
-      setDefeated(index + 1)
-      if (members[index].champion) {
-        setWon(true)
-        onRunEnd?.('win')
-      }
+        onMapCleared?.()
+        setDefeated(index + 1)
+        if (members[index].champion) {
+          setWon(true)
+          onRunEnd?.('win', updatedRoster)
+        }
     } else {
       // Losses normally exit via BattleCard's Play Again (onRestart); adopt
       // the sim's final team if this path is ever reached.

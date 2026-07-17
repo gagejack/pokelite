@@ -104,7 +104,7 @@ function MapSvg({
       <img
         src={background}
         alt="map background"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated', filter: 'brightness(0.9)' }}
       />
       <svg
         width="100%"
@@ -506,9 +506,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // Every enemy Pokémon fought counts as "seen" in the Pokédex.
     team.forEach(p => onSpeciesSeen?.(p.pokeId))
 
-    const trainerSprite = config.trainerFullSprites?.[node.trainer]
-      ?? config.characters?.find(c => c.name === node.trainer)?.sprite
-      ?? null
+    const isGrass = node.type === NODE_TYPES.GRASS
+    const trainerSprite = isGrass && team.length > 0
+      ? team[0].sprite
+      : config.trainerFullSprites?.[node.trainer]
+        ?? config.characters?.find(c => c.name === node.trainer)?.sprite
+        ?? null
 
     return { team, trainerSprite }
   }
@@ -665,7 +668,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       } else if (isBoss) {
         onMapCleared?.()
         onBadgeEarned?.(mapIndex)
-        onRunEnd?.('win')
+        onRunEnd?.('win', updatedRoster)
         setClearedNodes(prev => new Set([...prev, node.id]))
         setCurrentNode(node.id)
       } else {
@@ -900,6 +903,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                 itemTargeting={isMovingItem}
                 onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
                 onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+                onStartHeldItemDrag={(pokeIndex, item) => {
+                  if (item) setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })
+                  else setMovingItem(null)
+                }}
               />
               {/* Bag — drag an item onto a Pokémon to equip it. During an item
                   move, the whole panel is a drop target for stowing back to bag. */}
@@ -1001,6 +1008,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               itemTargeting={isMovingItem}
               onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
               onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
+              onStartHeldItemDrag={(pokeIndex, item) => {
+                if (item) setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })
+                else setMovingItem(null)
+              }}
             />
             {/* Bag — drag an item onto a Pokémon to equip (as on desktop), or tap
                 to pick it up then tap a Pokémon. Drop here to stow back. */}
@@ -1137,6 +1148,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
       {pendingLegendary && (
         <PokeballNode
+          isLegendary
           offered={pendingLegendary.offered}
           roster={roster}
           caughtSet={caughtSet}
