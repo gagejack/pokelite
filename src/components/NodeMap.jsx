@@ -7,14 +7,13 @@ import BattleCard from './BattleCard'
 import PokeballNode from './PokeballNode'
 import ItemNode from './ItemNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
-import EvolutionNotice from './EvolutionNotice'
-import EvolutionChoice from './EvolutionChoice'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedType, cachedName, rollStageForLevel, evolveInto, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
+import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
@@ -363,10 +362,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }, [mapData, clearedNodes, currentNode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loadingNode, setLoadingNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
-  const [evolutionNotices, setEvolutionNotices] = useState([])
-  // Pending multi-branch evolution picks (Eevee, Tyrogue…) — the popup shows
-  // one at a time; the Pokémon stays un-evolved until the player chooses.
-  const [evolutionChoices, setEvolutionChoices] = useState([])
+  const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned })
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
   // Aspect ratio (w/h) of the current map's background image. The card sizes
   // itself to this so the whole image shows and the nodes sit on it. Null until
@@ -637,16 +633,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const levelsGained = isRival ? 4 : node.type === NODE_TYPES.GRASS ? 1 : 2
 
     if (won) {
-      // Evolution options are gated to species that exist in this region's gen.
-      const maxSpeciesId = GEN_MAX_ID[config.generation] ?? Infinity
-      const { roster: updatedRoster, evolutionNotices: notices, evolutionChoices: choices } =
-        await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival, maxSpeciesId })
-      // Each evolved form is a new owned species for the Pokédex.
-      notices.forEach(n => onSpeciesOwned?.(n.pokeId))
-
-      setRoster(updatedRoster)
-      if (notices.length > 0) setEvolutionNotices(notices)
-      if (choices.length > 0) setEvolutionChoices(choices)
+      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival })
       setPendingBattle(null)
 
       if (isMasterBall) {
@@ -699,22 +686,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function rerollItemOffer() {
     setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems() } : prev)
-  }
-
-  // Player picked an evolution target in the EvolutionChoice popup. Evolve the
-  // pending Pokémon in place, record the new species, queue the notice, and
-  // advance to the next pending choice (if any).
-  async function handleEvolutionChoose(speciesId) {
-    const choice = evolutionChoices[0]
-    if (!choice) return
-    const current = roster[choice.index]
-    const evolved = current ? await evolveInto(current, speciesId) : null
-    if (evolved) {
-      setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
-      onSpeciesOwned?.(evolved.pokeId)
-      setEvolutionNotices(prev => [...prev, { from: choice.fromName, to: evolved.name, pokeId: evolved.pokeId }])
-    }
-    setEvolutionChoices(prev => prev.slice(1))
   }
 
   function handlePokeballPick({ pokemon, swapIndex }) {
@@ -1161,19 +1132,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         </div>
       )}
 
-      {evolutionChoices.length > 0 && (
-        <EvolutionChoice
-          fromName={evolutionChoices[0].fromName}
-          fromSprite={evolutionChoices[0].sprite}
-          options={evolutionChoices[0].options}
-          onChoose={handleEvolutionChoose}
-        />
-      )}
-
-      {/* Notices wait until all pending evolution choices are resolved. */}
-      {evolutionChoices.length === 0 && (
-        <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
-      )}
+      {evo.render()}
 
 
       {pendingPokeball && (

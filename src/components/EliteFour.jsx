@@ -4,11 +4,10 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
 import BattleCard from './BattleCard'
-import EvolutionNotice from './EvolutionNotice'
-import EvolutionChoice from './EvolutionChoice'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, applyBattleVictory, cachedName, evolveInto, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedName } from '../game/pokemon.js'
+import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { swapInRoster } from '../game/roster.js'
 import { TYPE_COLORS } from '../game/types.js'
 
@@ -24,9 +23,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
 
   const [defeated, setDefeated] = useState(0)
   const [pendingBattle, setPendingBattle] = useState(null)
-  const [evolutionNotices, setEvolutionNotices] = useState([])
-  // Pending multi-branch evolution picks (Eevee, Tyrogue…) — see NodeMap.
-  const [evolutionChoices, setEvolutionChoices] = useState([])
+  const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned })
   const [loadingIndex, setLoadingIndex] = useState(null)
   const [won, setWon] = useState(false)
 
@@ -66,13 +63,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     const { index } = pendingBattle
     if (battleWon) {
       // Levels gained per battle; reorder happens on the next member's prep screen.
-      const maxSpeciesId = GEN_MAX_ID[config?.generation] ?? Infinity
-      const { roster: updatedRoster, evolutionNotices: notices, evolutionChoices: choices } =
-        await applyBattleVictory(finalPlayerTeam, { levelsGained: 2, fullHeal: false, maxSpeciesId })
-      notices.forEach(n => onSpeciesOwned?.(n.pokeId))
-      setRoster(updatedRoster)
-      if (notices.length > 0) setEvolutionNotices(notices)
-      if (choices.length > 0) setEvolutionChoices(choices)
+      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: 2, fullHeal: false })
       setPendingBattle(null)
         onMapCleared?.()
         setDefeated(index + 1)
@@ -86,21 +77,6 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
       setRoster(finalPlayerTeam.map(fp => ({ ...fp })))
       setPendingBattle(null)
     }
-  }
-
-  // Player picked an evolution target in the EvolutionChoice popup — mirrors
-  // the same handler in NodeMap.
-  async function handleEvolutionChoose(speciesId) {
-    const choice = evolutionChoices[0]
-    if (!choice) return
-    const current = roster[choice.index]
-    const evolved = current ? await evolveInto(current, speciesId) : null
-    if (evolved) {
-      setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
-      onSpeciesOwned?.(evolved.pokeId)
-      setEvolutionNotices(prev => [...prev, { from: choice.fromName, to: evolved.name, pokeId: evolved.pokeId }])
-    }
-    setEvolutionChoices(prev => prev.slice(1))
   }
 
   const MemberRow = ({ member, index }) => {
@@ -218,22 +194,9 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
         </div>
       )}
 
-      {evolutionChoices.length > 0 && (
-        <EvolutionChoice
-          fromName={evolutionChoices[0].fromName}
-          fromSprite={evolutionChoices[0].sprite}
-          options={evolutionChoices[0].options}
-          onChoose={handleEvolutionChoose}
-        />
-      )}
+      {evo.render()}
 
-      {/* Notices wait until all pending evolution choices are resolved. */}
-      {evolutionChoices.length === 0 && (
-        <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
-      )}
-
-
-      {won && evolutionNotices.length === 0 && (
+      {won && evo.evolutionNotices.length === 0 && evo.evolutionChoices.length === 0 && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
           <div style={{
             backgroundColor: cardBg, border: borderStyle, boxShadow: shadowStyle,
