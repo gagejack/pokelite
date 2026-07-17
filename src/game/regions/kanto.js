@@ -452,6 +452,7 @@ const BADGES = [
 // --- Region config ---
 export const kantoConfig = {
   name: 'Kanto',
+  generation: 1,
   damageMultiplier: 2,
   trainerSprites: TRAINER_SPRITES,
   trainerFullSprites: TRAINER_FULL_SPRITES,

@@ -130,6 +130,7 @@ const CHARACTERS = [
 
 export const sinnohConfig = {
   name: 'Sinnoh',
+  generation: 4,
   damageMultiplier: 2,
   trainerSprites: {},
   trainerFullSprites: {},

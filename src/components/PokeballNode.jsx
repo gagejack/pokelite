@@ -144,8 +144,8 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
               className="hover:opacity-70 transition-opacity"
               style={{
                 fontFamily: 'Upheaval', fontSize: '13px',
-                color: textColor, border: borderStyle, boxShadow: shadowStyle,
-                backgroundColor: bg, padding: '8px 20px',
+                color: '#ffffff', border: borderStyle, boxShadow: shadowStyle,
+                backgroundColor: '#ef4444', padding: '8px 20px',
                 cursor: rerollsLeft <= 0 || rerolling ? 'default' : 'pointer',
                 opacity: rerollsLeft <= 0 || rerolling ? 0.4 : 1,
               }}

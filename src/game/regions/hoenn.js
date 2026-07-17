@@ -166,6 +166,7 @@ const CHARACTERS = [
 
 export const hoennConfig = {
   name: 'Hoenn',
+  generation: 3,
   damageMultiplier: 2,
   trainerSprites: {},
   trainerFullSprites: {},

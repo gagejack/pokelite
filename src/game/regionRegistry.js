@@ -13,6 +13,8 @@ import { sinnohConfig } from './regions/sinnoh.js'
 //
 // {
 //   name:               string,                       // 'Unova'
+//   generation:         number,                        // 1–9; evolution options are
+//                                                      // gated to species in this gen
 //   damageMultiplier:   number,                        // global damage scale
 //   characters:         [{ id, name, sprite }],        // overworld portraits
 //   trainerSprites:     { [name]: overworldSprite },   // node icons

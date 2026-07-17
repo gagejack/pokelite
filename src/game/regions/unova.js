@@ -664,6 +664,7 @@ const BADGES = [
 // --- Region config ---
 export const unovaConfig = {
   name: 'Unova',
+  generation: 5,
   damageMultiplier: 2.5,
   trainerSprites: TRAINER_SPRITES,
   trainerFullSprites: TRAINER_FULL_SPRITES,
