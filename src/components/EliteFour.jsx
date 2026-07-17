@@ -190,6 +190,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
+            onMainMenu={onBack}
           />
         </div>
       )}

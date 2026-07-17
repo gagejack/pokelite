@@ -28,7 +28,7 @@ const MOBILE_CARD_H = 640
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
@@ -319,7 +319,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
   const defeatOverlay = battleResult === 'loss' ? (
-    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} />
+    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} />
   ) : null
 
   // Victory overlay — centered "Victory!" + Continue popup. Skipped entirely
@@ -737,7 +737,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 // Shown when the player is defeated: the final team as a 2×3 card grid, with a
 // Play Again button below. Replaces the in-card "Play Again" button so the
 // battle card itself keeps all its space for the roster.
-function DefeatScreen({ roster, dark, onRestart }) {
+function DefeatScreen({ roster, dark, onRestart, onMainMenu }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   // Light theme keeps DARK grey strokes/shadows — the lighter #666 wash out
@@ -801,17 +801,33 @@ function DefeatScreen({ roster, dark, onRestart }) {
           ))}
         </div>
 
-        {onRestart && (
-          <button
-            onClick={onRestart}
-            style={{
-              fontFamily: 'Upheaval', fontSize: '16px', color: '#1a1a1a',
-              border: '2px solid #000', backgroundColor: '#facc15',
-              padding: '10px 40px', cursor: 'pointer',
-            }}
-          >
-            Play Again
-          </button>
+        {(onRestart || onMainMenu) && (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {onRestart && (
+              <button
+                onClick={onRestart}
+                style={{
+                  fontFamily: 'Upheaval', fontSize: '16px', color: '#1a1a1a',
+                  border: '2px solid #000', backgroundColor: '#facc15',
+                  padding: '10px 40px', cursor: 'pointer',
+                }}
+              >
+                Play Again
+              </button>
+            )}
+            {onMainMenu && (
+              <button
+                onClick={onMainMenu}
+                style={{
+                  fontFamily: 'Upheaval', fontSize: '16px', color: textColor,
+                  border: borderStyle, backgroundColor: cellBg,
+                  padding: '10px 40px', cursor: 'pointer',
+                }}
+              >
+                Main Menu
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -833,24 +849,24 @@ function VictoryScreen({ dark, onContinue }) {
       onClick={e => e.stopPropagation()}
       style={{
         position: 'fixed', inset: 0, zIndex: 120,
-        backgroundColor: 'rgba(0,0,0,0.82)',
+        backgroundColor: 'rgba(0,0,0,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '16px', boxSizing: 'border-box',
       }}
     >
       <div style={{
         backgroundColor: cardBg, border: borderStyle, boxShadow: shadowStyle,
-        padding: '24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px',
+        padding: '16px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
       }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '30px', color: '#22c55e', textShadow: '2px 2px 0 #000' }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: '#22c55e', textShadow: '2px 2px 0 #000' }}>
           Victory!
         </span>
         <button
           onClick={onContinue}
           style={{
-            fontFamily: 'Upheaval', fontSize: '16px', color: textColor,
+            fontFamily: 'Upheaval', fontSize: '13px', color: textColor,
             border: borderStyle, backgroundColor: innerBg,
-            padding: '10px 40px', cursor: 'pointer',
+            padding: '7px 28px', cursor: 'pointer',
           }}
         >
           Continue

@@ -16,11 +16,15 @@ const HP_DARK = { '#22c55e': '#15803d', '#facc15': '#a16207', '#ef4444': '#991b1
 const STAT_BAR_LIGHT = '#6890F0'
 const STAT_BAR_DARK = '#3b5aa8'
 
-function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor }) {
+function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor, onHeldItemClick }) {
   const isDesktop = useIsDesktop()
   const { stats, move } = pokemon
   const k = isDesktop ? 1.7 : 1
   const s = px => `${Math.round(px * k)}px`
+  // Fonts scale a touch smaller than the card's layout on desktop so the hover
+  // stat card reads tighter without shrinking the sprite/bars/spacing.
+  const fontK = isDesktop ? 0.82 : 1
+  const sf = px => `${Math.round(px * k * fontK)}px`
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const isSpecial = move?.damageClass === 'special'
   const statRows = [
@@ -38,7 +42,7 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
     <>
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(4) }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: s(25), color: textColor, textTransform: 'capitalize' }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: sf(25), color: textColor, textTransform: 'capitalize' }}>
           {pokemon.name}
         </span>
         <img
@@ -46,13 +50,13 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
           alt={pokemon.name}
           style={{ width: s(56), height: s(56), imageRendering: 'pixelated' }}
         />
-        <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: mutedColor }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: sf(10), color: mutedColor }}>
           Lv. {pokemon.level}
         </span>
         <div style={{ display: 'flex', gap: s(4) }}>
           {pokemon.types.map(t => (
             <span key={t} style={{
-              fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
+              fontFamily: 'Upheaval', fontSize: sf(7), color: '#fff',
               backgroundColor: TYPE_COLORS[t] || '#888',
               padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
             }}>
@@ -64,11 +68,31 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
           }}>
-            <img
-              src={itemIconUrl(pokemon.heldItem)}
-              alt={pokemon.heldItem.name}
-              style={{ width: s(32), height: s(32), imageRendering: 'pixelated', padding: s(2) }}
-            />
+            {onHeldItemClick ? (
+              // Clicking the held item starts moving it: the card closes and the
+              // player picks another roster slot (or the Bag) to give it to.
+              <button
+                type="button"
+                onClick={() => onHeldItemClick(pokemon.heldItem)}
+                title={`${pokemon.heldItem.name} — tap to move`}
+                style={{
+                  border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                  display: 'flex', lineHeight: 0,
+                }}
+              >
+                <img
+                  src={itemIconUrl(pokemon.heldItem)}
+                  alt={pokemon.heldItem.name}
+                  style={{ width: s(32), height: s(32), imageRendering: 'pixelated', padding: s(2) }}
+                />
+              </button>
+            ) : (
+              <img
+                src={itemIconUrl(pokemon.heldItem)}
+                alt={pokemon.heldItem.name}
+                style={{ width: s(32), height: s(32), imageRendering: 'pixelated', padding: s(2) }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -76,8 +100,8 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
       {/* HP bar */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: s(3) }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>HP</span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: textColor }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: sf(8), color: mutedColor }}>HP</span>
+          <span style={{ fontFamily: 'Upheaval', fontSize: sf(8), color: textColor }}>
             {stats.hp}/{stats.maxHp}
           </span>
         </div>
@@ -97,7 +121,7 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
       <div style={{ display: 'flex', flexDirection: 'column', gap: s(4) }}>
         {statRows.filter(row => row.label !== 'HP').map(({ label, value }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: s(6) }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, width: s(40), flexShrink: 0 }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor, width: s(40), flexShrink: 0 }}>
               {label}
             </span>
             <div style={{ flex: 1, height: s(4), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
@@ -107,7 +131,7 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
                 background: twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK),
               }} />
             </div>
-            <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
               {value}
             </span>
           </div>
@@ -116,15 +140,15 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
       <div style={{ height: '2px', backgroundColor: dark ? '#121212' : '#666' }} />
       {/* Move */}
       <div style={{ backgroundColor: innerBg, border: borderStyle, padding: `${s(6)} ${s(8)}`, display: 'flex', flexDirection: 'column', gap: s(3) }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>MOVE</span>
+        <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor }}>MOVE</span>
         {move ? (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: s(10), color: textColor, textTransform: 'capitalize' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: sf(10), color: textColor, textTransform: 'capitalize' }}>
                 {move.name.replace(/-/g, ' ')}
               </span>
               <span style={{
-                fontFamily: 'Upheaval', fontSize: s(7), color: '#fff',
+                fontFamily: 'Upheaval', fontSize: sf(7), color: '#fff',
                 backgroundColor: TYPE_COLORS[move.type] || '#888',
                 padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
               }}>
@@ -132,23 +156,23 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor 
               </span>
             </div>
             <div style={{ display: 'flex', gap: s(10) }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor }}>
                 PWR: <span style={{ color: textColor }}>{move.power ?? '—'}</span>
               </span>
-              <span style={{ fontFamily: 'Upheaval', fontSize: s(7), color: mutedColor, textTransform: 'capitalize' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor, textTransform: 'capitalize' }}>
                 {move.damageClass}
               </span>
             </div>
           </>
         ) : (
-          <span style={{ fontFamily: 'Upheaval', fontSize: s(8), color: mutedColor }}>No move yet</span>
+          <span style={{ fontFamily: 'Upheaval', fontSize: sf(8), color: mutedColor }}>No move yet</span>
         )}
       </div>
     </>
   )
 }
 
-export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onMoveHeldItem, onShowItemInfo, onStartHeldItemDrag }) {
+export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onStartHeldItemDrag }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [selected, setSelected] = useState(null)
@@ -353,7 +377,13 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
                 width: '260px',
               }}
             >
-              <PokemonCardContent pokemon={roster[hoveredIndex]} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor} />
+              <PokemonCardContent pokemon={roster[hoveredIndex]} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor}
+                onHeldItemClick={onStartHeldItemDrag ? item => {
+                  clearTimeout(hoverTimeout.current)
+                  setHoveredIndex(null)
+                  onStartHeldItemDrag(hoveredIndex, item)
+                } : undefined}
+              />
             </div>
           )}
         </div>
@@ -368,14 +398,11 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           textColor={textColor}
           mutedColor={mutedColor}
           onClose={closePopup}
-          onMoveHeldItem={onMoveHeldItem ? () => {
-            if (selected.heldItem) onMoveHeldItem(selected.heldItem, selectedIndex)
+          // Tapping the held item starts moving it: close the popup, then the
+          // player picks another roster slot (or the Bag) to give it to.
+          onHeldItemClick={onStartHeldItemDrag ? item => {
             closePopup()
-          } : undefined}
-          // Clicking the held item opens its info popup (same as the bag).
-          onShowHeldItemInfo={onShowItemInfo ? () => {
-            if (selected.heldItem) onShowItemInfo(selected.heldItem, selectedIndex)
-            closePopup()
+            onStartHeldItemDrag(selectedIndex, item)
           } : undefined}
         />
       )}
@@ -483,7 +510,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   )
 }
 
-function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mutedColor, onClose, onMoveHeldItem, onShowHeldItemInfo }) {
+function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mutedColor, onClose, onHeldItemClick }) {
   const isDesktop = useIsDesktop()
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
@@ -515,7 +542,7 @@ function PokemonPopup({ pokemon, dark, borderStyle, shadowStyle, textColor, mute
           padding: s(12),
         }}
       >
-        <PokemonCardContent pokemon={pokemon} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor} />
+        <PokemonCardContent pokemon={pokemon} dark={dark} borderStyle={borderStyle} textColor={textColor} mutedColor={mutedColor} onHeldItemClick={onHeldItemClick} />
         <button
           onClick={onClose}
           style={{

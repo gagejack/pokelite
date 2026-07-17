@@ -113,8 +113,17 @@ function MapSvg({
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
       >
         <defs>
+          {/* The overworld sprites are 3×4 walk-cycle sheets; we show only the
+              top-left (down-facing, standing) frame. The image below is scaled
+              so one frame ≈ one node, offset to origin, then clipped to exactly
+              that frame — otherwise the top of the next row bleeds in under the
+              sprite's feet. The drop shadow lives on the outer <g> (unclipped),
+              so it still extends past this tight frame box. */}
           <clipPath id="trainer-clip">
-            <rect x={0} y={0} width={NODE_SIZE} height={NODE_SIZE * 1.15} />
+            <rect
+              x={-NODE_SIZE * 0.083} y={-NODE_SIZE * 0.075}
+              width={(NODE_SIZE * 3.5) / 3} height={(NODE_SIZE * 4.5) / 4}
+            />
           </clipPath>
           <filter id="node-shadow" x="-60%" y="-60%" width="220%" height="220%">
             {/* Larger, softer, subtler shadow behind the tight one */}
@@ -188,8 +197,9 @@ function MapSvg({
                   style={{ imageRendering: 'pixelated', opacity }}
                 />
               ) : isTrainerNode ? (
-                <g clipPath="url(#trainer-clip)" filter={isHovered ? 'url(#hover-outline)' : reachable ? 'url(#white-outline)' : 'url(#trainer-shadow)'}>
+                <g filter={isHovered ? 'url(#hover-outline)' : reachable ? 'url(#white-outline)' : 'url(#trainer-shadow)'}>
                   <image href={icon}
+                    clipPath="url(#trainer-clip)"
                     x={-NODE_SIZE * 0.083} y={-NODE_SIZE * 0.075}
                     width={NODE_SIZE * 3.5} height={NODE_SIZE * 4.5}
                     style={{ imageRendering: 'pixelated', opacity }}
@@ -905,7 +915,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                 onSwap={swapRoster}
                 itemTargeting={isMovingItem}
                 onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
-                onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
                 onStartHeldItemDrag={(pokeIndex, item) => {
                   if (item) setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })
                   else setMovingItem(null)
@@ -1010,7 +1019,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               onSwap={(a, b) => setRoster(prev => { const r = [...prev]; [r[a], r[b]] = [r[b], r[a]]; return r })}
               itemTargeting={isMovingItem}
               onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
-              onShowItemInfo={(item, pokeIndex) => setInfoItem({ item, from: { kind: 'pokemon', pokeIndex } })}
               onStartHeldItemDrag={(pokeIndex, item) => {
                 if (item) setMovingItem({ item, from: { kind: 'pokemon', pokeIndex } })
                 else setMovingItem(null)
@@ -1128,6 +1136,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
+            onMainMenu={onBack}
           />
         </div>
       )}
