@@ -63,6 +63,20 @@ export const ELITE_FOUR_TEAMS = {
   'Blue':    [{ id: 18, level: 77 }, { id: 65, level: 77 }, { id: 112, level: 78 }, { id: 103, level: 78 }, { id: 6, level: 80 }], // Pidgeot, Alakazam, Rhydon, Exeggutor, Charizard (ace)
 }
 
+// Rival (Blue) teams for RIVAL nodes, keyed by variant so the same rival can be
+// placed at different game stages with a stage-appropriate roster. Flat
+// { id, level } specs, same format as BOSS_TEAMS; ace last.
+export const RIVAL_TEAMS = {
+  // Map 3 (Vermilion, band [18,28]) — canonical early-game Blue, just under the
+  // Lt. Surge gym (L26-28).
+  blueEarlyGame: [
+    { id: 17,  level: 22 }, // Pidgeotto
+    { id: 20,  level: 22 }, // Raticate
+    { id: 64,  level: 23 }, // Kadabra
+    { id: 102, level: 24 }, // Exeggcute (ace)
+  ],
+}
+
 // Per-map level ranges (indexed by mapIndex). Same pacing as Unova.
 export const MAP_LEVEL_RANGES = [
   [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],

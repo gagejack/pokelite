@@ -8,6 +8,11 @@ export const NODE_TYPES = {
   POKECENTER: 'pokecenter',
   BOSS: 'boss',
   MYSTERY: 'mystery',
+  // Rival — a special trainer that heals + gives +4 levels to the whole roster
+  // on defeat. Placed manually (never randomly rolled). A placed rival node is:
+  //   { id, type: NODE_TYPES.RIVAL, trainer: 'Blue', rivalTeam: 'blueEarlyGame' }
+  // where `trainer` drives sprite/icon/name and `rivalTeam` keys config.rivalTeams.
+  RIVAL: 'rival',
 }
 
 // The concrete node types a Mystery ("?") node can resolve into, each equally

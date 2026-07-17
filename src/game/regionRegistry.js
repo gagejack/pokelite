@@ -28,6 +28,8 @@ import { sinnohConfig } from './regions/sinnoh.js'
 //   mapLevelRanges:     [ [min, max] ],                // per-map (8) level bands
 //   bossTeams:          { [name]: [{ id, level }] },   // gym leaders
 //   eliteFourTeams:     { [name]: [{ id, level }] },   // E4 + champion
+//   rivalTeams:         { [variant]: [{ id, level }] },// RIVAL node teams
+//                                                      // (node.rivalTeam keys in; +4 lvl + full heal)
 //   starterBoss:        { [starterId]: bossName },     // map-1 boss by starter
 //   fallbackSpeciesId:  number,                        // when a pool is empty
 //   eliteFour:          [{ name, type, sprite, fullSprite, champion? }],

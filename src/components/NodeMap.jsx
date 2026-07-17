@@ -44,8 +44,10 @@ const NODE_SIZE = 100
 // scale with it too.
 const NODE_SCALE = 1.3
 // Extra multiplier applied to gym-leader (boss) nodes so they stand out as
-// bigger than regular nodes. Stacks on top of NODE_SCALE.
+// bigger than regular nodes. Stacks on top of NODE_SCALE. Rivals render at the
+// same size — both are major fights.
 const BOSS_SCALE = 1.4
+const isBossSized = type => type === NODE_TYPES.BOSS || type === NODE_TYPES.RIVAL
 const ROW_HEIGHT = 200
 const COL_WIDTH = 200
 const PADDING_TOP = 150
@@ -173,9 +175,9 @@ function MapSvg({
           const isHovered = hoveredNode?.id === node.id
           const icon = getIcon(node, isCurrentNode)
           const opacity = isCurrentNode ? 1 : cleared ? 0.8 : reachable ? 1 : locked ? 0.2 : .85
-          const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS
-          // Gym leaders (boss nodes) render larger than everything else.
-          const nodeScale = NODE_SCALE * (node.type === NODE_TYPES.BOSS ? BOSS_SCALE : 1)
+          const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL
+          // Gym leaders + rivals render larger than everything else.
+          const nodeScale = NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
           return (
             <g key={node.id} transform={`translate(${x}, ${y}) scale(${iconFixX * nodeScale}, ${iconFixY * nodeScale}) translate(${-NODE_SIZE / 2}, 0)`}>
               {isCurrentNode ? (
@@ -215,7 +217,7 @@ function MapSvg({
         const cleared = clearedNodes.has(node.id)
         const reachable = !cleared && isReachable(node.id)
         const { px, py } = toPixel(x, y)
-        const size = NODE_SIZE * mapScale * NODE_SCALE * (node.type === NODE_TYPES.BOSS ? BOSS_SCALE : 1)
+        const size = NODE_SIZE * mapScale * NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
         const isHovered = hoveredNode?.id === node.id
         // Only the hovered node shows a tooltip, so only it needs the label
         // (which does boss-team cachedType/cachedName lookups). Skip the work
@@ -454,12 +456,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isBoss = node.type === NODE_TYPES.BOSS
     const isTrainer = node.type === NODE_TYPES.TRAINER
     const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
+    const isRival = node.type === NODE_TYPES.RIVAL
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
 
     let specs
     if (isBoss) {
       specs = config.bossTeams?.[node.trainer] ?? []
+    } else if (isRival) {
+      // Rival: a fixed authored team selected by the node's rivalTeam variant.
+      specs = config.rivalTeams?.[node.rivalTeam] ?? []
     } else if (isMasterBall) {
       // Master Ball: a single legendary from this map's pool, at its fixed level
       // (not position-scaled). Empty pool → no legendary (caller clears the node).
@@ -578,6 +584,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       || node.type === NODE_TYPES.BOSS
       || node.type === NODE_TYPES.GRASS
       || node.type === NODE_TYPES.MASTER_BALL
+      || node.type === NODE_TYPES.RIVAL
 
     if (isBattle) {
       setLoadingNode(node.id)
@@ -625,12 +632,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const node = pendingBattle.node
     const isBoss = node.type === NODE_TYPES.BOSS
     const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
+    const isRival = node.type === NODE_TYPES.RIVAL
     const legendary = pendingBattle.enemyTeam[0]
-    const levelsGained = node.type === NODE_TYPES.GRASS ? 1 : 2
+    // Rival grants +4 levels + a full heal; otherwise grass=1, everything else=2.
+    const levelsGained = isRival ? 4 : node.type === NODE_TYPES.GRASS ? 1 : 2
 
     if (won) {
       const { roster: updatedRoster, evolutionNotices: notices } =
-        await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss })
+        await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival })
       // Each evolved form is a new owned species for the Pokédex.
       notices.forEach(n => onSpeciesOwned?.(n.pokeId))
 
@@ -707,7 +716,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function getIcon(node, isCurrentNode) {
     if (isCurrentNode && character) return character.sprite
-    if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS) {
+    if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL) {
       return config.trainerSprites[node.trainer] || ITEM_ICONS[NODE_TYPES.POKEBALL]
     }
     if (node.type === NODE_TYPES.GRASS) return mapConfig.grassIcon
@@ -739,6 +748,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         level: p.level,
       }))
       return { title: node.trainer ?? 'Gym Leader', sub }
+    }
+    if (node.type === NODE_TYPES.RIVAL) {
+      // Same team-row format as a boss, plus the rival's reward line.
+      const team = config.rivalTeams?.[node.rivalTeam] ?? []
+      const sub = team.map(p => ({
+        type: cachedType(p.id),
+        name: cachedName(p.id) ?? '???',
+        level: p.level,
+      }))
+      return { title: node.trainer ?? 'Rival', sub: [...sub, '+4 levels + full heal'] }
     }
     if (node.type === NODE_TYPES.MASTER_BALL) {
       // The exact legendary is rolled at battle time, so hide its identity (???)

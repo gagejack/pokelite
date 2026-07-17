@@ -6,6 +6,18 @@ const itemId = p => p?.heldItem?.id ?? null
 const healAmount = (mon, base) =>
   Math.floor(base * (itemId(mon) === 'big_root' ? 1.5 : 1))
 
+// Passive per-round heals (Leftovers / Black Sludge) decay as a battle drags on
+// so an over-healing matchup can't loop forever (which the round cap would then
+// mis-score as a defeat). Full strength through DECAY_START rounds — well past
+// any normal battle — then linearly to 0 by DECAY_END, guaranteeing HP always
+// trends down and the battle resolves on its own. Real fights never reach this.
+const DECAY_START = 20
+const DECAY_END = 40
+const passiveHealFactor = round =>
+  round <= DECAY_START ? 1
+    : round >= DECAY_END ? 0
+    : (DECAY_END - round) / (DECAY_END - DECAY_START)
+
 // Effective speed for turn order (Choice Scarf +50%, Iron Ball −40%).
 function effSpeed(p) {
   let s = p.stats.speed
@@ -218,30 +230,37 @@ export function simulateBattle(playerTeam, enemyTeam, damageMultiplier = 2) {
         enemyActiveHp:  enemy[ei].stats.hp,
       })
 
-      // Advance active pointer if the defender fainted
-      if (defender.fainted) {
-        if (dSide === 'enemy') ei = nextAlive(enemy, ei)
-        else pi = nextAlive(player, pi)
-        break // end this round; restart with the new active Pokémon
-      }
-      // Advance if the ATTACKER fainted to Rocky Helmet recoil
-      if (attacker.fainted) {
-        if (aSide === 'enemy') ei = nextAlive(enemy, ei)
-        else pi = nextAlive(player, pi)
-        break
+      // Advance the active pointer for EACH side that lost its active Pokémon
+      // this exchange, then end the round. Both can faint together (e.g. Rocky
+      // Helmet recoil kills the attacker as its hit KOs the defender) — handle
+      // both before breaking, or the un-advanced side's pointer stays parked on
+      // a fainted Pokémon and the battle loops forever.
+      if (defender.fainted || attacker.fainted) {
+        if (defender.fainted) {
+          if (dSide === 'enemy') ei = nextAlive(enemy, ei)
+          else pi = nextAlive(player, pi)
+        }
+        if (attacker.fainted) {
+          if (aSide === 'enemy') ei = nextAlive(enemy, ei)
+          else pi = nextAlive(player, pi)
+        }
+        break // end this round; restart with the new active Pokémon(s)
       }
     }
 
     // End of round — passive heal for the active holder(s).
-    // Leftovers (10%) and Black Sludge (12%), each scaled by Big Root.
+    // Leftovers (10%) and Black Sludge (12%), each scaled by Big Root. The heal
+    // decays after a long stall (passiveHealFactor) so a battle can never loop
+    // on net-positive HP.
     if (pi !== -1 && ei !== -1) {
       const heals = []
+      const healFactor = passiveHealFactor(rounds)
       for (const [side, idx, team] of [['player', pi, player], ['enemy', ei, enemy]]) {
         const mon = team[idx]
         if (!mon || mon.fainted || mon.stats.hp >= mon.stats.maxHp) continue
         const pct = itemId(mon) === 'leftovers' ? 0.10 : itemId(mon) === 'black_sludge' ? 0.12 : 0
-        if (pct === 0) continue
-        const heal = healAmount(mon, Math.floor(mon.stats.maxHp * pct))
+        if (pct === 0 || healFactor === 0) continue
+        const heal = healAmount(mon, Math.floor(mon.stats.maxHp * pct * healFactor))
         if (heal > 0) {
           mon.stats.hp = Math.min(mon.stats.maxHp, mon.stats.hp + heal)
           heals.push({ side, index: idx, hpAfter: mon.stats.hp, label: `+${heal}` })

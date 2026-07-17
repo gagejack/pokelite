@@ -39,6 +39,8 @@ export async function prewarmCache(regionConfig) {
   // Boss teams + Elite Four teams (keyed by trainer name → [{ id, level }])
   Object.values(regionConfig.bossTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   Object.values(regionConfig.eliteFourTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  // Rival teams (keyed by variant → [{ id, level }])
+  Object.values(regionConfig.rivalTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   // Legendary (Master Ball) pools (per-map arrays of { id, level })
   regionConfig.legendaryPools?.forEach(pool => pool.forEach(({ id }) => ids.add(id)))
 
