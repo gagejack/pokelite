@@ -12,7 +12,6 @@ import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
 import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
-import lightModeBackground from '../assets/lightModeBackground.jpeg'
 
 // onSkipMap is accepted and shown when the user is an admin.
 function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClose, setAutoClose, onRestart, onSkipMap, setSettingsOpen, bg, borderStyle, textColor, role }) {
@@ -99,14 +98,15 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
   const textColor = dark ? '#DBDBDB' : '#666666'
 
+  // Flat page background — dark grey in dark mode, off-white in light. (Was a
+  // full-bleed sky/grass photo; the solid fill keeps the pixel-art UI panels
+  // readable and stops the art competing with the cards on top of it.)
+  const pageBg = dark ? '#1e1e1e' : '#EDEDED'
+
   return (
     <div style={{
       height: '100dvh', display: 'flex', flexDirection: 'column',
-      backgroundColor: bg,
-      backgroundImage: `url(${lightModeBackground})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
+      backgroundColor: pageBg,
     }}>
       <div data-navbar style={{
         position: 'relative',

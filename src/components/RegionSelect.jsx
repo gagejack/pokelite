@@ -125,12 +125,19 @@ function ComingSoonCell({ cards, borderStyle, isDesktop }) {
 }
 
 export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
-  const { cards } = useTheme()
+  const { cards, dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(null)
 
   const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
   const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
+  // The page heading/subtitle sit directly on the flat page background (not on
+  // a card), so they have to flip with the theme — white-on-dark reads as
+  // invisible against the light mode's off-white. Text inside the region cards
+  // stays light, since those always have dark artwork behind them.
+  const headingColor = dark ? '#ffffff' : '#2b2b2b'
+  const subheadingColor = dark ? '#facc15' : '#8a6d0b'
+  const headingShadow = dark ? '0 2px 6px rgba(0,0,0,0.8)' : 'none'
 
   return (
     <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
@@ -142,10 +149,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         minHeight: 0,
       }}>
         <div className="flex flex-col items-center gap-2">
-          <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: '#ffffff', textShadow: '0 2px 6px rgba(0,0,0,0.8)' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: headingColor, textShadow: headingShadow }}>
             Select a Region
           </span>
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15', textAlign: 'center', maxWidth: '220px', lineHeight: 1.6, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: subheadingColor, textAlign: 'center', maxWidth: '220px', lineHeight: 1.6, textShadow: headingShadow }}>
             Choose one region to start, once the region is complete, unlock a region token to continue your journey
           </span>
         </div>

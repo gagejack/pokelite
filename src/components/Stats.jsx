@@ -200,11 +200,11 @@ export default function Stats({ onClose }) {
             </div>
           ) : tab === 'halloffame' ? (
             <div className="flex flex-col gap-6">
-              <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor, textAlign: 'center' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
                 Hall of Fame — Winning Teams
               </span>
               {(!stats?.winRosters || stats.winRosters.length === 0) ? (
-                <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '14px' : '12px', color: mutedColor, textAlign: 'center' }}>
                   No wins yet. Complete a run to see your team here!
                 </span>
               ) : (
@@ -214,24 +214,24 @@ export default function Stats({ onClose }) {
                     boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
                     padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
                   }}>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15' }}>
+                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: '#facc15' }}>
                       Win #{i + 1}
                     </span>
-                    <div style={{ display: 'flex', gap: isDesktop ? '8px' : '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: isDesktop ? '10px' : '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {roster.map(p => (
                         <div key={p.id} style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          width: isDesktop ? '100px' : '80px',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                          width: isDesktop ? '116px' : '86px',
                         }}>
                           <img
                             src={SPRITE(p.id)}
                             alt={p.name}
-                            style={{ width: isDesktop ? '52px' : '40px', height: isDesktop ? '52px' : '40px', imageRendering: 'pixelated' }}
+                            style={{ width: isDesktop ? '84px' : '60px', height: isDesktop ? '84px' : '60px', imageRendering: 'pixelated' }}
                           />
-                          <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>
+                          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '13px' : '11px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>
                             {p.name}
                           </span>
-                          <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: '#facc15' }}>
+                          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '11px' : '10px', color: '#facc15' }}>
                             LVL {p.level}
                           </span>
                         </div>
