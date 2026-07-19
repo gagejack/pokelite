@@ -19,7 +19,14 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
     return (
       <img key={badge.name} src={badge.icon} alt={badge.name} title={badge.name}
         style={{
-          width: '26px', height: '26px', objectFit: 'contain', imageRendering: 'pixelated', flexShrink: 0,
+          // Horizontal (mobile): every badge shares the row equally and is
+          // allowed to shrink, so all of them fit at any width instead of
+          // overflowing off the right edge. 26px is the cap, not a fixed size.
+          // Vertical (desktop): fixed 26px, no shrinking.
+          ...(isHorizontal
+            ? { flex: '1 1 0', minWidth: 0, maxWidth: '26px', height: 'auto', aspectRatio: '1' }
+            : { width: '26px', height: '26px', flexShrink: 0 }),
+          objectFit: 'contain', imageRendering: 'pixelated',
           // Unearned: blacked out. Earned: full color.
           filter: has ? 'none' : 'brightness(0) opacity(0.45)',
           transition: 'filter 0.25s',
@@ -28,18 +35,18 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
     )
   })
 
-  // Mobile: a full-width horizontal bar with an inline "Badges" label, matching
-  // the Bag row.
+  // Mobile: a full-width horizontal bar of just the badges — no "Badges" label,
+  // so the row's whole width goes to the icons. They flex-shrink (see above),
+  // so all of them always fit without scrolling or clipping.
   if (isHorizontal) {
     return (
       <div style={{
-        width: '100%', flexShrink: 0,
+        width: '100%', flexShrink: 0, boxSizing: 'border-box',
         border: borderStyle, boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
         backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-        display: 'flex', flexDirection: 'row', alignItems: 'center',
-        padding: '4px 8px', gap: '6px', overflowX: 'auto',
+        display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        padding: '4px 8px', gap: '6px',
       }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff', backgroundColor: labelBg, padding: '2px 6px', flexShrink: 0 }}>Badges</span>
         {badgeIcons}
       </div>
     )
