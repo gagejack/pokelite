@@ -68,7 +68,7 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
                 width: '58%', height: '58%', objectFit: 'contain', imageRendering: 'pixelated',
                 marginLeft: i === 1 ? '-22%' : 0,
                 filter: available
-                  ? `drop-shadow(1px 2px 3px rgba(0,0,0,0.8))${isHovered ? ' brightness(1.12)' : ''}`
+                  ? `drop-shadow(3px 6px 9px rgba(0,0,0,0.9))${isHovered ? ' brightness(1.12)' : ''}`
                   : 'grayscale(0.7) brightness(.8)',
                 transition: 'filter 0.2s',
               }}
