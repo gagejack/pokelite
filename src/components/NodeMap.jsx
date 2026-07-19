@@ -125,10 +125,15 @@ function MapSvg({
               width={(NODE_SIZE * 3.5) / 3} height={(NODE_SIZE * 4.5) / 4}
             />
           </clipPath>
-          <filter id="node-shadow" x="-60%" y="-60%" width="220%" height="220%">
+          {/* Item/pokéball/grass nodes. These draw at NODE_SIZE (or 0.7x for
+              grass) — roughly a THIRD the box the trainer sheet uses — and
+              filter primitives are in user-space units, so reusing the trainer
+              values here produced a shadow far too small and diffuse to read
+              against the map. Scaled up to match the trainers' apparent weight. */}
+          <filter id="node-shadow" x="-80%" y="-80%" width="260%" height="260%">
             {/* Larger, softer, subtler shadow behind the tight one */}
-            <feDropShadow dx="3" dy="7" stdDeviation="9" floodColor="rgba(0,0,0,0.35)" />
-            <feDropShadow dx="2" dy="3" stdDeviation="3" floodColor="rgba(0,0,0,0.9)" />
+            <feDropShadow dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" />
+            <feDropShadow dx="1" dy="2" stdDeviation="1.5" floodColor="rgba(0,0,0,0.95)" />
           </filter>
           <filter id="trainer-shadow" x="-60%" y="-60%" width="220%" height="220%">
             <feDropShadow dx="3" dy="7" stdDeviation="9" floodColor="rgba(0,0,0,0.35)" />
@@ -153,6 +158,36 @@ function MapSvg({
             <feFlood floodColor="#ffffff" result="white" />
             <feComposite in="white" in2="expanded" operator="in" result="outline" />
             <feMerge>
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Small-node (item/pokéball/grass) variants of the two outline
+              filters. Same look as the trainer ones, but the filter region is
+              widened so the yellow glow isn't clipped on these much smaller
+              boxes, and the shadow is merged in — the outline filters replace
+              #node-shadow when a node is reachable/hovered, so without this the
+              drop shadow would vanish exactly on the nodes the player can reach. */}
+          <filter id="hover-outline-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#facc15" floodOpacity="0.9" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="white-outline-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
               <feMergeNode in="outline" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
@@ -212,7 +247,7 @@ function MapSvg({
                 return (
                   <image href={icon} x={offset} y={offset}
                     width={size} height={size}
-                    filter={isHovered ? 'url(#hover-outline)' : reachable ? 'url(#white-outline)' : 'url(#node-shadow)'}
+                    filter={isHovered ? 'url(#hover-outline-sm)' : reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)'}
                     style={{ imageRendering: 'pixelated', opacity }}
                   />
                 )

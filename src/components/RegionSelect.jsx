@@ -53,12 +53,17 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
           backgroundColor: '#1a1a1a',
         }}
       >
-        {/* Region map backdrop — blurred + darkened so the legendaries and text
-            stay legible over it. */}
+        {/* Region map backdrop — darkened so the legendaries and text stay
+            legible over it. The blur is BAKED INTO the .jpg assets rather than
+            applied with a CSS filter: a small-radius filter: blur() rasterizes
+            very differently across GPUs (near-invisible on 1x Windows/ANGLE,
+            heavy on a 2x Retina panel), so the two never matched. Pre-blurred
+            pixels look identical everywhere, and compress much smaller. Re-blur
+            with scripts/preblurRegionMaps.mjs if the amount needs tuning. */}
         <img src={region.map} alt="" style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           objectFit: 'cover', transform: 'scale(1.05)',
-          filter: available ? 'blur(1.5px) brightness(0.75)' : 'blur(1.5px) brightness(0.3) grayscale(0.5)',
+          filter: available ? 'brightness(0.75)' : 'brightness(0.3) grayscale(0.5)',
         }} />
         {/* Legendary duo — fills the box as the background */}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -49,3 +49,5 @@ npm run build:dex  # regenerate public/data/pokedex.json + evolutions.json
 ## Important Stuff
 IMPORTANT: if you're asking me to do follow up steps, please print out some type of large banner with # saying "YOUR ATTENTION IS REQUIRED SIR" with cool emoji output
 
+##
+- Always ask for more information if necessary.
