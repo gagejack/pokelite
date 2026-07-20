@@ -152,6 +152,11 @@ export function cachedName(id) {
   return baseCache.get(id)?.name ?? null
 }
 
+// Hard level ceiling. The stat formulas below are only defined up to 100, and
+// a full run (8 maps + Elite Four at +1/+2/+4 levels per win) overshoots it, so
+// levelUp clamps here.
+export const MAX_LEVEL = 100
+
 // Pure stat formula (Gen 5, 31 IVs, neutral nature, 0 EVs)
 export function calcHP(base, level) {
   return Math.floor(((2 * base + 31) * level) / 100) + level + 10
@@ -201,7 +206,11 @@ export const SHINY_ODDS = 1 / 512
 
 // Build a full battle-ready Pokémon instance from base data + level.
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
-export function buildPokemonInstance(base, level, isStarter = false) {
+export function buildPokemonInstance(base, rawLevel, isStarter = false) {
+  // Clamp here too, not just in levelUp: this is the single constructor for
+  // every instance (spawns, evolutions, enemy teams), so nothing can enter the
+  // game above MAX_LEVEL regardless of what a caller passes.
+  const level = Math.min(MAX_LEVEL, Math.max(1, rawLevel))
   const boost = isStarter ? 1.3 : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
   const move = getTypeMove(base.types[0], tierForLevel(level))
@@ -300,8 +309,23 @@ export async function resolveEvolutionLine(pokeId) {
   const root = await loadEvolutionChain(pokeId)
   if (!root) return []
 
+  // Start at the REQUESTED species, not the chain root. A pool entry partway up
+  // a line (e.g. Pikachu, whose root is Pichu) is a deliberate floor — walking
+  // from the root would offer the pre-evolution the pool didn't ask for, and
+  // for non-level-up steps like Pichu→Pikachu the walk below would stop dead
+  // there and *only* ever yield Pichu.
+  const findNode = node => {
+    if (node.id === pokeId) return node
+    for (const child of node.evolvesTo ?? []) {
+      const hit = findNode(child)
+      if (hit) return hit
+    }
+    return null
+  }
+  const start = findNode(root) ?? root
+
   const stages = []
-  let node = root
+  let node = start
   let cumulativeLevel = 1
   while (node) {
     if (!node.id) break
@@ -373,12 +397,15 @@ function buildEvolvedInstance(instance, evolvedBase, newLevel) {
 // Check if a Pokémon should evolve after reaching newLevel.
 // `maxSpeciesId` gates options to the run region's generation (pass
 // GEN_MAX_ID[config.generation]). Branches whose trigger isn't level-up
-// (stones, trade, friendship) unlock at NON_LEVEL_EVO_LEVEL. Returns:
+// (stones, trade, friendship) unlock at NON_LEVEL_EVO_LEVEL.
+// `ignoreLevel` drops the level requirement entirely — used by the Evolve
+// Stone item, which evolves a Pokémon on the spot regardless of level.
+// Returns:
 //   null                  — no eligible evolution
 //   { evolved }           — exactly one eligible branch: the evolved instance
 //   { options: [{ id }] } — several eligible branches: the UI must ask the
 //                           player (EvolutionChoice), then call evolveInto()
-export async function checkEvolution(instance, newLevel, { maxSpeciesId = Infinity } = {}) {
+export async function checkEvolution(instance, newLevel, { maxSpeciesId = Infinity, ignoreLevel = false } = {}) {
   try {
     if (!evoCache.has(instance.pokeId)) {
       await loadEvolutionLine(instance.pokeId)
@@ -386,7 +413,7 @@ export async function checkEvolution(instance, newLevel, { maxSpeciesId = Infini
     const branches = evoCache.get(instance.pokeId) ?? []
     const eligible = branches.filter(b =>
       b.id <= maxSpeciesId &&
-      newLevel >= (b.levelUp ? b.minLevel : NON_LEVEL_EVO_LEVEL)
+      (ignoreLevel || newLevel >= (b.levelUp ? b.minLevel : NON_LEVEL_EVO_LEVEL))
     )
     if (eligible.length === 0) return null
     if (eligible.length > 1) return { options: eligible.map(b => ({ id: b.id })) }
@@ -452,7 +479,10 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
 // Level up a Pokémon instance — recalculates stats only.
 // The move never changes on level-up; only a TM / Power Upgrade node changes it.
 export function levelUp(instance, base, levels) {
-  const newLevel = instance.level + levels
+  // Clamp at MAX_LEVEL — a full run's victories would otherwise push levels
+  // past 100, where the stat formulas stop being meaningful. Already-capped
+  // Pokémon keep their stats exactly (newLevel === level, so hpDiff is 0).
+  const newLevel = Math.min(MAX_LEVEL, instance.level + levels)
   const newHp = calcHP(base.baseStats.hp, newLevel)
   const hpDiff = newHp - instance.stats.maxHp
   return {

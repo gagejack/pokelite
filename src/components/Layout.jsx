@@ -149,7 +149,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       </div>
       <Suspense fallback={null}>
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
-        {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
+        {statsOpen && <Stats onClose={() => setStatsOpen(false)} role={role} />}
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       </Suspense>
     </div>

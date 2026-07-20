@@ -31,6 +31,10 @@ function effSpeed(p) {
 // Held-item effects are applied here for whichever side holds them — see the
 // per-item branches below. Attacker-side flags (`_wpActive`, `_cellActive`) are
 // set elsewhere in the loop and read here as persistent damage bonuses.
+// `damageMultiplier` is the ATTACKER's multiplier — the caller passes the
+// player's or the enemy's depending on who is swinging (see simulateBattle).
+// Asymmetric values are the difficulty knob: a lower enemy multiplier makes the
+// run easier without changing how fast the player's own attacks resolve.
 export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   if (!move || !move.power) return { damage: 0, crit: false }
   const aItem = itemId(attacker)
@@ -98,7 +102,12 @@ function nextAlive(team, from) {
 // Returns a log array the UI replays frame by frame.
 // Attack entries describe one attack (with any item `events`); 'leftovers'
 // entries describe end-of-round passive heals.
-export function simulateBattle(playerTeam, enemyTeam, damageMultiplier = 2) {
+// `damage` is either a single number (symmetric — both sides hit with it) or
+// { player, enemy } for asymmetric difficulty tuning. A number is still accepted
+// so older callers/tests keep working.
+export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
+  const playerDmg = typeof damage === 'number' ? damage : (damage?.player ?? 2)
+  const enemyDmg  = typeof damage === 'number' ? damage : (damage?.enemy ?? 2)
   // Deep-clone teams so original roster isn't mutated (carry heldItem reference)
   const player = playerTeam.map(p => ({ ...p, stats: { ...p.stats } }))
   const enemy  = enemyTeam.map(p => ({ ...p, stats: { ...p.stats } }))
@@ -149,7 +158,10 @@ export function simulateBattle(playerTeam, enemyTeam, damageMultiplier = 2) {
       const defender = dTeam[dIdx]
       if (attacker.fainted || defender.fainted) continue
 
-      const { damage, crit } = calcDamage(attacker, defender, attacker.move, damageMultiplier)
+      // Each side swings with its OWN multiplier — this is what makes the
+      // difficulty asymmetric.
+      const { damage, crit } = calcDamage(attacker, defender, attacker.move,
+        aSide === 'player' ? playerDmg : enemyDmg)
       const effectiveness = getEffectiveness(attacker.move?.type ?? 'normal', defender.types)
 
       const events = []

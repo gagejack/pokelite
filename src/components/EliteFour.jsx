@@ -8,6 +8,7 @@ import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedName } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
+import { getRegionBalance } from '../lib/regionBalance'
 import { swapInRoster } from '../game/roster.js'
 import { TYPE_COLORS } from '../game/types.js'
 
@@ -186,7 +187,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
             trainerSprite={pendingBattle.trainerSprite}
             playerRoster={roster}
             character={character}
-            damageMultiplier={config?.damageMultiplier ?? 2}
+            damageMultiplier={getRegionBalance(region?.name)}
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}

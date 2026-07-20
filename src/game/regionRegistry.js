@@ -54,6 +54,15 @@ export function getRegionConfig(regionName) {
   return REGION_CONFIGS[regionName] ?? null
 }
 
+// Names of every registered region, in registry order. Used by the admin
+// balance dashboard's region picker so it never hardcodes the region list.
+// `playableOnly` filters to regions that actually have authored maps.
+export function regionNames({ playableOnly = false } = {}) {
+  return Object.keys(REGION_CONFIGS).filter(name =>
+    !playableOnly || (REGION_CONFIGS[name]?.maps?.length ?? 0) > 0
+  )
+}
+
 // Every legendary species id across all regions (for the stats "Legendaries"
 // box — a caught species is "legendary" if it's in any region's pool).
 export function allLegendaryIds() {

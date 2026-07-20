@@ -13,6 +13,7 @@ import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pok
 import { getRegionConfig } from './game/regionRegistry.js'
 import { supabase } from './lib/supabase.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
+import { loadRegionBalance } from './lib/regionBalance.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
 // Character select is skipped for now — every run uses this default protagonist.
@@ -60,6 +61,10 @@ export default function App() {
     })()
     return () => { cancelled = true }
   }, [user])
+
+  // Shared per-region damage tuning (admin balance dashboard). Fetched once on
+  // start; failures are non-fatal — the region configs' own values apply.
+  useEffect(() => { loadRegionBalance() }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
@@ -298,6 +303,9 @@ export default function App() {
   // Move an already-owned item between the bag and roster Pokémon.
   //   from: { kind: 'bag', index } | { kind: 'pokemon', pokeIndex }
   //   to:   { kind: 'bag' }        | { kind: 'pokemon', pokeIndex }
+  //       | { kind: 'consumed' }   — item is used up (Evolve Stone): it's
+  //         cleared from its source and not added anywhere. Handled by the
+  //         existing logic below, since no branch matches 'consumed'.
   // Equipping onto a Pokémon that already holds an item sends the OLD item to
   // the bag (one-directional). Resolved in one pass so nothing is duplicated/lost.
   function moveItem({ item, from, to }) {

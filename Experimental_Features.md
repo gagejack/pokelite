@@ -211,10 +211,45 @@ Query win rate per boss/map in the Supabase SQL editor to find walling spots.
 
 ### 4.3 Dev balance dashboard
 `itemOdds()` already exists for inspecting drop rates but is never rendered.
-**Implementation:** A dev-only route (or `?dev=1` panel in `Stats.jsx`)
-showing: item drop %s (`itemOdds()`), catch odds per map, move-tier DPS at
-each level band (`TIER_BASE_POWER` × `calcStat` curves), and node-type
-distribution per map. Read-only views over existing data — no game changes.
+**Design (planned):** An admin-gated **"Balance" tab in the Stats modal** —
+not `?dev=1`, which is client-side obscurity anyone could discover. The app
+already loads `profiles.role` from Supabase in `Layout.jsx` and gates the
+admin "Skip map" button on `role === 'admin'`; the tab reuses that same gate
+(pass `role` down to `Stats`). Caveat: client gating hides the UI only — the
+numbers ship in the JS bundle regardless, which is fine for read-only balance
+data.
+
+**Implementation:**
+1. *Data layer (read-only, minimal touches):*
+   - Export `NODE_TYPE_CHANCES` from `src/game/nodeMap.js` (module-private
+     today) — the only change to a logic-bearing file.
+   - Add `catchOdds(pool, tierBudget?)` to `src/game/catch.js`, mirroring
+     `itemOdds()`: per-species first-slot % from the rarity budget.
+   - Everything else imports as-is: `itemOdds()`, `TIER_BASE_POWER` /
+     `tierForLevel`, `calcStat`, `masterBallChance`, `getRegionConfig`,
+     `mapLevelRange`.
+2. *UI — new `src/components/BalanceDashboard.jsx`* rendered inside the Stats
+   modal (Upheaval font, tier colors, bordered panels, CSS-width bars — no
+   chart lib). Four panels:
+   - **Item drop %** — `itemOdds()` grouped by tier, tier-colored bars.
+   - **Catch odds per map** — region + map dropdowns (regions from the
+     registry, maps from `config.catchPools.length`); sprite + name via
+     `fetchPokemonBase` (instant from the local Pokédex), rarity chip,
+     offer %, and the map's level band from `mapLevelRanges`.
+   - **Move-tier DPS** — tiers 1–4 × `tierForLevel` bands; damage index =
+     base power × `calcStat(refAttack, bandMidpoint)` with the reference
+     base stat noted in the panel.
+   - **Node distribution** — `NODE_TYPE_CHANCES` table with icons, the
+     Master Ball ramp per map (`masterBallChance(i)`, 0% → 10%), and a note
+     for the guaranteed Pokéball/Pokécenter rows.
+3. *Files touched:* `BalanceDashboard.jsx` (new), `Stats.jsx` (third tab,
+   admin-gated, accepts `role`), `Layout.jsx` (pass `role`),
+   `nodeMap.js` (export), `catch.js` (add `catchOdds`).
+
+Out of scope: game-behavior changes, new routes, chart libs, Supabase writes.
+**Verify:** admin login → tab appears, all panels populate for both regions
+across maps; non-admin/logged-out → no tab; tier budgets and per-map catch %s
+sum to ~100.
 
 ### 4.4 Difficulty modes
 Easy/Normal/Hard as a first-class knob also doubles as a balance

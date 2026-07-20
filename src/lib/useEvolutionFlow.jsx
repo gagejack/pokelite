@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { applyBattleVictory, evolveInto, GEN_MAX_ID } from '../game/pokemon.js'
+import { applyBattleVictory, evolveInto, checkEvolution, GEN_MAX_ID } from '../game/pokemon.js'
 import EvolutionNotice from '../components/EvolutionNotice'
 import EvolutionChoice from '../components/EvolutionChoice'
 
@@ -41,6 +41,33 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     return updatedRoster
   }
 
+  // Evolve Stone: evolve the roster slot on the spot, ignoring level entirely
+  // (so stone/friendship evolutions like Pikachu→Raichu work, and a Lv5
+  // Caterpie can become Metapod). Multi-branch lines (Eevee) queue the same
+  // EvolutionChoice popup used post-battle. Returns true if the stone was
+  // consumed — i.e. the Pokémon either evolved or has a pending choice — and
+  // false if it has no evolution at all, so the caller can keep the item.
+  async function evolveWithStone(pokeIndex) {
+    const target = roster[pokeIndex]
+    if (!target) return false
+    const maxSpeciesId = GEN_MAX_ID[config?.generation] ?? Infinity
+    const result = await checkEvolution(target, target.level, { maxSpeciesId, ignoreLevel: true })
+    if (result?.options) {
+      setEvolutionChoices(prev => [...prev, {
+        index: pokeIndex, fromId: target.pokeId, fromName: target.name,
+        sprite: target.sprite, options: result.options,
+      }])
+      return true
+    }
+    if (result?.evolved) {
+      setRoster(prev => prev.map((p, i) => i === pokeIndex && p.pokeId === target.pokeId ? result.evolved : p))
+      onSpeciesOwned?.(result.evolved.pokeId)
+      setEvolutionNotices(prev => [...prev, { from: target.name, to: result.evolved.name, pokeId: result.evolved.pokeId }])
+      return true
+    }
+    return false
+  }
+
   // Player picked an evolution target in the EvolutionChoice popup. Evolve the
   // pending Pokémon in place, record the new species, queue the notice, and
   // advance to the next pending choice (if any).
@@ -75,5 +102,5 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     return <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
   }
 
-  return { applyVictory, render, evolutionNotices, evolutionChoices }
+  return { applyVictory, evolveWithStone, render, evolutionNotices, evolutionChoices }
 }

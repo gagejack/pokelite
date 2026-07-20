@@ -8,6 +8,15 @@ import bgNacrene from '../../assets/regions/Unova/MapAssets/Nacrene.png'
 import bgCastelia from '../../assets/regions/Unova/MapAssets/Castelia.png'
 import bgNimbasa from '../../assets/regions/Unova/MapAssets/Nimbasa.png'
 import bgDriftveil from '../../assets/regions/Unova/MapAssets/Driftveil.png'
+// Maps 6–8 have no authored Unova art yet, so they borrow Kanto's type-themed
+// backgrounds, matched to each map's gym-leader type by mood:
+//   Mistralton / Skyla  (flying) → Psychic — open, airy meadow
+//   Icirrus    / Brycen (ice)    → Water   — icy blue border
+//   Opelucid   / Drayden (dragon)→ Fire    — dramatic red volcanic finale
+// Swap these for Unova-native art when it exists.
+import bgFlying from '../../assets/regions/Kanto/Maps/Psychic.png'
+import bgIce from '../../assets/regions/Kanto/Maps/Water.png'
+import bgDragon from '../../assets/regions/Kanto/Maps/Fire.png'
 import grassIcon from '../../assets/regions/Unova/MapAssets/BW_Dark_Grass_Sp.png'
 
 // Gym badges — one per map (index 0–7), earned by beating that map's gym leader.
@@ -646,7 +655,7 @@ const MAP_NAMES = [
 
 // Maps 1–5 have their own art; maps 6–8 reuse earlier city art as placeholders
 // until their own backgrounds are authored.
-const MAP_BACKGROUNDS = [bgStriaton, bgNacrene, bgCastelia, bgNimbasa, bgDriftveil, bgNacrene, bgStriaton, bgNacrene]
+const MAP_BACKGROUNDS = [bgStriaton, bgNacrene, bgCastelia, bgNimbasa, bgDriftveil, bgFlying, bgIce, bgDragon]
 
 // Gym badges in map order (index i is earned by beating map i's gym leader).
 // { name, icon } — the badge list UI blacks these out until earned.

@@ -7,6 +7,24 @@
 // tier. Regions may override with config.catchTierBudget.
 export const CATCH_TIER_BUDGET = { common: 60, rare: 25, epic: 10, legendary: 5 }
 
+// Utility: per-species offer odds for a map's catch pool, for tuning and for
+// the admin balance dashboard. Mirrors itemOdds() in items.js — the % is the
+// chance of being drawn into a single (first) slot, so values sum to ~100 per
+// pool. Not used by the game itself.
+export function catchOdds(pool = [], tierBudget = CATCH_TIER_BUDGET) {
+  const weightOf = mon => {
+    const budget = tierBudget[mon.rarity] ?? 0
+    const n = pool.filter(m => m.rarity === mon.rarity).length
+    return n > 0 ? budget / n : 0
+  }
+  const total = pool.reduce((sum, mon) => sum + weightOf(mon), 0)
+  return pool.map(mon => ({
+    id: mon.id,
+    rarity: mon.rarity,
+    perSlotPct: total > 0 ? (weightOf(mon) / total) * 100 : 0,
+  }))
+}
+
 // Draw `count` distinct species from a map's catch pool, weighted by rarity.
 // Returns an array of { id, rarity }.
 export function pickCatchOffer(pool, count = 3, tierBudget = CATCH_TIER_BUDGET) {

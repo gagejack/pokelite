@@ -14,6 +14,7 @@ import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
+import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
@@ -871,10 +872,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // --- Held-item movement (bag drag + stat-card picker) ---
   const isMovingItem = !!movingItem
   // Resolve a pending move onto a target (a roster Pokémon or the bag).
-  function resolveItemMove(to) {
+  async function resolveItemMove(to) {
     if (!movingItem) return
-    onMoveItem?.({ item: movingItem.item, from: movingItem.from, to })
+    const { item, from } = movingItem
     setMovingItem(null)
+    // Evolve Stone dropped on a Pokémon: evolve it and consume the stone
+    // (remove it from wherever it came from) rather than equipping it. If the
+    // target has no evolution at all the stone is kept, so it isn't wasted.
+    if (item?.consumable === 'evolve' && to.kind === 'pokemon') {
+      const used = await evo.evolveWithStone(to.pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
+    onMoveItem?.({ item, from, to })
   }
   const cancelItemMove = () => setMovingItem(null)
 
@@ -1167,7 +1177,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             trainerSprite={pendingBattle.trainerSprite}
             playerRoster={roster}
             character={character}
-            damageMultiplier={config.damageMultiplier ?? 2}
+            damageMultiplier={getRegionBalance(region.name)}
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
@@ -1215,8 +1225,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           offered={pendingItem.offered}
           roster={roster}
           onReroll={pendingItem.node.fromMystery ? rerollItemOffer : null}
-          onAssign={(item, pokemonIndex, swapBackItem) => {
-            onItemAssign(item, pokemonIndex, swapBackItem)
+          onAssign={async (item, pokemonIndex, swapBackItem) => {
+            // The Evolve Stone is a consumable, not a held item: it evolves the
+            // target on the spot and is used up, so it never gets equipped.
+            if (item?.consumable === 'evolve') {
+              await evo.evolveWithStone(pokemonIndex)
+            } else {
+              onItemAssign(item, pokemonIndex, swapBackItem)
+            }
             setClearedNodes(prev => new Set([...prev, pendingItem.node.id]))
             setCurrentNode(pendingItem.node.id)
             setPendingItem(null)

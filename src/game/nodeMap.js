@@ -57,7 +57,9 @@ export function masterBallChance(mapIndex) {
 }
 
 // % chance for each node type (must sum to 100)
-const NODE_TYPE_CHANCES = [
+// Exported so the admin balance dashboard can display the live distribution
+// instead of a hand-copied table that could drift.
+export const NODE_TYPE_CHANCES = [
   { type: NODE_TYPES.GRASS,         chance: 28 },
   { type: NODE_TYPES.TRAINER,       chance: 28 },
   { type: NODE_TYPES.POKEBALL,      chance: 19 },

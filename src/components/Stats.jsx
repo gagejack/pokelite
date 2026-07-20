@@ -4,6 +4,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
 import LoginModal from './LoginModal'
+import BalanceDashboard from './BalanceDashboard'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
@@ -34,7 +35,7 @@ const REGION_COLORS = {
   Unova:  { light: '#64748b', dark: '#1e293b' },
 }
 
-export default function Stats({ onClose }) {
+export default function Stats({ onClose, role = null }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -46,6 +47,10 @@ export default function Stats({ onClose }) {
   // Which detail popup is open: null | 'legendary' | 'shiny'
   const [detail, setDetail] = useState(null)
   const [tab, setTab] = useState('stats')
+  const isAdmin = role === 'admin'
+  // If the role resolves late (or the user logs out), never leave the admin
+  // tab selected.
+  useEffect(() => { if (!isAdmin) setTab(t => (t === 'balance' ? 'stats' : t)) }, [isAdmin])
 
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
@@ -169,6 +174,21 @@ export default function Stats({ onClose }) {
             >
               Hall of Fame
             </button>
+            {/* Admin-only balance dashboard (same gate as the Skip-map button
+                in Layout). Client-side gating hides the UI, not the numbers —
+                fine here, since it's read-only tuning data. */}
+            {isAdmin && (
+              <button
+                onClick={() => setTab('balance')}
+                style={{
+                  fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'balance' ? '#facc15' : mutedColor,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  borderBottom: tab === 'balance' ? '2px solid #facc15' : '2px solid transparent',
+                }}
+              >
+                Balance
+              </button>
+            )}
           </div>
           <button onClick={onClose} className="hover:opacity-70 transition-opacity"
             style={{ fontFamily: 'Upheaval', fontSize: '18px', color: textColor }}>X</button>
@@ -198,6 +218,8 @@ export default function Stats({ onClose }) {
                 Login
               </button>
             </div>
+          ) : tab === 'balance' && isAdmin ? (
+            <BalanceDashboard />
           ) : tab === 'halloffame' ? (
             <div className="flex flex-col gap-6">
               <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
