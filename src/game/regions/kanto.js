@@ -75,7 +75,7 @@ import Sabrina3 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina
 
 import { buildRows, NODE_TYPES } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
-import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, MAP_LEVEL_RANGES } from './kanto.teams.js'
+import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, MAP_LEVEL_RANGES, BLUE_STARTER_COUNTER } from './kanto.teams.js'
 
 // --- Map + misc assets ---
 import bgRock from '../../assets/regions/Kanto/Maps/Rock.png'
@@ -472,6 +472,8 @@ export const kantoConfig = {
   trainerTypePools: TRAINER_TYPE_POOLS,
   bossTeams: BOSS_TEAMS,
   eliteFourTeams: ELITE_FOUR_TEAMS,
+  // Blue's ace is the fully-evolved starter that counters the player's pick.
+  blueStarterCounter: BLUE_STARTER_COUNTER,
   rivalTeams: RIVAL_TEAMS,
   mapLevelRanges: MAP_LEVEL_RANGES,
   // Catch tuning + generic draw algorithm (game/catch.js).

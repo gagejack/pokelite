@@ -1,29 +1,34 @@
 import { getEffectiveness } from './typeChart.js'
+import { BALANCE } from './balance.js'
+
+// All battle tuning numbers live in game/balance.js (BALANCE.battle).
+const B = BALANCE.battle
+const HI = B.heldItems
 
 const itemId = p => p?.heldItem?.id ?? null
 
-// Big Root boosts all HP recovery the holder receives by 50%.
+// Big Root boosts all HP recovery the holder receives.
 const healAmount = (mon, base) =>
-  Math.floor(base * (itemId(mon) === 'big_root' ? 1.5 : 1))
+  Math.floor(base * (itemId(mon) === 'big_root' ? HI.bigRootHeal : 1))
 
 // Passive per-round heals (Leftovers / Black Sludge) decay as a battle drags on
 // so an over-healing matchup can't loop forever (which the round cap would then
-// mis-score as a defeat). Full strength through DECAY_START rounds — well past
-// any normal battle — then linearly to 0 by DECAY_END, guaranteeing HP always
+// mis-score as a defeat). Full strength through decayStart rounds — well past
+// any normal battle — then linearly to 0 by decayEnd, guaranteeing HP always
 // trends down and the battle resolves on its own. Real fights never reach this.
-const DECAY_START = 20
-const DECAY_END = 40
+const DECAY_START = B.passiveHeal.decayStart
+const DECAY_END = B.passiveHeal.decayEnd
 const passiveHealFactor = round =>
   round <= DECAY_START ? 1
     : round >= DECAY_END ? 0
     : (DECAY_END - round) / (DECAY_END - DECAY_START)
 
-// Effective speed for turn order (Choice Scarf +50%, Iron Ball −40%).
+// Effective speed for turn order (Choice Scarf faster, Iron Ball slower).
 function effSpeed(p) {
   let s = p.stats.speed
   const id = itemId(p)
-  if (id === 'choice_scarf') s *= 1.5
-  if (id === 'iron_ball')    s *= 0.6
+  if (id === 'choice_scarf') s *= HI.choiceScarfSpeed
+  if (id === 'iron_ball')    s *= HI.ironBallSpeed
   return s
 }
 
@@ -43,48 +48,48 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   let atk = isSpecial ? attacker.stats.spAtk : attacker.stats.attack
   let def = isSpecial ? defender.stats.spDef : defender.stats.defense
 
-  // Choice Band — +50% physical Attack
-  if (!isSpecial && aItem === 'choice_band') atk *= 1.5
+  // Choice Band — physical Attack boost.
+  if (!isSpecial && aItem === 'choice_band') atk *= HI.choiceBand
 
   // Defensive items — raise the defender's relevant defense stat.
-  if (dItem === 'eviolite')                  def *= 1.5              // all moves
-  if (dItem === 'assault_vest' && isSpecial) def *= 1.5             // special only
-  if (dItem === 'light_clay' && !isSpecial)  def *= 1.25            // physical only
+  if (dItem === 'eviolite')                  def *= HI.eviolite      // all moves
+  if (dItem === 'assault_vest' && isSpecial) def *= HI.assaultVest   // special only
+  if (dItem === 'light_clay' && !isSpecial)  def *= HI.lightClay     // physical only
 
   const effectiveness = getEffectiveness(move.type, defender.types)
 
-  // Scope Lens +30% / Razor Claw +60% crit rate
-  let critChance = 1 / 16
-  if (aItem === 'scope_lens') critChance *= 1.3
-  if (aItem === 'razor_claw') critChance *= 1.6
+  // Scope Lens / Razor Claw crit-rate boosts.
+  let critChance = B.critChance
+  if (aItem === 'scope_lens') critChance *= HI.scopeLensCrit
+  if (aItem === 'razor_claw') critChance *= HI.razorClawCrit
   const crit = Math.random() < critChance
 
-  const random = 0.85 + Math.random() * 0.15
+  const random = B.randomRoll.base + Math.random() * B.randomRoll.span
 
   // Attacker damage multipliers (stack multiplicatively).
   let itemDmg = 1
-  if (aItem === 'expert_belt')  itemDmg *= 1.2
-  if (aItem === 'life_orb')     itemDmg *= 1.3
-  if (aItem === 'iron_ball')    itemDmg *= 1.35
-  if (aItem === 'muscle_band' && !isSpecial) itemDmg *= 1.2
-  if (aItem === 'wise_glasses' && isSpecial) itemDmg *= 1.2
+  if (aItem === 'expert_belt')  itemDmg *= HI.expertBelt
+  if (aItem === 'life_orb')     itemDmg *= HI.lifeOrb
+  if (aItem === 'iron_ball')    itemDmg *= HI.ironBallDmg
+  if (aItem === 'muscle_band' && !isSpecial) itemDmg *= HI.muscleBand
+  if (aItem === 'wise_glasses' && isSpecial) itemDmg *= HI.wiseGlasses
   // King's Rock — crits deal 100% more damage (a crit hits for ×2 total
   // instead of the usual ×1.5, i.e. an extra ×(2/1.5) on top of the crit).
-  if (aItem === 'kings_rock' && crit) itemDmg *= 2 / 1.5
-  // Type-boost plates — +50% damage when the move's type matches the plate.
-  if (attacker.heldItem?.boostType && attacker.heldItem.boostType === move.type) itemDmg *= 1.5
+  if (aItem === 'kings_rock' && crit) itemDmg *= HI.kingsRockCritFactor
+  // Type-boost plates — damage boost when the move's type matches the plate.
+  if (attacker.heldItem?.boostType && attacker.heldItem.boostType === move.type) itemDmg *= HI.typePlate
   // Persistent bonuses granted after a trigger earlier in the battle.
-  if (aItem === 'weakness_policy' && attacker._wpActive)  itemDmg *= 1.5
-  if (aItem === 'cell_battery'   && attacker._cellActive) itemDmg *= 1.3
+  if (aItem === 'weakness_policy' && attacker._wpActive)  itemDmg *= HI.weaknessPolicy
+  if (aItem === 'cell_battery'   && attacker._cellActive) itemDmg *= HI.cellBattery
 
-  // Bright Powder — 15% chance an incoming hit is halved.
+  // Bright Powder — chance an incoming hit is halved.
   let defDmg = 1
-  if (dItem === 'bright_powder' && Math.random() < 0.15) defDmg *= 0.5
-  // Resist Charm — super-effective hits against the holder deal 50% less.
-  if (dItem === 'resist_charm' && effectiveness > 1) defDmg *= 0.5
+  if (dItem === 'bright_powder' && Math.random() < HI.brightPowderChance) defDmg *= HI.brightPowderFactor
+  // Resist Charm — super-effective hits against the holder deal less.
+  if (dItem === 'resist_charm' && effectiveness > 1) defDmg *= HI.resistCharm
 
   const base = Math.floor(((2 * attacker.level / 5 + 2) * move.power * atk / def) / 50) + 2
-  const damage = Math.max(1, Math.floor(base * effectiveness * random * damageMultiplier * itemDmg * defDmg * (crit ? 1.5 : 1)))
+  const damage = Math.max(1, Math.floor(base * effectiveness * random * damageMultiplier * itemDmg * defDmg * (crit ? B.critMultiplier : 1)))
   return { damage, crit }
 }
 
@@ -123,7 +128,7 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
 
   // Hard cap on rounds — far beyond any real battle. Belt-and-suspenders so a
   // logic error can never hard-freeze the main thread again.
-  const MAX_ROUNDS = 10000
+  const MAX_ROUNDS = B.maxRounds
   let rounds = 0
 
   // Tie-break order is decided ONCE per active pairing, not re-rolled every
@@ -189,27 +194,27 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
       // Sitrus Berry — once per battle, heal 25% max HP the first time the
       // holder drops below 50% (and survives).
       if (itemId(defender) === 'sitrus_berry' && !defender._sitrusUsed && !defender.fainted
-          && defender.stats.hp > 0 && defender.stats.hp < defender.stats.maxHp * 0.5) {
+          && defender.stats.hp > 0 && defender.stats.hp < defender.stats.maxHp * HI.sitrusThreshold) {
         defender._sitrusUsed = true
-        const heal = healAmount(defender, Math.floor(defender.stats.maxHp * 0.25))
+        const heal = healAmount(defender, Math.floor(defender.stats.maxHp * HI.sitrusHeal))
         if (heal > 0) {
           defender.stats.hp = Math.min(defender.stats.maxHp, defender.stats.hp + heal)
           events.push({ kind: 'heal', side: dSide, index: dIdx, hpAfter: defender.stats.hp, label: `+${heal}` })
         }
       }
 
-      // Shell Bell — attacker heals 20% of damage dealt
+      // Shell Bell — attacker heals a fraction of damage dealt.
       if (damage > 0 && itemId(attacker) === 'shell_bell' && !attacker.fainted) {
-        const heal = healAmount(attacker, Math.floor(damage * 0.2))
+        const heal = healAmount(attacker, Math.floor(damage * HI.shellBellHeal))
         if (heal > 0 && attacker.stats.hp < attacker.stats.maxHp) {
           attacker.stats.hp = Math.min(attacker.stats.maxHp, attacker.stats.hp + heal)
           events.push({ kind: 'heal', side: aSide, index: aIdx, hpAfter: attacker.stats.hp, label: `+${heal}` })
         }
       }
 
-      // Rocky Helmet — attacker takes 1/3 of its max HP on contact
+      // Rocky Helmet — attacker takes a fraction of its max HP on contact.
       if (itemId(defender) === 'rocky_helmet' && damage > 0 && !attacker.fainted) {
-        const recoil = Math.floor(attacker.stats.maxHp / 3)
+        const recoil = Math.floor(attacker.stats.maxHp * HI.rockyHelmetRecoil)
         if (recoil > 0) {
           attacker.stats.hp = Math.max(0, attacker.stats.hp - recoil)
           const attackerFainted = attacker.stats.hp === 0
@@ -270,7 +275,7 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
       for (const [side, idx, team] of [['player', pi, player], ['enemy', ei, enemy]]) {
         const mon = team[idx]
         if (!mon || mon.fainted || mon.stats.hp >= mon.stats.maxHp) continue
-        const pct = itemId(mon) === 'leftovers' ? 0.10 : itemId(mon) === 'black_sludge' ? 0.12 : 0
+        const pct = itemId(mon) === 'leftovers' ? B.passiveHeal.leftovers : itemId(mon) === 'black_sludge' ? B.passiveHeal.blackSludge : 0
         if (pct === 0 || healFactor === 0) continue
         const heal = healAmount(mon, Math.floor(mon.stats.maxHp * pct * healFactor))
         if (heal > 0) {

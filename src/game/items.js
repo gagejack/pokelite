@@ -14,13 +14,10 @@
 // TIER_BUDGET should sum to 100, but it doesn't have to — the draw normalizes
 // to whatever the totals are. (itemOdds() below prints the resulting %s.)
 // ─────────────────────────────────────────────────────────────────────────
+import { BALANCE } from './balance.js'
 
-export const TIER_BUDGET = {
-  common:    60, // staples / mild effects — show up often
-  rare:      25, // solid, generally useful
-  epic:      10, // strong, build-defining
-  legendary:  5, // game-changing, jackpot
-}
+// Drop budget per tier — lives in game/balance.js (central tuning module).
+export const TIER_BUDGET = BALANCE.items.tierBudget
 
 // Rarity glow color per tier (used by the item-selection card border).
 export const TIER_COLORS = {

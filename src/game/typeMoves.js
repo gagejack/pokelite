@@ -9,15 +9,17 @@
 // matches when an animation exists; uncovered moves fall back to the orb projectile.
 // `dc` is the authored damage class: 'physical' or 'special'.
 
-// basePower per tier (balance knobs)
-export const TIER_BASE_POWER = { 1: 35, 2: 60, 3: 95, 4: 140 }
+import { BALANCE } from './balance.js'
+
+// basePower per tier — balance knobs live in game/balance.js.
+export const TIER_BASE_POWER = BALANCE.moves.tierBasePower
 
 // Tier level ranges → which tier a freshly spawned Pokémon gets for its level.
-// Even split toward ~100 (balance knobs).
 export function tierForLevel(level) {
-  if (level >= 75) return 4
-  if (level >= 50) return 3
-  if (level >= 25) return 2
+  const { tier4, tier3, tier2 } = BALANCE.moves.tierLevels
+  if (level >= tier4) return 4
+  if (level >= tier3) return 3
+  if (level >= tier2) return 2
   return 1
 }
 

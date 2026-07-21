@@ -7,16 +7,18 @@ import BattleCard from './BattleCard'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedName } from '../game/pokemon.js'
+import { BALANCE } from '../game/balance.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { swapInRoster } from '../game/roster.js'
+import { itemIconUrl } from '../game/items.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, roster, setRoster, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -34,12 +36,26 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
 
+  // A member's full team. Blue (the champion) gets a 6th ace appended: the
+  // fully-evolved starter that counters the player's pick, falling back to the
+  // config's first entry if the starter is unknown. Shared by the preview row
+  // (MemberRow) and the actual battle (startBattle) so they never disagree.
+  function teamSpecs(member) {
+    const specs = config?.eliteFourTeams?.[member.name] ?? []
+    const counter = config?.blueStarterCounter
+    if (member.champion && counter) {
+      const ace = counter[starter?.id] ?? Object.values(counter)[0]
+      if (ace) return [...specs, ace]
+    }
+    return specs
+  }
+
   async function startBattle(index) {
     if (loadingIndex !== null || pendingBattle || won) return
     const member = members[index]
     setLoadingIndex(index)
     try {
-      const specs = config?.eliteFourTeams?.[member.name] ?? []
+      const specs = teamSpecs(member)
       const enemyTeam = await Promise.all(
         specs.map(async s => buildPokemonInstance(await fetchPokemonBase(s.id), s.level))
       )
@@ -64,7 +80,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     const { index } = pendingBattle
     if (battleWon) {
       // Levels gained per battle; reorder happens on the next member's prep screen.
-      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: 2, fullHeal: false })
+      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: BALANCE.progression.levelsGained.eliteFour, fullHeal: false })
       setPendingBattle(null)
         onMapCleared?.()
         setDefeated(index + 1)
@@ -84,7 +100,7 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
     const beaten = index < defeated
     const isNext = index === defeated && !won
     const locked = index > defeated
-    const specs = config?.eliteFourTeams?.[member.name] ?? []
+    const specs = teamSpecs(member)
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {index > 0 && (
@@ -163,17 +179,41 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
 
   const swapRoster = swapInRoster(setRoster)
 
+  // Held-item moving: clicking a held item in a Pokémon's stat popup starts a
+  // move; the next roster slot clicked receives it. Mirrors NodeMap's flow but
+  // there's no bag here, so the only source/target is a roster Pokémon.
+  const [movingItem, setMovingItem] = useState(null)
+  const isMovingItem = !!movingItem
+  async function resolveItemMove(to) {
+    if (!movingItem) return
+    const { item, from } = movingItem
+    setMovingItem(null)
+    // Evolve Stone on a Pokémon: evolve + consume rather than equip (kept if the
+    // target can't evolve, so it isn't wasted).
+    if (item?.consumable === 'evolve' && to.kind === 'pokemon') {
+      const used = await evo.evolveWithStone(to.pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
+    onMoveItem?.({ item, from, to })
+  }
+  const rosterItemProps = {
+    itemTargeting: isMovingItem,
+    onPickTarget: pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex }),
+    onStartHeldItemDrag: (pokeIndex, item) => setMovingItem(item ? { item, from: { kind: 'pokemon', pokeIndex } } : null),
+  }
+
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
       {isDesktop ? (
         <div className="flex w-full py-4" style={{ alignItems: 'flex-start', justifyContent: 'center', gap: '16px', visibility: pendingBattle ? 'hidden' : 'visible', overflowY: 'auto', minHeight: 0 }}>
-          <Roster roster={roster} onSwap={swapRoster} />
+          <Roster roster={roster} onSwap={swapRoster} {...rosterItemProps} />
           {memberColumn}
         </div>
       ) : (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ marginBottom: '10px' }}>
-            <Roster roster={roster} horizontal onSwap={swapRoster} />
+            <Roster roster={roster} horizontal onSwap={swapRoster} {...rosterItemProps} />
           </div>
           {memberColumn}
         </div>
@@ -222,6 +262,28 @@ export default function EliteFour({ region, character, roster, setRoster, onBack
               Home
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Item-move banner — shown after a held item is clicked, until a target
+          Pokémon is picked (or the move is cancelled). */}
+      {isMovingItem && (
+        <div style={{
+          position: 'fixed', top: '48px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 90, display: 'flex', alignItems: 'center', gap: '10px',
+          backgroundColor: 'rgba(0,0,0,0.82)', border: '2px solid #facc15',
+          padding: '8px 14px',
+        }}>
+          <img src={itemIconUrl(movingItem.item)} alt="" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
+          <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
+            Choose a Pokémon for {movingItem.item.name}
+          </span>
+          <button
+            onClick={() => setMovingItem(null)}
+            style={{ fontFamily: 'Upheaval', fontSize: '10px', color: '#1a1a1a', backgroundColor: '#facc15', border: 'none', padding: '4px 10px', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
         </div>
       )}
     </Layout>

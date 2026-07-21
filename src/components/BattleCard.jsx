@@ -6,6 +6,7 @@ import { useSettings } from '../lib/settings'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
+import { BALANCE } from '../game/balance.js'
 import { itemIconUrl } from '../game/items.js'
 import MoveAnimation from './MoveAnimation.jsx'
 import battleGrass from '../assets/battleGrass.png'
@@ -34,7 +35,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const { battleSpeed, autoClose } = useSettings()
   const isBoss = node.type === NODE_TYPES.BOSS
   const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
-  const levelsGained = node.type === NODE_TYPES.GRASS ? 1 : 2
+  const levelsGained = node.type === NODE_TYPES.GRASS ? BALANCE.progression.levelsGained.grass : BALANCE.progression.levelsGained.default
 
   const borderStyle = dark ? '2px solid #333333' : '2px solid #666666'
   const shadowStyle = dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #666666'

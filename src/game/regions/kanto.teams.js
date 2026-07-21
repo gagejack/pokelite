@@ -56,11 +56,23 @@ export const BOSS_TEAMS = {
 // Elite Four + Champion — fought in order after the 8th gym, authored above
 // Giovanni's 71–73 band (player gains +2 levels per battle along the way).
 export const ELITE_FOUR_TEAMS = {
-  'Lorelei': [{ id: 87, level: 74 }, { id: 91, level: 74 }, { id: 131, level: 76 }], // Dewgong, Cloyster, Lapras
-  'Bruno':   [{ id: 95, level: 74 }, { id: 106, level: 74 }, { id: 68, level: 76 }], // Onix, Hitmonlee, Machamp
-  'Agatha':  [{ id: 93, level: 74 }, { id: 42, level: 74 }, { id: 94, level: 76 }],  // Haunter, Golbat, Gengar
-  'Lance':   [{ id: 130, level: 74 }, { id: 142, level: 74 }, { id: 149, level: 76 }], // Gyarados, Aerodactyl, Dragonite
-  'Blue':    [{ id: 18, level: 77 }, { id: 65, level: 77 }, { id: 112, level: 78 }, { id: 103, level: 78 }, { id: 6, level: 80 }], // Pidgeot, Alakazam, Rhydon, Exeggutor, Charizard (ace)
+  'Lorelei': [{ id: 87, level: 74 }, { id: 91, level: 73 }, { id: 80, level: 74 }, { id: 124, level: 74 }, { id: 131, level: 76 }], // Dewgong, Cloyster, Slowbro, Jynx, Lapras (ace)
+  'Bruno':   [{ id: 95, level: 73 }, { id: 107, level: 75 }, { id: 106, level: 75 }, { id: 95, level: 76 }, { id: 68, level: 78 }], // Onix, Hitmonchan, Hitmonlee, Onix, Machamp (ace)
+  'Agatha':  [{ id: 94, level: 76 }, { id: 42, level: 76 }, { id: 93, level: 75 }, { id: 24, level: 78 }, { id: 94, level: 80 }],  // Gengar, Golbat, Haunter, Arbok, Gengar (ace)
+  'Lance':   [{ id: 130, level: 76 }, { id: 148, level: 74 }, { id: 148, level: 74 }, { id: 142, level: 78 }, { id: 149, level: 80 }], // Gyarados, Dragonair, Dragonair, Aerodactyl, Dragonite (ace)
+  // Blue's 6th mon (the ace) is a starter-counter picked at battle time from
+  // BLUE_STARTER_COUNTER below — the fully-evolved starter that beats the
+  // player's pick (FR/LG behaviour). EliteFour splices it in as the ace.
+  'Blue':    [{ id: 18, level: 73 }, { id: 65, level: 77 }, { id: 112, level: 75 }, { id: 103, level: 75 }, { id: 130, level: 76 }], // Pidgeot, Alakazam, Rhydon, Exeggutor, Gyarados
+}
+
+// Blue's ace, chosen to counter the player's starter (id → { id, level }).
+// Bulbasaur(1)→Charizard, Charmander(4)→Blastoise, Squirtle(7)→Venusaur.
+// The 6th slot; falls back to Charizard if the starter is unknown.
+export const BLUE_STARTER_COUNTER = {
+  1: { id: 6,  level: 78 }, // vs Bulbasaur → Charizard
+  4: { id: 9,  level: 78 }, // vs Charmander → Blastoise
+  7: { id: 3,  level: 78 }, // vs Squirtle → Venusaur
 }
 
 // Rival (Blue) teams for RIVAL nodes, keyed by variant so the same rival can be

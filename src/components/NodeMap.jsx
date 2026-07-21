@@ -18,6 +18,7 @@ import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
+import { BALANCE } from '../game/balance.js'
 import { swapInRoster } from '../game/roster.js'
 // The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
 // a filename can't be imported, since "?" is the query separator in a specifier.)
@@ -675,8 +676,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
     const isRival = node.type === NODE_TYPES.RIVAL
     const legendary = pendingBattle.enemyTeam[0]
-    // Rival grants +4 levels + a full heal; otherwise grass=1, everything else=2.
-    const levelsGained = isRival ? 4 : node.type === NODE_TYPES.GRASS ? 1 : 2
+    // Rival grants a full heal + the most levels; grass the fewest. See BALANCE.
+    const lv = BALANCE.progression.levelsGained
+    const levelsGained = isRival ? lv.rival : node.type === NODE_TYPES.GRASS ? lv.grass : lv.default
 
     if (won) {
       const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival })

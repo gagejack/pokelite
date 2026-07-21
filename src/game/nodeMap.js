@@ -1,3 +1,5 @@
+import { BALANCE } from './balance.js'
+
 export const NODE_TYPES = {
   GRASS: 'grass',
   TRAINER: 'trainer',
@@ -29,7 +31,7 @@ const MYSTERY_OUTCOMES = [
 // Number of times a Mystery-node item/catch offer can be rerolled. The reroll
 // button IS the mystery bonus (replacing the old "extra choice + boosted
 // odds" bonus) — the offer itself is drawn at normal odds like any other node.
-export const MYSTERY_REROLLS = 2
+export const MYSTERY_REROLLS = BALANCE.map.mysteryRerolls
 
 // Resolve a Mystery node into one of its outcome types, equally weighted among
 // the AVAILABLE outcomes. On maps with no legendary pool a Master Ball outcome
@@ -46,27 +48,25 @@ export function resolveMysteryType({ allowLegendary = true } = {}) {
 // (legendary) node. Ramps by map: 0 before map 3, then 0.5% on map 3
 // (index 2) rising linearly to ~10% on map 8 (index 7).
 export function masterBallChance(mapIndex) {
-  const START_INDEX = 2   // map 3
-  const END_INDEX = 7     // map 8
-  const START = 0.005     // 0.5%
-  const END = 0.10        // 10%
-  if (mapIndex < START_INDEX) return 0
-  if (mapIndex >= END_INDEX) return END
-  const t = (mapIndex - START_INDEX) / (END_INDEX - START_INDEX)
-  return START + t * (END - START)
+  const { startIndex, endIndex, start, end } = BALANCE.map.masterBall
+  if (mapIndex < startIndex) return 0
+  if (mapIndex >= endIndex) return end
+  const t = (mapIndex - startIndex) / (endIndex - startIndex)
+  return start + t * (end - start)
 }
 
-// % chance for each node type (must sum to 100)
-// Exported so the admin balance dashboard can display the live distribution
-// instead of a hand-copied table that could drift.
-export const NODE_TYPE_CHANCES = [
-  { type: NODE_TYPES.GRASS,         chance: 28 },
-  { type: NODE_TYPES.TRAINER,       chance: 28 },
-  { type: NODE_TYPES.POKEBALL,      chance: 19 },
-  { type: NODE_TYPES.ITEM,          chance: 14 },
-  { type: NODE_TYPES.POWER_UPGRADE, chance: 5  },
-  { type: NODE_TYPES.MYSTERY,       chance: 6  },
-]
+// % chance for each node type (must sum to 100). Values come from BALANCE
+// (game/balance.js); balance.js uses string literals to stay import-free, so
+// we assert here that each maps to a real NODE_TYPES value — a typo there
+// would otherwise silently drop a node type from generation.
+// Exported so the admin balance dashboard can display the live distribution.
+const NODE_TYPE_VALUES = new Set(Object.values(NODE_TYPES))
+export const NODE_TYPE_CHANCES = BALANCE.map.nodeTypeChances.map(({ type, chance }) => {
+  if (!NODE_TYPE_VALUES.has(type)) {
+    throw new Error(`BALANCE.map.nodeTypeChances: "${type}" is not a NODE_TYPES value`)
+  }
+  return { type, chance }
+})
 
 export function pick(pool) {
   return pool[Math.floor(Math.random() * pool.length)]
@@ -95,7 +95,7 @@ function randomNode(id, trainerPool, mapIndex = 0) {
 
 // Row layout: 1→2→3→4→3→4→3→2(pokecenter)→1(boss)
 export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
-  const ROW_WIDTHS = [1, 2, 3, 4, 3, 4, 3]
+  const ROW_WIDTHS = BALANCE.map.rowWidths
   let id = 0
   const rows = ROW_WIDTHS.map(width =>
     Array.from({ length: width }, () => randomNode(id++, trainerPool, mapIndex))

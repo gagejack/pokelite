@@ -3,9 +3,11 @@
 // budget via config.catchTierBudget; the drawing algorithm here is region-
 // agnostic (it mirrors pickThreeItems in items.js).
 
+import { BALANCE } from './balance.js'
+
 // Default catch rarity budget — shared equally among a map's members of each
-// tier. Regions may override with config.catchTierBudget.
-export const CATCH_TIER_BUDGET = { common: 60, rare: 25, epic: 10, legendary: 5 }
+// tier. Regions may override with config.catchTierBudget. Lives in balance.js.
+export const CATCH_TIER_BUDGET = BALANCE.catch.tierBudget
 
 // Utility: per-species offer odds for a map's catch pool, for tuning and for
 // the admin balance dashboard. Mirrors itemOdds() in items.js — the % is the

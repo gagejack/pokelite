@@ -435,8 +435,10 @@ export default function App() {
         <EliteFour
           region={selectedRegion}
           character={selectedCharacter}
+          starter={selectedStarter}
           roster={roster}
           setRoster={setRoster}
+          onMoveItem={moveItem}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
           onMapCleared={handleMapCleared}

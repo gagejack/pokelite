@@ -167,7 +167,7 @@ core sim, and item descriptions in `items.js` can drift from actual behavior.
 runs the holder's hooks at each. `calcDamage`/`simulateBattle` shrink to a
 generic pipeline, and item behavior lives next to its description.
 
-### 3.4 Central balance/tuning module
+### 3.4 Central balance/tuning module ✅ IMPLEMENTED
 Tunables are scattered: node odds (`nodeMap.js`), item budgets (`items.js`),
 catch budgets (`catch.js`), tier powers (`typeMoves.js`), starter boost + heal
 % (`pokemon.js`), trainer counts + level curves (`battleTeams.js`), item
@@ -177,6 +177,19 @@ effects (`battle.js`), `damageMultiplier` (region config + defaulted again in
 object; every module imports its knobs from there. Pure reorganization, zero
 behavior change — but now playtesting tweaks happen in a single file, and the
 sim tooling below can import it.
+
+> **Shipped:** `src/game/balance.js` — a deep-frozen, import-free leaf module
+> holding every gameplay knob (map gen, item/catch budgets, move tiers,
+> pokémon/evolution, progression, trainer gen, and all battle item/crit/roll
+> numbers). Owning modules keep their logic and alias their exports
+> (`TIER_BUDGET`, `NODE_TYPE_CHANCES`, `MAX_LEVEL`, `SHINY_ODDS`, etc.) into
+> `BALANCE`, so no importer changed. `nodeMap.js` asserts each
+> `nodeTypeChances` string is a real `NODE_TYPES` value. The dynamic
+> per-region player/enemy `damageMultiplier` stays in Supabase
+> (`lib/regionBalance.js`) — `BALANCE` holds only static defaults. Verified
+> zero-behavior-change: a before/after snapshot of every odds function, tier
+> table, and per-map catch % (Kanto+Unova) is byte-identical, and a
+> deterministic `calcDamage` matrix (15 item/crit cases) matches exactly.
 
 ### 3.5 Trim the battle log schema
 Attack entries carry legacy/duplicate fields (`side` vs `attackerSide`,
@@ -266,7 +279,7 @@ multipliers live in `balance.js` per 3.4.
 
 | Priority | Item | Why first |
 |---|---|---|
-| 1 | 3.4 Central balance module | Pure refactor; everything below builds on it |
+| 1 | 3.4 Central balance module | Pure refactor; everything below builds on it | Added
 | 2 | 2.3 Seeded RNG | Unlocks sims, dailies, reproducible bugs |
 | 3 | 4.1 Headless simulator | Balance stops being guesswork |
 | 4 | 1.1 Lazy region assets | Biggest UX-perf win, low risk |
