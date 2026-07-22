@@ -124,10 +124,12 @@ function ComingSoonCell({ cards, borderStyle, isDesktop }) {
   )
 }
 
-export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen }) {
+export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen, onCustomSeed }) {
   const { cards, dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(null)
+  const [seedInput, setSeedInput] = useState('')
+  const [seedError, setSeedError] = useState(null)
 
   const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
   const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
@@ -171,6 +173,44 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
               hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
           ))}
           <ComingSoonCell cards={cards} borderStyle={borderStyle} isDesktop={isDesktop} />
+        </div>
+
+        {/* Custom seed entry. Daily Challenge button goes here in Phase 2. */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cards ? '#DBDBDB' : '#333333' }}>
+            Custom Seed:
+          </span>
+          <input
+            value={seedInput}
+            onChange={e => { setSeedInput(e.target.value); setSeedError(null) }}
+            placeholder="KANTO-7Q2"
+            style={{
+              fontFamily: 'Orange Kid', fontSize: '14px', padding: '6px 8px',
+              width: '140px', textTransform: 'uppercase',
+              border: borderStyle, backgroundColor: cards ? '#1a1a1a' : '#fff',
+              color: cards ? '#DBDBDB' : '#333333',
+            }}
+          />
+          <button
+            onClick={() => {
+              const res = onCustomSeed?.(seedInput)
+              if (res?.error) setSeedError(res.error)
+            }}
+            className="hover:opacity-70 transition-opacity"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '12px',
+              color: cards ? '#DBDBDB' : '#333333',
+              border: borderStyle, boxShadow: shadowStyle,
+              backgroundColor: cards ? '#2e2e2e' : '#DBDBDB', padding: '8px 16px',
+            }}
+          >
+            Go
+          </button>
+          {seedError && (
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#ef4444' }}>
+              {seedError}
+            </span>
+          )}
         </div>
 
         <button
