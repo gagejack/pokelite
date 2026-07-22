@@ -14,6 +14,7 @@ import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
+import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
@@ -28,6 +29,7 @@ export default function App() {
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [runSeed, setRunSeed] = useState(null)   // { region, seed, code } or null
   const [runMode, setRunMode] = useState('normal')
+  const [dailyOpen, setDailyOpen] = useState(false)
   const runStartedAt = useRef(0)
   const dailyDate = useRef(null)                  // Phase 2 (daily) sets this
   const [selectedCharacter, setSelectedCharacter] = useState(DEFAULT_CHARACTER)
@@ -97,6 +99,21 @@ export default function App() {
     })()
     return () => { cancelled = true }
   }, [user])
+
+  // Launch today's daily challenge: derive region+seed from the UTC date,
+  // seed the run, and record the start-date so the attempt submits under the
+  // day it began (even across a midnight rollover). Called from DailyChallenge.
+  function startDailyRun() {
+    const date = todayUtc()
+    const daily = dailyFor(date)                 // { date, region, seed, code }
+    setRunSeed({ region: daily.region, seed: daily.seed, code: daily.code })
+    setRunMode('daily')
+    dailyDate.current = date
+    setSelectedRegion({ name: daily.region })
+    prewarmCache(getRegionConfig(daily.region))
+    setDailyOpen(false)
+    setScreen('starter')
+  }
 
   async function initRoster(starter) {
     const base = await fetchPokemonBase(starter.id)
@@ -255,6 +272,26 @@ export default function App() {
       }))
     }
     await supabase.from('runs').insert(payload)
+    // Daily challenge: record this finished run as an attempt (trust-client).
+    // Guarded so only daily-mode runs submit; guests already returned above.
+    // NOTE: "Play Again" (restartRun) keeps runMode/dailyDate, so a replay
+    // submits ANOTHER attempt at its own run-end — intended (spec §5: every
+    // finished daily-mode run is an attempt, capped at 10 by submitAttempt).
+    if (runMode === 'daily' && dailyDate.current) {
+      const { data: prof } = await supabase
+        .from('profiles').select('username').eq('id', user.id).maybeSingle()
+      const res = await submitAttempt({
+        userId: user.id,
+        username: prof?.username ?? null,
+        dailyDate: dailyDate.current,
+        region: selectedRegion?.name ?? dailyFor(dailyDate.current).region,
+        maps_cleared: mapsCleared.current,
+        elapsed_ms: Math.max(0, Date.now() - (runStartedAt.current || Date.now())),
+      })
+      // Surface failures (e.g. a two-tab unique-index rejection) — same pattern
+      // as recordCatch/recordBadgeEarned; never blocks the run.
+      if (res?.error) console.warn('daily submitAttempt failed:', res.error)
+    }
   }
 
   function handlePokemonCaught(pokemonId) {
