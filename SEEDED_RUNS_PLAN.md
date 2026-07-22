@@ -35,6 +35,25 @@ free later — but those are not built here.
 
 Guests keep normal runs and custom seeds; only the **ranked daily** requires login.
 
+### Review amendments (post-design, pre-implementation)
+
+Codebase review found the plan collides with the existing save/resume system
+and produced these amendments, all folded into the sections below:
+
+1. **Snapshot seeded-run state** — `rngState`, `runSeed`, `runMode`,
+   `runStartedAt`, `dailyDate` join the run snapshot so save/resume preserves
+   determinism and daily context (Section 3).
+2. **`daily_date` captured at run start**, submitted under that date — solves
+   the midnight-rollover and resume-next-day cases (Sections 3, 5).
+3. **Unique index** `(user_id, daily_date, attempt_no)` — free two-tab
+   duplicate-attempt protection (Section 5).
+4. **Two implementation phases** — Phase 1 (RNG + custom seeds) is
+   independently shippable before Phase 2 (daily + leaderboard) begins
+   (see Implementation phases).
+5. **Seed code on the victory screen too**, not just defeat (Section 3).
+6. **Tap-to-copy** on every displayed seed code (Section 3).
+7. **Daily countdown** ("resets in Xh Ym") in the Daily view (Section 4).
+
 ---
 
 ## Section 1 — RNG core (`src/game/rng.js`)
@@ -51,6 +70,10 @@ export function rng()   { return _rng() }
 export function seedRng(seed) { _rng = mulberry32(seed >>> 0) }
 export function clearRng()    { _rng = Math.random }
 export function isSeeded()    { return _rng !== Math.random }
+
+// Save/resume support: mulberry32's entire state is one uint32 accumulator.
+export function getRngState()      // → uint32 | null (null when unseeded)
+export function setRngState(state) // resume a seeded sequence mid-stream
 ```
 
 **Sweep:** replace all 18 `Math.random()` calls across the six sim files with
@@ -122,15 +145,27 @@ Three run start paths funnel through one seeded entry point:
 - `runSeed` — active `{ region, seed, code }` or `null` for normal runs.
 - `runMode` — `'normal' | 'custom' | 'daily'`.
 - `runStartedAt` — `Date.now()` at run-start confirm (tiebreak clock).
+- `dailyDate` — the UTC "YYYY-MM-DD" captured at run **start** (daily mode
+  only). Submission uses this date, so a run that crosses midnight or is
+  resumed on a later day still counts for the day it was started.
 
 **Lifecycle:**
-- **Run start:** set the three fields; `seedRng` (custom/daily) or `clearRng`
+- **Run start:** set the fields above; `seedRng` (custom/daily) or `clearRng`
   (normal).
-- **Run end** (death or clear — existing `recordRunEnd` path): compute
-  `maps_cleared` and `elapsed_ms = Date.now() - runStartedAt`; if
-  `runMode === 'daily'`, write a `daily_attempts` row (Section 5). Always
-  `clearRng()` after.
+- **Run end** (death or clear — existing `recordRunEnd` path in
+  `App.jsx:198`): compute `maps_cleared` and
+  `elapsed_ms = Date.now() - runStartedAt`; if `runMode === 'daily'`, write a
+  `daily_attempts` row under `dailyDate` (Section 5). Always `clearRng()`
+  after.
 - **Abandon mid-run** (tab close): no row written → attempt **not** consumed.
+
+**Save/resume (existing system — `buildRunSnapshot`/`resumeRun` in
+`App.jsx`):** the snapshot gains `runSeed`, `runMode`, `runStartedAt`,
+`dailyDate`, and `rngState` (`getRngState()`), and `resumeRun` restores them
+(`setRngState` for seeded runs, `clearRng` for normal). This keeps a resumed
+seeded run's rolls identical to an uninterrupted one. The wall clock keeps
+running across a save — `runStartedAt` is persisted as-is, consistent with the
+wall-clock tiebreak decision (time away counts; it's only a tiebreak).
 
 **Seeded badge:** a subtle "🌱 Seeded" indicator on the map when a run is
 seeded, distinguishing it from a normal run.
@@ -152,11 +187,17 @@ A control row sits **between the region grid and the Back button**:
 - **Custom Seed input** — to the right of the Daily button. Type a code + submit
   to start a custom-seed run. Invalid code → inline "invalid seed" message.
 
-### Defeat popup
+### Seed code display (defeat + victory)
 
 The run's seed **code shows at the top of the defeat popup** (e.g.
-`KANTO-7Q2`), easy to copy/share after a run ends. (Shown for any seeded run —
-daily or custom. Normal runs have no code to show.)
+`KANTO-7Q2`) — the `DefeatScreen` overlay inside `BattleCard.jsx` — via a
+`seedCode` prop threaded from App. The **victory screen shows it too** ("I
+cleared KANTO-7Q2, try it" is the best sharing moment; same prop plumbing).
+Shown for any seeded run — daily or custom; normal runs have no code to show.
+
+Every displayed seed code is **tap-to-copy** (`navigator.clipboard`, with a
+brief "Copied!" confirmation) — this applies to the defeat popup, victory
+screen, and the Daily view.
 
 ---
 
@@ -166,7 +207,8 @@ A panel/modal, gated to logged-in users. Logged-out → "Sign in to play the
 daily" prompt.
 
 Contents:
-- **Today's daily** — region + UTC date, and a **Play** button.
+- **Today's daily** — region + UTC date, a **Play** button, and a countdown to
+  the next daily ("resets in 3h 12m" — time until 00:00 UTC).
 - **Attempt tracker** — `Attempt X / 10`, with a note: only the **first 3
   count**; best of those 3 is your ranked score; attempts 4–10 are practice
   (playable, unranked).
@@ -194,6 +236,11 @@ Play from here starts a daily-mode run (Section 3, path 3).
 | `elapsed_ms` | bigint | tiebreak |
 | `created_at` | timestamptz | default `now()` |
 
+**Constraints:**
+- Unique index on `(user_id, daily_date, attempt_no)` — prevents duplicate
+  attempt numbers from two open tabs (free two-tab protection).
+- `attempt_no` CHECK between 1 and 10.
+
 **RLS:**
 - `select` — any authenticated user (leaderboard is shared among users).
 - `insert` — only rows where `user_id = auth.uid()`.
@@ -204,9 +251,10 @@ Play from here starts a daily-mode run (Section 3, path 3).
 - `getTodayAttempts(userId)` → today's rows → derives `attemptNo` (count + 1,
   display-capped at 10) and `bestOfFirst3` (min-none / best over
   `attempt_no <= 3`).
-- `submitAttempt({ maps_cleared, elapsed_ms })` → inserts the next `attempt_no`
-  for today. Called only at run-end when `runMode === 'daily'` and the user has
-  fewer than 10 attempts today.
+- `submitAttempt({ daily_date, region, maps_cleared, elapsed_ms })` → inserts
+  the next `attempt_no` for that date (the run's start-date, not "today" at
+  submission time). Called only at run-end when `runMode === 'daily'` and the
+  user has fewer than 10 attempts for that date.
 - `getLeaderboard(dateStr)` → today's rows reduced to each user's
   best-of-first-3, sorted `maps_cleared desc, elapsed_ms asc` for display.
 
@@ -217,22 +265,44 @@ Play from here starts a daily-mode run (Section 3, path 3).
 
 ---
 
+## Implementation phases
+
+Two phases; **Phase 1 is independently shippable** — if Phase 2 stalls,
+shareable custom seeds are still a complete feature.
+
+**Phase 1 — Deterministic core + custom seeds (no Supabase):**
+- `src/game/rng.js`, `src/game/seed.js`.
+- The `Math.random` → `rng()` sweep across the six sim files.
+- App run-state fields + seed lifecycle + snapshot/resume fields.
+- Custom Seed input on region-select; seed code (tap-to-copy) on defeat +
+  victory screens; "🌱 Seeded" map badge.
+- Verify determinism (same seed → same run) and unseeded parity before Phase 2.
+
+**Phase 2 — Daily challenge + leaderboard (Supabase):**
+- `supabase/daily_attempts.sql`, `src/lib/daily.js`.
+- Daily Challenge button + `DailyChallenge.jsx` view (attempts, best,
+  leaderboard, countdown).
+- Daily-mode run launch + run-end submission under the start-date.
+
 ## Files touched
 
 **New**
-- `src/game/rng.js` — seeded PRNG leaf module.
+- `src/game/rng.js` — seeded PRNG leaf module (incl. get/setRngState).
 - `src/game/seed.js` — encode/decode + daily derivation.
-- `src/lib/daily.js` — attempts + leaderboard queries.
-- `src/components/DailyChallenge.jsx` — the daily view/modal (+ leaderboard).
-- `supabase/daily_attempts.sql` — table + RLS.
+- `src/lib/daily.js` — attempts + leaderboard queries (Phase 2).
+- `src/components/DailyChallenge.jsx` — the daily view/modal (+ leaderboard)
+  (Phase 2).
+- `supabase/daily_attempts.sql` — table + constraints + RLS (Phase 2).
 
 **Edited**
 - `src/game/{nodeMap,items,catch,battleTeams,battle,pokemon}.js` — `Math.random`
   → `rng()` + import (order-preserving).
-- `src/App.jsx` — run-state fields, seed lifecycle, run-end submission, custom
-  seed / daily launch.
-- Region-select component — Daily button + Custom Seed input row.
-- Defeat popup component — show seed code at top.
+- `src/App.jsx` — run-state fields, seed lifecycle, snapshot/resume additions
+  (`runSeed`/`runMode`/`runStartedAt`/`dailyDate`/`rngState`), run-end
+  submission, custom seed / daily launch.
+- `src/components/RegionSelect.jsx` — Daily button + Custom Seed input row.
+- `src/components/BattleCard.jsx` — `seedCode` prop; show tap-to-copy code on
+  the DefeatScreen overlay and the victory screen.
 - `Experimental_Features.md` — mark 2.3 shipped.
 
 ## Non-goals
@@ -255,6 +325,13 @@ Play from here starts a daily-mode run (Section 3, path 3).
    random samples; ambiguous chars never emitted; garbage → `null`.
 5. **Daily derivation:** `dailyFor(date)` stable for a fixed date across
    machines; region rotates across consecutive days; UTC rollover correct.
-6. **Leaderboard/attempts:** simulate 10 attempts; confirm attempt cap, first-3
+   A daily started before midnight UTC and finished after submits under the
+   start date.
+6. **Save/resume determinism:** seed a run, consume some rolls, snapshot
+   (`getRngState`), restore (`setRngState`) — subsequent rolls identical to an
+   uninterrupted sequence. Resumed run keeps its `runMode`/`dailyDate` and
+   still submits correctly.
+7. **Leaderboard/attempts:** simulate 10 attempts; confirm attempt cap, first-3
    scoring, best-of-3 selection, and sort order (progress desc, time asc). RLS:
-   a user cannot insert another user's row.
+   a user cannot insert another user's row; the unique index rejects a
+   duplicate `(user, date, attempt_no)`.
