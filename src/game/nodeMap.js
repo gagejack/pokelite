@@ -1,4 +1,5 @@
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 export const NODE_TYPES = {
   GRASS: 'grass',
@@ -69,11 +70,11 @@ export const NODE_TYPE_CHANCES = BALANCE.map.nodeTypeChances.map(({ type, chance
 })
 
 export function pick(pool) {
-  return pool[Math.floor(Math.random() * pool.length)]
+  return pool[Math.floor(rng() * pool.length)]
 }
 
 export function pickType() {
-  const roll = Math.random() * 100
+  const roll = rng() * 100
   let count = 0
   for (const { type, chance } of NODE_TYPE_CHANCES) {
     count += chance
@@ -87,7 +88,7 @@ function randomNode(id, trainerPool, mapIndex = 0) {
   // A Pokéball node has a rare, map-ramped chance to become a Master Ball
   // (legendary) node instead — a variant of the Pokéball, so the overall
   // node distribution is barely affected.
-  if (type === NODE_TYPES.POKEBALL && Math.random() < masterBallChance(mapIndex)) {
+  if (type === NODE_TYPES.POKEBALL && rng() < masterBallChance(mapIndex)) {
     type = NODE_TYPES.MASTER_BALL
   }
   return { id, type, ...(type === NODE_TYPES.TRAINER ? { trainer: pick(trainerPool) } : {}) }
@@ -105,7 +106,7 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
   rows[1][0] = { id: rows[1][0].id, type: NODE_TYPES.POKEBALL }
 
   // Row 7 (2 nodes) — guaranteed pokecenter among 2
-  const pcIndex = Math.random() < 0.5 ? 0 : 1
+  const pcIndex = rng() < 0.5 ? 0 : 1
   rows.push(Array.from({ length: 2 }, (_, i) =>
     i === pcIndex
       ? { id: id++, type: NODE_TYPES.POKECENTER }

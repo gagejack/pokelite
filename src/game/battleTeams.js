@@ -1,5 +1,6 @@
 import { pick } from './nodeMap.js'
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 // Generic, region-agnostic battle-team helpers. All region DATA (species pools,
 // boss teams, level bands) lives in the region config (see game/regions/*.js);
@@ -19,7 +20,7 @@ export function mapLevelRange(ranges, mapIndex = 0) {
 export function pickLevel([min, max], positionWeight = 0.5) {
   const span = max - min
   const { posFactor, randSpan, randOffset } = BALANCE.trainers.level
-  const t = Math.max(0, Math.min(1, positionWeight * posFactor + Math.random() * randSpan - randOffset))
+  const t = Math.max(0, Math.min(1, positionWeight * posFactor + rng() * randSpan - randOffset))
   return Math.round(min + span * t)
 }
 
@@ -43,7 +44,7 @@ export function buildTrainerTeamSpec(pool, band, count, positionWeight = 0.5) {
 // How many Pokémon a trainer has (1-2 for early maps, 1-3 for later).
 export function pickTrainerCount(mapIndex = 0) {
   const { earlyMaxMap, midMaxMap, early, mid, late } = BALANCE.trainers.count
-  if (mapIndex <= earlyMaxMap) return Math.random() < early.oneChance ? 1 : 2
-  if (mapIndex <= midMaxMap) return Math.random() < mid.oneChance ? 1 : Math.random() < mid.twoChance ? 2 : 3
-  return Math.random() < late.twoChance ? 2 : 3
+  if (mapIndex <= earlyMaxMap) return rng() < early.oneChance ? 1 : 2
+  if (mapIndex <= midMaxMap) return rng() < mid.oneChance ? 1 : rng() < mid.twoChance ? 2 : 3
+  return rng() < late.twoChance ? 2 : 3
 }

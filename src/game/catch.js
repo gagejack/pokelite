@@ -4,6 +4,7 @@
 // agnostic (it mirrors pickThreeItems in items.js).
 
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 // Default catch rarity budget — shared equally among a map's members of each
 // tier. Regions may override with config.catchTierBudget. Lives in balance.js.
@@ -40,7 +41,7 @@ export function pickCatchOffer(pool, count = 3, tierBudget = CATCH_TIER_BUDGET) 
   while (result.length < count && remaining.length > 0) {
     const total = remaining.reduce((s, m) => s + weightOf(m, remaining), 0)
     if (total <= 0) break
-    let roll = Math.random() * total
+    let roll = rng() * total
     for (let i = 0; i < remaining.length; i++) {
       roll -= weightOf(remaining[i], remaining)
       if (roll <= 0) { result.push(remaining.splice(i, 1)[0]); break }

@@ -15,6 +15,7 @@
 // to whatever the totals are. (itemOdds() below prints the resulting %s.)
 // ─────────────────────────────────────────────────────────────────────────
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 // Drop budget per tier — lives in game/balance.js (central tuning module).
 export const TIER_BUDGET = BALANCE.items.tierBudget
@@ -132,7 +133,7 @@ export function pickThreeItems(count = 3, tierBudget = TIER_BUDGET) {
   while (result.length < count && remaining.length > 0) {
     const pool = remaining.reduce((sum, item) => sum + itemWeight(item, tierBudget), 0)
     if (pool <= 0) break
-    let roll = Math.random() * pool
+    let roll = rng() * pool
     for (let i = 0; i < remaining.length; i++) {
       roll -= itemWeight(remaining[i], tierBudget)
       if (roll <= 0) {

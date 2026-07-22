@@ -1,5 +1,6 @@
 import { getEffectiveness } from './typeChart.js'
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 // All battle tuning numbers live in game/balance.js (BALANCE.battle).
 const B = BALANCE.battle
@@ -62,9 +63,9 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   let critChance = B.critChance
   if (aItem === 'scope_lens') critChance *= HI.scopeLensCrit
   if (aItem === 'razor_claw') critChance *= HI.razorClawCrit
-  const crit = Math.random() < critChance
+  const crit = rng() < critChance
 
-  const random = B.randomRoll.base + Math.random() * B.randomRoll.span
+  const random = B.randomRoll.base + rng() * B.randomRoll.span
 
   // Attacker damage multipliers (stack multiplicatively).
   let itemDmg = 1
@@ -84,7 +85,7 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
 
   // Bright Powder — chance an incoming hit is halved.
   let defDmg = 1
-  if (dItem === 'bright_powder' && Math.random() < HI.brightPowderChance) defDmg *= HI.brightPowderFactor
+  if (dItem === 'bright_powder' && rng() < HI.brightPowderChance) defDmg *= HI.brightPowderFactor
   // Resist Charm — super-effective hits against the holder deal less.
   if (dItem === 'resist_charm' && effectiveness > 1) defDmg *= HI.resistCharm
 
@@ -134,7 +135,7 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
   // Tie-break order is decided ONCE per active pairing, not re-rolled every
   // round — otherwise a tied pair could flip order between rounds and the same
   // Pokémon would appear to attack twice in a row.
-  let tieFirst = Math.random() < 0.5
+  let tieFirst = rng() < 0.5
   let tiePair = `${pi}-${ei}`
 
   while (alivePlayers().length > 0 && aliveEnemies().length > 0 && pi !== -1 && ei !== -1) {
@@ -145,7 +146,7 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
     // Re-roll the tie-break only when the active pairing changes (a faint/swap).
     if (`${pi}-${ei}` !== tiePair) {
       tiePair = `${pi}-${ei}`
-      tieFirst = Math.random() < 0.5
+      tieFirst = rng() < 0.5
     }
 
     // Determine order by effective speed (Choice Scarf applies here)

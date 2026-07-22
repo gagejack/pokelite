@@ -1,6 +1,7 @@
 import { getTypeMove, tierForLevel } from './typeMoves.js'
 import { slimChain, speciesIdFromUrl } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
+import { rng } from './rng.js'
 
 const baseCache = new Map()
 
@@ -228,7 +229,7 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false) {
   const boost = isStarter ? BALANCE.pokemon.starterBoost : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
   const move = getTypeMove(base.types[0], tierForLevel(level))
-  const shiny = Math.random() < SHINY_ODDS
+  const shiny = rng() < SHINY_ODDS
   return {
     pokeId:     base.pokeId,
     name:       base.name,
@@ -349,7 +350,7 @@ export async function resolveEvolutionLine(pokeId) {
     // skipped so we never offer a form the player couldn't have leveled into).
     const branches = node.evolvesTo.filter(b => b.levelUp)
     if (branches.length === 0) break
-    const nextNode = branches[Math.floor(Math.random() * branches.length)]
+    const nextNode = branches[Math.floor(rng() * branches.length)]
     // Cumulative: a later stage can't be reached below its own evolution level.
     cumulativeLevel = Math.max(cumulativeLevel, nextNode.minLevel)
     node = nextNode
@@ -374,7 +375,7 @@ export async function rollStageForLevel(id, level) {
   const eligible = stages.filter(s => s.minLevel <= level)
   if (eligible.length === 0) return stages[0].id
   const total = eligible.reduce((s, _, i) => s + (i + 1), 0)
-  let roll = Math.random() * total
+  let roll = rng() * total
   for (let i = 0; i < eligible.length; i++) {
     roll -= i + 1
     if (roll <= 0) return eligible[i].id
