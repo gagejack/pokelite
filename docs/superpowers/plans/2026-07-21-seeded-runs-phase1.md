@@ -157,7 +157,7 @@ git commit -m "feat(rng): seeded PRNG leaf module with state save/restore"
 - Consumes: nothing (leaf module in Phase 1).
 - Produces:
   - `encodeSeed(region: string, seed: number): string` — e.g. `encodeSeed('Kanto', 12345)` → `'KANTO-...'`. Uppercases region, base32-encodes the uint32 seed with an ambiguous-char-free alphabet.
-  - `decodeSeed(code: string): { region: string, seed: number } | null` — inverse; case-insensitive, tolerant of surrounding whitespace; returns `null` for malformed input. `region` is returned uppercased (the caller matches it against the app's region list case-insensitively).
+  - `decodeSeed(code: string): { region: string, seed: number, code: string } | null` — inverse; case-insensitive, tolerant of surrounding whitespace; returns `null` for malformed OR out-of-uint32-range input. `region` is uppercased; `code` is the normalized canonical string (so callers store it without re-encoding).
 
 **Note on alphabet:** Crockford base32 (radix 32) — the standard set with the four confusable letters `I L O U` removed. 32-bit seeds encode to at most 7 chars.
 
@@ -198,6 +198,14 @@ check('empty → null', decodeSeed('') === null)
 check('no dash → null', decodeSeed('KANTO7Q2') === null)
 check('bad char → null', decodeSeed('KANTO-!!!') === null)
 check('null input → null', decodeSeed(null) === null)
+check('I/O/L/U rejected', decodeSeed('KANTO-IOLU') === null)
+
+// Out-of-uint32-range codes rejected, not silently truncated.
+check('overflow → null', decodeSeed('KANTO-ZZZZZZZ') === null) // 34359738367 > 2^32-1
+check('max uint32 accepted', decodeSeed(encodeSeed('Kanto', 4294967295))?.seed === 4294967295)
+
+// decode returns the normalized canonical code (uppercase, matches encodeSeed).
+check('normalized code returned', decodeSeed('kanto-1b')?.code === encodeSeed('Kanto', decodeSeed('kanto-1b').seed))
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)
@@ -242,14 +250,18 @@ export function decodeSeed(code) {
   if (dash <= 0 || dash === trimmed.length - 1) return null
   const region = trimmed.slice(0, dash)
   const body = trimmed.slice(dash + 1)
-  if (!/^[0-9A-HJKMNP-TV-Z]+$/.test(body)) return null // Crockford chars only
+  // Regex is the single character gate: only Crockford chars (excludes I L O U).
+  if (!/^[0-9A-HJKMNP-TV-Z]+$/.test(body)) return null
   let n = 0
-  for (const ch of body) {
-    const v = B32.indexOf(ch)
-    if (v < 0) return null
-    n = n * 32 + v
-  }
-  return { region, seed: n >>> 0 }
+  for (const ch of body) n = n * 32 + B32.indexOf(ch)
+  // Reject values that overflow uint32 — otherwise `>>> 0` would silently
+  // truncate an out-of-range code (e.g. "ZZZZZZZ") onto a valid-but-different
+  // seed, so two distinct codes would load the same run.
+  if (n > 0xffffffff) return null
+  const seed = n >>> 0
+  // Return the normalized canonical code too, so callers store it without
+  // re-encoding (encode once, at the point of truth).
+  return { region, seed, code: encodeSeed(region, seed) }
 }
 ```
 
@@ -377,17 +389,18 @@ git commit -m "feat(rng): route all sim RNG through seedable rng()"
 
 **Interfaces:**
 - Consumes: `seedRng`, `clearRng`, `getRngState`, `setRngState` from Task 1; `decodeSeed`, `encodeSeed` from Task 2.
-- Produces: state `runSeed` (`{ region, seed, code } | null`), `runMode` (`'normal' | 'custom' | 'daily'`), refs `runStartedAt`, `dailyDate`; a `beginSeededRun(region, seed, mode)` helper wired to a new `onCustomSeed` prop on `<RegionSelect>`; the region-select screen can start a custom-seeded run.
+- Produces: state `runSeed` (`{ region, seed, code } | null`), `runMode` (`'normal' | 'custom' | 'daily'`), refs `runStartedAt`, `dailyDate`; a new `onCustomSeed` prop on `<RegionSelect>` returning `{ ok: true } | { error: string }`; the region-select screen can start a custom-seeded run.
 
-**Note:** Phase 1 uses only `'normal'` and `'custom'` modes and never sets `dailyDate` (Phase 2 adds `'daily'`). The fields exist now so the snapshot format (Task 5) is stable.
+**Note:** Phase 1 uses only `'normal'` and `'custom'` modes and never sets `dailyDate` (Phase 2 adds `'daily'`). The fields exist now so the snapshot format (Task 5) is stable — `runMode` is carried (not derived from `runSeed`) because Phase 2's `'daily'` also carries a `runSeed`, so mode is the bit that distinguishes them.
 
 - [ ] **Step 1: Add imports**
 
-In `src/App.jsx`, after the `import { getRegionConfig } ...` line, add:
+In `src/App.jsx`, change the existing `import { getRegionConfig } from './game/regionRegistry.js'` to also pull in `regionNames`, and add the two new imports:
 
 ```js
+import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
-import { encodeSeed, decodeSeed } from './game/seed.js'
+import { decodeSeed } from './game/seed.js'
 ```
 
 - [ ] **Step 2: Add run-mode state near the other `useState`/`useRef` (around line 40)**
@@ -430,15 +443,17 @@ Replace the `<RegionSelect ... />` block (line 379) with one that passes an `onC
           onCustomSeed={code => {
             const decoded = decodeSeed(code)
             if (!decoded) return { error: 'Invalid seed' }
-            // Match the decoded REGION against the app's region list.
-            const region = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova']
+            // Match the decoded REGION against the playable region list — the
+            // single source of truth (regionRegistry), so this never drifts
+            // from what RegionSelect shows as playable.
+            const region = regionNames({ playableOnly: true })
               .find(n => n.toUpperCase() === decoded.region)
-            const config = region && getRegionConfig(region)
-            if (!config || (config.maps?.length ?? 0) === 0) return { error: 'Unknown region' }
-            setRunSeed({ region, seed: decoded.seed, code: encodeSeed(region, decoded.seed) })
+            if (!region) return { error: 'Unknown region' }
+            // decoded.code is already the normalized canonical string.
+            setRunSeed({ region, seed: decoded.seed, code: decoded.code })
             setRunMode('custom')
             setSelectedRegion({ name: region })
-            prewarmCache(config)
+            prewarmCache(getRegionConfig(region))
             setScreen('starter')
             return { ok: true }
           }}
@@ -664,11 +679,37 @@ Above `DefeatScreen`, add a small component:
 ```jsx
 function SeedCodeChip({ code, dark }) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef(null)
+  // Clear a pending "Copied!" reset if the chip unmounts (defeat/victory
+  // overlays unmount when the player taps Play Again / Continue / Main Menu).
+  useEffect(() => () => clearTimeout(timerRef.current), [])
   if (!code) return null
   const copy = () => {
-    navigator.clipboard?.writeText(code).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 1200)
-    }).catch(() => {})
+    const done = () => {
+      setCopied(true)
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1200)
+    }
+    // navigator.clipboard is undefined on non-secure origins (e.g. testing the
+    // dev build over http on a phone at a LAN IP), so fall back to execCommand.
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(fallbackCopy)
+    } else {
+      fallbackCopy()
+    }
+    function fallbackCopy() {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = code
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        done()
+      } catch { /* clipboard unavailable — code is still visible to copy manually */ }
+    }
   }
   return (
     <button onClick={copy} title="Copy seed"
@@ -685,7 +726,7 @@ function SeedCodeChip({ code, dark }) {
 }
 ```
 
-(`useState` is already imported in BattleCard.jsx.)
+**Before using this,** confirm `useRef` and `useEffect` are in BattleCard.jsx's React import (it already imports `useState`, `useRef`, `useEffect` — verify the top-of-file import line and add any missing name).
 
 - [ ] **Step 3: Show it in `DefeatScreen`**
 
