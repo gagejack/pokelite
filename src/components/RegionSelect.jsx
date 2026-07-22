@@ -124,7 +124,7 @@ function ComingSoonCell({ cards, borderStyle, isDesktop }) {
   )
 }
 
-export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen, onCustomSeed }) {
+export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen, onCustomSeed, onOpenDaily }) {
   const { cards, dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(null)
@@ -175,8 +175,21 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           <ComingSoonCell cards={cards} borderStyle={borderStyle} isDesktop={isDesktop} />
         </div>
 
-        {/* Custom seed entry. Daily Challenge button goes here in Phase 2. */}
+        {/* Daily challenge + custom seed entry. */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            type="button"
+            onClick={onOpenDaily}
+            className="hover:opacity-70 transition-opacity"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '12px',
+              color: cards ? '#DBDBDB' : '#333333',
+              border: borderStyle, boxShadow: shadowStyle,
+              backgroundColor: cards ? '#2e2e2e' : '#DBDBDB', padding: '8px 16px',
+            }}
+          >
+            🗓️ Daily Challenge
+          </button>
           <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cards ? '#DBDBDB' : '#333333' }}>
             Custom Seed:
           </span>

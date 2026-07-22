@@ -484,6 +484,7 @@ export default function App() {
           }}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
+          onOpenDaily={() => setDailyOpen(true)}
         />
       )}
       {screen === 'starter' && (
