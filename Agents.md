@@ -45,6 +45,8 @@ npm run build:dex  # regenerate public/data/pokedex.json + evolutions.json
 - Don't add dependencies without a clear reason; the stack is intentional
 - Don't put game rules or data (Pokémon pools, move lists, type charts) in React components — keep them in `src/game/`
 - Numeric balance knobs (odds, budgets, tier powers, item multipliers, XP, heal %s) live in `src/game/balance.js` (the `BALANCE` object) — tune there, not inline. The live per-region damage sliders are separate (`src/lib/regionBalance.js` + Supabase).
+- Seeded-run RNG: all sim randomness flows through `src/game/rng.js` (seedable);
+  shareable seed codes in `src/game/seed.js`. Never reorder rng() calls.
 - Mobile layout is a top priority — design mobile-first, then scale up to desktop
 
 ## Important Stuff

@@ -103,6 +103,10 @@ PRNG (e.g. mulberry32) threaded through `nodeMap.js`, `items.js`, `catch.js`,
 module-level `rng` object that defaults to `Math.random`; add a seed input on
 the region-select screen. Also the foundation for section 4 tooling.
 
+> ✅ Phase 1 shipped (2026-07-21): deterministic seeded runs + shareable
+> KANTO-7Q2 codes (rng.js/seed.js, custom-seed input, seed shown on
+> defeat/victory + map badge). Phase 2 (daily challenge + leaderboard) pending.
+
 ### 2.4 Reroll tokens for offers
 Item and catch offers are take-it-or-leave-it; a bad spread feels like a wasted
 node. A limited number of rerolls per map adds agency without new node types.
