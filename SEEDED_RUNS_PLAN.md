@@ -115,7 +115,8 @@ export function dailyFor(dateStr)          // → { region, seed, code }  (dateS
 ```
 
 - **Format:** `REGION-XXX`. Region name uppercased. Numeric part is the 32-bit
-  seed in a compact alphabet **excluding ambiguous chars** (`0/O`, `1/I`).
+  seed in a compact base32 alphabet **excluding the confusable letters**
+  (`I L O U` — Crockford base32).
   Decode is case-insensitive and dash-tolerant. Invalid → `null` (UI shows
   "invalid seed").
 - **Daily seed:** `seed = hash32(dateStr)` via a small string hash (xmur3 /
@@ -322,7 +323,7 @@ shareable custom seeds are still a complete feature.
 3. **Unseeded parity:** with no seed, confirm the `rng()` path is byte-identical
    to the old `Math.random` behavior (call order unchanged) — no gameplay drift.
 4. **Seed codec round-trip:** `decodeSeed(encodeSeed(r, s))` === `{r, s}` for
-   random samples; ambiguous chars never emitted; garbage → `null`.
+   random samples; confusable letters (I L O U) never emitted; garbage → `null`.
 5. **Daily derivation:** `dailyFor(date)` stable for a fixed date across
    machines; region rotates across consecutive days; UTC rollover correct.
    A daily started before midnight UTC and finished after submits under the
