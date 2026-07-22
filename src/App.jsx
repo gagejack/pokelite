@@ -112,6 +112,12 @@ export default function App() {
     resetRunStats()
     // Install the run's RNG. runSeed is set before startRun for seeded modes;
     // a normal run clears back to Math.random.
+    // ORDERING: seed here, THEN initRoster (the starter's shiny roll is the
+    // first rng consumer). initRoster is async and always awaits fetchPokemonBase,
+    // so the shiny roll resolves on a microtask AFTER NodeMap's synchronous
+    // map generation — map-gen consumes the seed first, starter-shiny second.
+    // Same-seed runs stay identical as long as that await ordering holds; don't
+    // add a synchronous fast-path to fetchPokemonBase without preserving it.
     if (runSeed) seedRng(runSeed.seed)
     else clearRng()
     runStartedAt.current = Date.now()
@@ -374,6 +380,13 @@ export default function App() {
     setBag([])
     setMapIndex(0)
     resetRunStats()
+    // Re-seed before initRoster (the first rng consumer) so a seeded run's
+    // "Play Again" reproduces the SAME map/offers the seed originally gave —
+    // the mulberry32 stream must restart, not continue where the dead run
+    // left off. Normal runs fall back to Math.random.
+    if (runSeed) seedRng(runSeed.seed)
+    else clearRng()
+    runStartedAt.current = Date.now()
     initRoster(selectedStarter)
     // Fresh run: drop any resumable save + reset the ended flag.
     mapProgress.current = null
