@@ -4,6 +4,7 @@ import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
 import RegionSelect from './components/RegionSelect'
 import StarterSelect from './components/StarterSelect'
+import DailyChallenge from './components/DailyChallenge'
 // NodeMap (pulls in the whole battle stack: BattleCard, MoveAnimation + its 78
 // animation sheets, framer-motion) and EliteFour are only needed once a run
 // starts, so they load on demand instead of bloating the initial chunk.
@@ -571,6 +572,13 @@ export default function App() {
       )}
       {resetting && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 200, pointerEvents: 'none' }} />
+      )}
+      {dailyOpen && (
+        <DailyChallenge
+          user={user}
+          onPlay={startDailyRun}
+          onClose={() => setDailyOpen(false)}
+        />
       )}
     </Suspense>
     </SettingsProvider>
