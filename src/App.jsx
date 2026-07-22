@@ -10,7 +10,11 @@ import StarterSelect from './components/StarterSelect'
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
-import { getRegionConfig } from './game/regionRegistry.js'
+import { getRegionConfig, regionNames } from './game/regionRegistry.js'
+// getRngState/setRngState are consumed by the run-snapshot save/load wiring (Task 5).
+// eslint-disable-next-line no-unused-vars
+import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
+import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
@@ -24,6 +28,12 @@ export default function App() {
   const [resetting, setResetting] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
+  const [runSeed, setRunSeed] = useState(null)   // { region, seed, code } or null
+  // runMode is read by the run-snapshot save/load wiring (Task 5).
+  // eslint-disable-next-line no-unused-vars
+  const [runMode, setRunMode] = useState('normal')
+  const runStartedAt = useRef(0)
+  const dailyDate = useRef(null)                  // Phase 2 (daily) sets this
   const [selectedCharacter, setSelectedCharacter] = useState(DEFAULT_CHARACTER)
   const [selectedStarter, setSelectedStarter] = useState(null)
   const [roster, setRoster] = useState([])
@@ -104,6 +114,11 @@ export default function App() {
     setSelectedStarter(starter)
     setRoster([])
     resetRunStats()
+    // Install the run's RNG. runSeed is set before startRun for seeded modes;
+    // a normal run clears back to Math.random.
+    if (runSeed) seedRng(runSeed.seed)
+    else clearRng()
+    runStartedAt.current = Date.now()
     initRoster(starter)
     // Starting a fresh run discards any previously saved one.
     mapProgress.current = null
@@ -187,6 +202,11 @@ export default function App() {
   // leaving to the menu after a save, and by resetRun below.
   function clearRunState() {
     setSelectedRegion(null)
+    clearRng()
+    setRunSeed(null)
+    setRunMode('normal')
+    runStartedAt.current = 0
+    dailyDate.current = null
     setSelectedCharacter(DEFAULT_CHARACTER)
     setSelectedStarter(null)
     setRoster([])
@@ -379,10 +399,29 @@ export default function App() {
         <RegionSelect
           onBack={() => setScreen('menu')}
           onSelectRegion={region => {
+            setRunSeed(null)        // normal run
+            setRunMode('normal')
             setSelectedRegion(region)
             const config = getRegionConfig(region.name)
             if (config) prewarmCache(config)
             setScreen('starter')
+          }}
+          onCustomSeed={code => {
+            const decoded = decodeSeed(code)
+            if (!decoded) return { error: 'Invalid seed' }
+            // Match the decoded REGION against the playable region list — the
+            // single source of truth (regionRegistry), so this never drifts
+            // from what RegionSelect shows as playable.
+            const region = regionNames({ playableOnly: true })
+              .find(n => n.toUpperCase() === decoded.region)
+            if (!region) return { error: 'Unknown region' }
+            // decoded.code is already the normalized canonical string.
+            setRunSeed({ region, seed: decoded.seed, code: decoded.code })
+            setRunMode('custom')
+            setSelectedRegion({ name: region })
+            prewarmCache(getRegionConfig(region))
+            setScreen('starter')
+            return { ok: true }
           }}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
