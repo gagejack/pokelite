@@ -476,7 +476,18 @@ export default function App() {
           initialCurrentNode={mapProgress.current?.currentNode}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
+          seedCode={runSeed?.code}
         />
+      )}
+      {screen === 'nodemap' && runSeed && (
+        <div style={{
+          position: 'fixed', top: '8px', right: '8px', zIndex: 50,
+          fontFamily: 'Orange Kid', fontSize: '13px', color: '#DBDBDB',
+          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+          borderRadius: '4px', pointerEvents: 'none',
+        }}>
+          🌱 {runSeed.code}
+        </div>
       )}
       {screen === 'elitefour' && (
         <EliteFour
@@ -494,7 +505,18 @@ export default function App() {
           onSpeciesOwned={recordSpeciesOwned}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
+          seedCode={runSeed?.code}
         />
+      )}
+      {screen === 'elitefour' && runSeed && (
+        <div style={{
+          position: 'fixed', top: '8px', right: '8px', zIndex: 50,
+          fontFamily: 'Orange Kid', fontSize: '13px', color: '#DBDBDB',
+          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+          borderRadius: '4px', pointerEvents: 'none',
+        }}>
+          🌱 {runSeed.code}
+        </div>
       )}
       {resetting && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 200, pointerEvents: 'none' }} />

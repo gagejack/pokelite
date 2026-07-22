@@ -29,7 +29,7 @@ const MOBILE_CARD_H = 640
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
@@ -320,14 +320,14 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
   const defeatOverlay = battleResult === 'loss' ? (
-    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} />
+    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} />
   ) : null
 
   // Victory overlay — centered "Victory!" + Continue popup. Skipped entirely
   // when auto mode is on (the auto-close effect continues automatically), so no
   // popup flashes before the battle closes.
   const victoryOverlay = (battleResult === 'win' && !autoClose) ? (
-    <VictoryScreen dark={dark} onContinue={handleContinue} />
+    <VictoryScreen dark={dark} onContinue={handleContinue} seedCode={seedCode} />
   ) : null
 
   // ── MOBILE layout ──
@@ -465,6 +465,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           Victory!
         </span>
       )}
+      {battleResult === 'win' && <SeedCodeChip code={seedCode} dark={dark} />}
 
       {/* 960×540 battle card */}
       <div style={{
@@ -735,10 +736,60 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   )
 }
 
+// Copyable seed-code chip shown on defeat/victory for seeded runs. Renders
+// nothing when there's no code (normal, unseeded runs).
+function SeedCodeChip({ code, dark }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef(null)
+  // Clear a pending "Copied!" reset if the chip unmounts (defeat/victory
+  // overlays unmount when the player taps Play Again / Continue / Main Menu).
+  useEffect(() => () => clearTimeout(timerRef.current), [])
+  if (!code) return null
+  const copy = () => {
+    const done = () => {
+      setCopied(true)
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1200)
+    }
+    // navigator.clipboard is undefined on non-secure origins (e.g. testing the
+    // dev build over http on a phone at a LAN IP), so fall back to execCommand.
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(fallbackCopy)
+    } else {
+      fallbackCopy()
+    }
+    function fallbackCopy() {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = code
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        done()
+      } catch { /* clipboard unavailable — code is still visible to copy manually */ }
+    }
+  }
+  return (
+    <button onClick={copy} title="Copy seed"
+      style={{
+        fontFamily: 'Orange Kid', fontSize: '14px',
+        color: dark ? '#DBDBDB' : '#333333',
+        border: dark ? '2px solid #121212' : '2px solid #444444',
+        backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
+        padding: '4px 10px', cursor: 'pointer',
+      }}>
+      🌱 {copied ? 'Copied!' : code}
+    </button>
+  )
+}
+
 // Shown when the player is defeated: the final team as a 2×3 card grid, with a
 // Play Again button below. Replaces the in-card "Play Again" button so the
 // battle card itself keeps all its space for the roster.
-function DefeatScreen({ roster, dark, onRestart, onMainMenu }) {
+function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   // Light theme keeps DARK grey strokes/shadows — the lighter #666 wash out
@@ -765,6 +816,7 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu }) {
         <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: '#ef4444', textShadow: '2px 2px 0 #000' }}>
           Defeated...
         </span>
+        <SeedCodeChip code={seedCode} dark={dark} />
 
         {/* 2 columns × 3 rows of the final team. */}
         <div style={{
@@ -838,7 +890,7 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu }) {
 // Shown on a win — a centered "Victory!" + Continue popup over the dimmed
 // battle card (mirrors DefeatScreen). When auto mode is on the battle
 // auto-continues and this never appears.
-function VictoryScreen({ dark, onContinue }) {
+function VictoryScreen({ dark, onContinue, seedCode }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const borderStyle = dark ? '2px solid #121212' : '2px solid #444444'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #444444'
@@ -862,6 +914,7 @@ function VictoryScreen({ dark, onContinue }) {
         <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: '#22c55e', textShadow: '2px 2px 0 #000' }}>
           Victory!
         </span>
+        <SeedCodeChip code={seedCode} dark={dark} />
         <button
           onClick={onContinue}
           style={{
