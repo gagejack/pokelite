@@ -47,6 +47,9 @@ npm run build:dex  # regenerate public/data/pokedex.json + evolutions.json
 - Numeric balance knobs (odds, budgets, tier powers, item multipliers, XP, heal %s) live in `src/game/balance.js` (the `BALANCE` object) — tune there, not inline. The live per-region damage sliders are separate (`src/lib/regionBalance.js` + Supabase).
 - Seeded-run RNG: all sim randomness flows through `src/game/rng.js` (seedable);
   shareable seed codes in `src/game/seed.js`. Never reorder rng() calls.
+- Daily challenge (2.3 Phase 2): date→region+seed derivation in
+  `src/game/dailyDerive.js` (pure) + `src/lib/daily.js` (queries); attempts in
+  the `daily_attempts` table (see `supabase/daily_attempts.sql`, run manually).
 - Mobile layout is a top priority — design mobile-first, then scale up to desktop
 
 ## Important Stuff

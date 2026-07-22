@@ -105,7 +105,12 @@ the region-select screen. Also the foundation for section 4 tooling.
 
 > ✅ Phase 1 shipped (2026-07-21): deterministic seeded runs + shareable
 > KANTO-7Q2 codes (rng.js/seed.js, custom-seed input, seed shown on
-> defeat/victory + map badge). Phase 2 (daily challenge + leaderboard) pending.
+> defeat/victory + map badge).
+
+> ✅ Phase 2 shipped (2026-07-22): daily challenge + leaderboard
+> (daily_attempts table, src/lib/daily.js, DailyChallenge modal, Daily button
+> on region-select; rotating region + date-seeded run, 10 attempts / first 3
+> scored, ranked by maps then time).
 
 ### 2.4 Reroll tokens for offers
 Item and catch offers are take-it-or-leave-it; a bad spread feels like a wasted

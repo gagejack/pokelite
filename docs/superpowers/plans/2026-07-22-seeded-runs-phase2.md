@@ -130,7 +130,10 @@ export function hashDateToSeed(dateStr) {
   }
   h = Math.imul(h ^ (h >>> 16), 2246822507)
   h = Math.imul(h ^ (h >>> 13), 3266489909)
-  return (h ^= h >>> 16) >>> 0
+  // Split finalizer (not `return (h ^= h >>> 16) >>> 0`): the compound
+  // assignment inside a return trips eslint no-useless-assignment.
+  h ^= h >>> 16
+  return h >>> 0
 }
 
 // Region for the day: rotate through the playable list by day index.
