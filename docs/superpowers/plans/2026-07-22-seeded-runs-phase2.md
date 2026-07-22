@@ -16,7 +16,7 @@
 - **Attempts:** up to **10** per user per `daily_date`. An attempt row is written **only at run-end** (death or clear) — abandoning mid-run does not consume an attempt.
 - **Start-date submission:** the daily's `daily_date` is captured at run **start** (already in App's `dailyDate` ref) and used at submit time, so a run crossing UTC midnight or resumed later still counts for the day it began.
 - **UTC day** = `new Date().toISOString().slice(0, 10)` ("YYYY-MM-DD"). Daily rolls over at 00:00 UTC globally.
-- **Region rotation:** daily region = `playableRegions[dayNumber % playableRegions.length]` where `playableRegions = regionNames({ playableOnly: true })` and `dayNumber` = whole days since a fixed epoch.
+- **Region rotation:** daily region = `playableRegions[dayNumber % playableRegions.length]` where `playableRegions = regionNames({ playableOnly: true })` and `dayNumber` = whole days since a fixed epoch. **Only Kanto + Unova are currently playable** (`hoenn.js`/`sinnoh.js` have `maps: []`), so the daily alternates between two regions until more ship — expected, not a bug. Task 1's test uses a 4-region mock list intentionally (pure-function test, not the live list).
 - **Leaderboard names:** denormalized — `username` is stored on each attempt row at submit time (daily boards reset, so staleness is a non-issue).
 - **`seed.js` stays a leaf module** (imports nothing). Daily derivation that needs the region list lives in `src/lib/daily.js` (app-side), NOT in `seed.js`.
 - Run `npm run build` and `npm run lint` after each task; both clean (lint baseline is 46 pre-existing problems — add none).
@@ -31,9 +31,11 @@
 - `src/game/dailyDerive.js` — **leaf module**, pure: `hashDateToSeed(dateStr)`, `dayNumber(dateStr)`, `pickDailyRegion(dateStr, regionList)`, `msUntilNextUtcDay(now)`. Imports nothing (so it's Node-testable and can't pull in region assets).
 - `src/game/dailyScore.js` — **leaf module**, pure scoring reducers: `bestOfFirst3(rows)`, `rankLeaderboard(rows)`, and the `MAX_ATTEMPTS`/`SCORED_ATTEMPTS` constants. Imports nothing, so the highest-risk logic is Node-testable in isolation. (`daily.js` re-exports these so callers have one import site.)
 - `src/lib/daily.js` — Supabase query layer + `dailyFor(dateStr)` (composes `dailyDerive` + `regionNames` + `seed.js`). App-side (imports regionRegistry/supabase — NOT Node-importable, which is why the pure reducers live in `dailyScore.js`).
+- `src/components/SeedCodeChip.jsx` — the tap-to-copy seed chip, **extracted** from `BattleCard.jsx` so the daily modal can show today's code (spec §3: tap-to-copy applies to the Daily view). Extraction (not a direct import from BattleCard) keeps the initial chunk lean: BattleCard pulls in MoveAnimation + 78 animation sheets + framer-motion, which App deliberately lazy-loads via NodeMap.
 - `src/components/DailyChallenge.jsx` — the daily modal.
 
 **Modified:**
+- `src/components/BattleCard.jsx` — remove the local `SeedCodeChip` definition; import it from `./SeedCodeChip` (one-line change, no behavior change).
 - `src/components/RegionSelect.jsx` — Daily Challenge button (left of the Custom Seed row); accept `onOpenDaily` prop.
 - `src/App.jsx` — daily modal state, `startDailyRun`, daily submission inside `recordRunEnd`, pass `onOpenDaily` + render `<DailyChallenge>`.
 
@@ -388,7 +390,7 @@ git commit -m "feat(daily): pure scoring reducers (best-of-first-3, leaderboard 
 - Produces (in addition to re-exporting the Task 3a names):
   - `todayUtc(): string` — `new Date().toISOString().slice(0,10)`.
   - `dailyFor(dateStr: string): { date, region, seed, code }` — `region = pickDailyRegion(dateStr, regionNames({playableOnly:true}))`, `seed = hashDateToSeed(dateStr)`, `code = encodeSeed(region, seed)`.
-  - `getTodayAttempts(userId, dateStr): Promise<{ attemptNo, used, best }>` — queries the day's rows for one user; `used` = count, `attemptNo` = `min(used + 1, MAX_ATTEMPTS)`, `best` = `bestOfFirst3`.
+  - `getTodayAttempts(userId, dateStr): Promise<{ used, best }>` — queries the day's rows for one user; `used` = count, `best` = `bestOfFirst3`. (No `attemptNo` field — the modal computes the X/10 display inline from `used`.)
   - `submitAttempt({ userId, username, dailyDate, region, maps_cleared, elapsed_ms }): Promise<{ ok } | { error }>` — computes the next `attempt_no` from the day's row count; no-op `{ ok: true, skipped: true }` at `MAX_ATTEMPTS`; inserts one row.
   - `getLeaderboard(dateStr, limit = 20): Promise<Array>` — queries the day's rows, returns `rankLeaderboard(...).slice(0, limit)`.
 
@@ -434,11 +436,10 @@ export async function getTodayAttempts(userId, dateStr) {
     .select('attempt_no, maps_cleared, elapsed_ms')
     .eq('user_id', userId)
     .eq('daily_date', dateStr)
-  if (error || !data) return { attemptNo: 1, used: 0, best: null }
+  if (error || !data) return { used: 0, best: null }
   const used = data.length
   return {
     used,
-    attemptNo: Math.min(used + 1, MAX_ATTEMPTS),
     best: bestOfFirst3(data),
   }
 }
@@ -504,6 +505,8 @@ git commit -m "feat(daily): daily query layer (dailyFor, attempts, leaderboard)"
 
 **Note:** `recordRunEnd` already fires at every run end and already early-returns for guests — the daily submit slots in right after the existing `runs` insert, guarded by `runMode === 'daily'`.
 
+**Note (Play Again consumes an attempt):** `restartRun` keeps `runMode === 'daily'` and `dailyDate`, so "Play Again" after a daily defeat submits ANOTHER attempt at the next run-end (capped at `MAX_ATTEMPTS` by `submitAttempt`; `runStartedAt` resets per replay, so each attempt gets its own elapsed time). Intended per spec §5 (every finished daily-mode run is an attempt) — don't "fix" it.
+
 - [ ] **Step 1: Add imports**
 
 In `src/App.jsx`, add near the other `src/lib` imports:
@@ -551,7 +554,7 @@ In `recordRunEnd`, after the existing `await supabase.from('runs').insert(payloa
     if (runMode === 'daily' && dailyDate.current) {
       const { data: prof } = await supabase
         .from('profiles').select('username').eq('id', user.id).maybeSingle()
-      await submitAttempt({
+      const res = await submitAttempt({
         userId: user.id,
         username: prof?.username ?? null,
         dailyDate: dailyDate.current,
@@ -559,6 +562,9 @@ In `recordRunEnd`, after the existing `await supabase.from('runs').insert(payloa
         maps_cleared: mapsCleared.current,
         elapsed_ms: Math.max(0, Date.now() - (runStartedAt.current || Date.now())),
       })
+      // Surface failures (e.g. a two-tab unique-index rejection) — same pattern
+      // as recordCatch/recordBadgeEarned; never blocks the run.
+      if (res?.error) console.warn('daily submitAttempt failed:', res.error)
     }
 ```
 
@@ -581,14 +587,34 @@ git commit -m "feat(app): daily-mode run launch + run-end attempt submission"
 ### Task 5: DailyChallenge modal (`src/components/DailyChallenge.jsx`)
 
 **Files:**
+- Create: `src/components/SeedCodeChip.jsx` — extract the existing chip from `BattleCard.jsx` (verbatim move, no behavior change).
+- Modify: `src/components/BattleCard.jsx` — delete the local `SeedCodeChip` definition; add `import SeedCodeChip from './SeedCodeChip'`.
 - Create: `src/components/DailyChallenge.jsx`
 - Modify: `src/App.jsx` — render `<DailyChallenge>` when `dailyOpen`.
 
 **Interfaces:**
-- Consumes: `dailyFor`, `getTodayAttempts`, `getLeaderboard`, `MAX_ATTEMPTS`, `SCORED_ATTEMPTS`, `todayUtc` from `src/lib/daily.js` (Task 3b); `msUntilNextUtcDay` from `src/game/dailyDerive.js`; props `user`, `onPlay` (= `startDailyRun`), `onClose`.
-- Produces: the daily modal UI. Logged-out → "Sign in to play the daily" prompt (no Play).
+- Consumes: `dailyFor`, `getTodayAttempts`, `getLeaderboard`, `MAX_ATTEMPTS`, `SCORED_ATTEMPTS`, `todayUtc` from `src/lib/daily.js` (Task 3b); `msUntilNextUtcDay` from `src/game/dailyDerive.js`; `SeedCodeChip` from `./SeedCodeChip`; props `user`, `onPlay` (= `startDailyRun`), `onClose`.
+- Produces: the daily modal UI. Logged-out → "Sign in to play the daily" prompt (no Play). Shows today's seed code (tap-to-copy) per spec §3 ("Every displayed seed code is tap-to-copy … and the Daily view").
 
-- [ ] **Step 1: Create the component**
+- [ ] **Step 1: Extract SeedCodeChip**
+
+Cut the `function SeedCodeChip({ code, dark }) { … }` definition out of `src/components/BattleCard.jsx` (line ~741) into a new `src/components/SeedCodeChip.jsx`, adding the React import it needs and a default export:
+
+```jsx
+import { useState, useEffect, useRef } from 'react'
+
+// Tap-to-copy seed code chip (🌱 KANTO-7Q2 → "Copied!"). Shared by the defeat
+// and victory screens (BattleCard) and the Daily view — extracted from
+// BattleCard so importing it here doesn't drag the battle stack (MoveAnimation
+// sheets, framer-motion) into the initial chunk, which App lazy-loads via NodeMap.
+export default function SeedCodeChip({ code, dark }) {
+  // …verbatim body from BattleCard.jsx…
+}
+```
+
+In `src/components/BattleCard.jsx`, delete the local definition and add `import SeedCodeChip from './SeedCodeChip'` with the other imports. (BattleCard already imports `useState`/`useRef`/`useEffect` for its own use — leave its React import as-is unless the chip was their only consumer; check before removing any name.)
+
+- [ ] **Step 2: Create the component**
 
 Create `src/components/DailyChallenge.jsx`:
 
@@ -597,6 +623,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { dailyFor, getTodayAttempts, getLeaderboard, MAX_ATTEMPTS, SCORED_ATTEMPTS, todayUtc } from '../lib/daily.js'
 import { msUntilNextUtcDay } from '../game/dailyDerive.js'
+import SeedCodeChip from './SeedCodeChip'
 
 // Format ms as "Hh Mm" for the reset countdown.
 function fmtCountdown(ms) {
@@ -615,7 +642,7 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
   const { dark } = useTheme()
   const date = todayUtc()
   const daily = dailyFor(date)
-  const [attempts, setAttempts] = useState(null)   // { used, attemptNo, best } | null
+  const [attempts, setAttempts] = useState(null)   // { used, best } | null
   const [board, setBoard] = useState([])
   const [countdown, setCountdown] = useState(msUntilNextUtcDay())
 
@@ -644,7 +671,10 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
 
   return (
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 130, backgroundColor: 'rgba(0,0,0,0.82)',
+      // zIndex 200: must clear Layout's navbar (150) so nav buttons can't be
+      // clicked "through" the modal (a Home tap would navigate away and leave
+      // this modal open over a stale screen). Matches SettingsPanel's layer.
+      position: 'fixed', inset: 0, zIndex: 200, backgroundColor: 'rgba(0,0,0,0.82)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
@@ -658,6 +688,10 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
         <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
           {date} · {daily.region} · resets in {fmtCountdown(countdown)}
         </span>
+        {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it too). */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <SeedCodeChip code={daily.code} dark={dark} />
+        </div>
 
         {!user ? (
           <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center', padding: '12px' }}>
@@ -731,7 +765,7 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
 }
 ```
 
-- [ ] **Step 2: Render it from App**
+- [ ] **Step 3: Render it from App**
 
 In `src/App.jsx`, add the modal render (near the other top-level overlays, e.g. after the `screen` blocks, before the closing `</Suspense>`). It renders whenever `dailyOpen`:
 
@@ -751,18 +785,18 @@ And add the import at the top of `src/App.jsx`:
 import DailyChallenge from './components/DailyChallenge'
 ```
 
-- [ ] **Step 3: Verify build/lint**
+- [ ] **Step 4: Verify build/lint**
 
 ```
 npm run build   # clean
 npm run lint    # no new problems
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/App.jsx src/components/DailyChallenge.jsx
-git commit -m "feat(daily): DailyChallenge modal (attempts, best, leaderboard, countdown)"
+git add src/App.jsx src/components/DailyChallenge.jsx src/components/SeedCodeChip.jsx src/components/BattleCard.jsx
+git commit -m "feat(daily): DailyChallenge modal (attempts, best, leaderboard, countdown, seed chip)"
 ```
 
 ---
@@ -841,7 +875,11 @@ git commit -m "feat(region-select): Daily Challenge button opens the daily modal
 ```
 node scripts/verify-daily-derive.mjs   # ALL PASS
 node scripts/verify-daily-score.mjs    # ALL PASS
-node scripts/verify-map-seed.mjs       # ALL PASS (Phase 1 regression — unaffected)
+node scripts/verify-rng.mjs            # ALL PASS (Phase 1 regression)
+node scripts/verify-seed.mjs           # ALL PASS (Phase 1 regression)
+node scripts/verify-determinism.mjs    # ALL PASS (Phase 1 regression)
+node scripts/verify-resume-rng.mjs     # ALL PASS (Phase 1 regression)
+node scripts/verify-map-seed.mjs       # ALL PASS (Phase 1 regression)
 npm run build && npm run lint          # clean, no new problems
 ```
 
@@ -855,7 +893,7 @@ Confirm the operator has run `supabase/daily_attempts.sql` in the Supabase SQL e
 
 - [ ] **Step 3: Update docs**
 
-In `Experimental_Features.md`, under `### 2.3 Seeded runs / daily seed`, update the Phase-1 blockquote's trailing "Phase 2 … pending" line to:
+In `Experimental_Features.md`, under `### 2.3 Seeded runs / daily seed`: the Phase-1 blockquote's last line is currently `> defeat/victory + map badge). Phase 2 (daily challenge + leaderboard) pending.` — delete ONLY the trailing sentence `Phase 2 (daily challenge + leaderboard) pending.` (keep the rest of the Phase-1 entry intact, ending at `> defeat/victory + map badge).`), then append a NEW blockquote below it:
 
 ```
 > ✅ Phase 2 shipped (2026-07-22): daily challenge + leaderboard
@@ -888,7 +926,7 @@ git commit -m "docs: mark 2.3 seeded-runs Phase 2 shipped"
 - Pure scoring reducers (best-of-first-3, leaderboard rank), Node-testable → Task 3a (`dailyScore.js`) ✅
 - `daily_attempts` table: cols, `attempt_no` CHECK 1..10, unique `(user_id,daily_date,attempt_no)`, RLS (authed select / own-insert) → Task 2 ✅
 - `src/lib/daily.js`: `getTodayAttempts`, `submitAttempt` (start-date, ≤10 cap), `getLeaderboard` → Task 3b; best-of-first-3, rank by maps then time → Task 3a ✅
-- Daily view: today's region+date, Play, countdown to next UTC day, attempt tracker (X/10, first 3 scored), your best, leaderboard (rank/name/maps/time, self-highlight), login gate → Task 5 ✅
+- Daily view: today's region+date, Play, countdown to next UTC day, attempt tracker (X/10, first 3 scored), your best, **today's seed code (tap-to-copy, spec §3)**, leaderboard (rank/name/maps/time, self-highlight), login gate → Task 5 ✅
 - Daily button on region-select → Task 6 ✅
 - Daily-mode launch + run-end submission under start-date (amendment 2) → Task 4 ✅
 - Denormalized username (decision) → Task 4 fetch + Task 2 column ✅
@@ -898,6 +936,6 @@ git commit -m "docs: mark 2.3 seeded-runs Phase 2 shipped"
 
 **Placeholder scan:** every code step contains complete code; SQL is complete and idempotent; no TBD/TODO. Task 2 has no unit test by nature (live SQL) — flagged explicitly with a schema read-through as its check, not a hidden gap.
 
-**Type consistency:** `dailyFor` returns `{ date, region, seed, code }` — consumed consistently in Task 4 (`startDailyRun`) and Task 5 (modal). `submitAttempt` param shape `{ userId, username, dailyDate, region, maps_cleared, elapsed_ms }` matches Task 4's call. `bestOfFirst3` → `{ maps_cleared, elapsed_ms } | null` consumed by `getTodayAttempts` and the modal's "Your best". `getTodayAttempts` → `{ used, attemptNo, best }` matches the modal. `MAX_ATTEMPTS`/`SCORED_ATTEMPTS` exported from `daily.js`, imported by the modal. `runMode === 'daily'` and `dailyDate.current` are the Phase-1 fields (already exist).
+**Type consistency:** `dailyFor` returns `{ date, region, seed, code }` — consumed consistently in Task 4 (`startDailyRun`) and Task 5 (modal, incl. the seed chip). `submitAttempt` param shape `{ userId, username, dailyDate, region, maps_cleared, elapsed_ms }` matches Task 4's call. `bestOfFirst3` → `{ maps_cleared, elapsed_ms } | null` consumed by `getTodayAttempts` and the modal's "Your best". `getTodayAttempts` → `{ used, best }` matches the modal (which computes the X/10 display from `used`). `MAX_ATTEMPTS`/`SCORED_ATTEMPTS` exported from `daily.js`, imported by the modal. `runMode === 'daily'` and `dailyDate.current` are the Phase-1 fields (already exist).
 
 **One cross-task note for the implementer:** `startDailyRun` (Task 4) and the `<DailyChallenge>` render (Task 5) both live in App.jsx and reference `dailyOpen`/`setDailyOpen` (added in Task 4) — implement Task 4 before Task 5. Task 6's App edit adds `onOpenDaily` referencing `setDailyOpen` (Task 4) — also after Task 4. The task order already reflects this.
