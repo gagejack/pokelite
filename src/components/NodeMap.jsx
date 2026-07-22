@@ -10,6 +10,7 @@ import PowerUpgradeNode from './PowerUpgradeNode'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
+import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
@@ -360,7 +361,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -375,10 +376,17 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // Use the restored layout when resuming a saved run (its generate() is random,
   // so re-generating would give a DIFFERENT map). Only reuse it if it's for this
   // same map index, otherwise generate fresh.
+  //
+  // For a SEEDED run, generate the map from a per-map derived seed so it is
+  // reproducible regardless of how many shared-stream rng() calls happened
+  // before (the starter's async shiny roll, prior battles, etc.). Unseeded runs
+  // generate straight off the shared Math.random stream as before.
   const mapData = useMemo(
-    () => (initialMapData && initialMapData.mapIndex === mapIndex)
-      ? initialMapData
-      : mapConfig.generate(starter),
+    () => {
+      if (initialMapData && initialMapData.mapIndex === mapIndex) return initialMapData
+      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter))
+      return mapConfig.generate(starter)
+    },
     [mapConfig] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const edges = mapConfig.edges

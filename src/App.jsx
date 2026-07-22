@@ -490,6 +490,7 @@ export default function App() {
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           seedCode={runSeed?.code}
+          seed={runSeed?.seed}
         />
       )}
       {screen === 'nodemap' && runSeed && (
