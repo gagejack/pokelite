@@ -11,8 +11,6 @@ const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
-// getRngState/setRngState are consumed by the run-snapshot save/load wiring (Task 5).
-// eslint-disable-next-line no-unused-vars
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
@@ -29,8 +27,6 @@ export default function App() {
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [runSeed, setRunSeed] = useState(null)   // { region, seed, code } or null
-  // runMode is read by the run-snapshot save/load wiring (Task 5).
-  // eslint-disable-next-line no-unused-vars
   const [runMode, setRunMode] = useState('normal')
   const runStartedAt = useRef(0)
   const dailyDate = useRef(null)                  // Phase 2 (daily) sets this
@@ -148,6 +144,11 @@ export default function App() {
       },
       map: mapProgress.current, // { mapData, clearedNodes, currentNode }
       savedAt: Date.now(),
+      runSeed,
+      runMode,
+      runStartedAt: runStartedAt.current,
+      dailyDate: dailyDate.current,
+      rngState: getRngState(),   // null for normal runs
     }
   }
 
@@ -180,6 +181,13 @@ export default function App() {
     setRoster(run.roster ?? [])
     setBag(run.bag ?? [])
     setMapIndex(run.mapIndex ?? 0)
+    setRunSeed(run.runSeed ?? null)
+    setRunMode(run.runMode ?? 'normal')
+    runStartedAt.current = run.runStartedAt ?? Date.now()
+    dailyDate.current = run.dailyDate ?? null
+    // Restore the exact RNG position so resumed rolls match an uninterrupted run.
+    if (run.rngState != null) setRngState(run.rngState)
+    else clearRng()
     mapsCleared.current = run.stats?.mapsCleared ?? 0
     pokemonCaught.current = run.stats?.pokemonCaught ?? 0
     pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
