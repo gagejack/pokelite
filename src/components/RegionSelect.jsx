@@ -183,6 +183,12 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           <input
             value={seedInput}
             onChange={e => { setSeedInput(e.target.value); setSeedError(null) }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const res = onCustomSeed?.(seedInput)
+                if (res?.error) setSeedError(res.error)
+              }
+            }}
             placeholder="KANTO-7Q2"
             style={{
               fontFamily: 'Orange Kid', fontSize: '14px', padding: '6px 8px',
@@ -192,6 +198,7 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             }}
           />
           <button
+            type="button"
             onClick={() => {
               const res = onCustomSeed?.(seedInput)
               if (res?.error) setSeedError(res.error)
