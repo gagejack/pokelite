@@ -84,6 +84,9 @@ Responsibilities:
 Cross-cutting:
 - **CORS:** return CORS headers (allow the site origin; handle the `OPTIONS`
   preflight) so the browser can invoke it.
+- **JWT gate off:** the function is deployed with `--no-verify-jwt` because
+  logged-out users must be able to call it (login precedes auth). It
+  authenticates internally via GoTrue, so the platform gate is redundant here.
 - **Secrets:** `SERVICE_ROLE_KEY` set via `supabase secrets set` — lives only in
   the function's environment, never in client code. `SUPABASE_URL` / anon key
   are non-secret (anon key already ships in the client).
