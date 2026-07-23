@@ -50,7 +50,8 @@ serve(async (req) => {
     .maybeSingle()
 
   // 2. Verify password + mint session via GoTrue's real token endpoint.
-  let session: unknown = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let session: any = null
   if (data?.email) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
@@ -62,5 +63,11 @@ serve(async (req) => {
 
   // 3. Identical generic failure for unknown-user AND wrong-password.
   if (!session) return json(401, GENERIC)
-  return json(200, session) // tokens only — no email
+
+  // Return ONLY the token fields. GoTrue's raw session embeds a `user` object
+  // (including the caller's own email); stripping it keeps the response body
+  // tokens-only. (The access_token JWT still carries the standard email claim —
+  // unavoidable for any Supabase login — but no email sits in plain JSON.)
+  const { access_token, refresh_token, expires_in, expires_at, token_type } = session
+  return json(200, { access_token, refresh_token, expires_in, expires_at, token_type })
 })

@@ -208,8 +208,13 @@ revoke execute on function public.get_email_for_username(text) from anon, authen
 3. **Unknown username:** *identical* generic error and status; no email.
 4. **Oracle closed:** calling `get_email_for_username` from the browser console
    returns a permission error (grant revoked).
-5. **No email on the wire:** inspect the Network tab across all three login
-   outcomes — confirm no email field in any response.
+5. **No email in the response body:** inspect the Network tab across all three
+   login outcomes — confirm no `email` field in any JSON response body. (The
+   success `access_token` is a JWT that, when base64-decoded, carries the
+   standard `email` claim — this is unavoidable for *any* Supabase login,
+   including the old flow, and is not a leak the client can't already see about
+   itself. The response *body* is tokens-only: the function strips GoTrue's
+   `user` object.)
 6. **Register unaffected:** new account creation still works.
 
 ## Deploy environment & sequencing (IMPORTANT)
