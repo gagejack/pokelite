@@ -28,3 +28,6 @@ dist-ssr
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Nested plugin repo, not part of the game
+i-have-adhd/
