@@ -10,6 +10,7 @@ export default function LoginForm({ onAuthSuccess }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('') // register only
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('') // register only
   const [showRegister, setShowRegister] = useState(false)
   const [authError, setAuthError] = useState(null)
   const [authLoading, setAuthLoading] = useState(false)
@@ -53,6 +54,7 @@ export default function LoginForm({ onAuthSuccess }) {
   async function handleRegister() {
     setAuthError(null)
     if (!username.trim() || !email.trim() || !password) { setAuthError('Enter username, email and password'); return }
+    if (password !== confirmPassword) { setAuthError('Passwords do not match'); return }
     setAuthLoading(true)
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password })
     if (signUpError) { setAuthLoading(false); setAuthError(signUpError.message); return }
@@ -122,6 +124,21 @@ export default function LoginForm({ onAuthSuccess }) {
           focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
         style={{ fontSize: '12px' }}
       />
+      {showRegister && (
+        <input
+          type="password"
+          placeholder="Confirm Password"
+          value={confirmPassword}
+          onChange={e => setConfirmPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleRegister()}
+          autoComplete="new-password"
+          className="w-full px-2 py-1 rounded-none outline-none
+            bg-white dark:bg-[#1a1a1a] text-black dark:text-white
+            placeholder-[#999] border border-[#bbb] dark:border-[#444]
+            focus:ring-2 focus:ring-[#666666] dark:focus:ring-[#555]"
+          style={{ fontSize: '12px' }}
+        />
+      )}
       {authError && (
         <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: '#ef4444', textAlign: 'center' }}>
           {authError}
@@ -158,7 +175,7 @@ export default function LoginForm({ onAuthSuccess }) {
               {authLoading ? '...' : 'Create Account'}
             </button>
             <button
-              onClick={() => { setShowRegister(false); setAuthError(null) }}
+              onClick={() => { setShowRegister(false); setAuthError(null); setConfirmPassword('') }}
               disabled={authLoading}
               className="flex-1 py-1 font-semibold bg-[#888] hover:bg-[#777] text-white transition-colors disabled:opacity-50"
               style={{ fontSize: '12px' }}
