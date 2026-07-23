@@ -209,16 +209,34 @@ revoke execute on function public.get_email_for_username(text) from anon, authen
    outcomes — confirm no email field in any response.
 6. **Register unaffected:** new account creation still works.
 
-## Deploy steps (operator)
+## Deploy environment & sequencing (IMPORTANT)
 
-1. `supabase functions deploy login-with-username`
-2. `supabase secrets set SERVICE_ROLE_KEY=<service_role key>` (from project settings)
-3. Run `supabase/revoke_email_rpc.sql` in the SQL editor.
-4. Ship the client change.
+The three pieces deploy through **three different mechanisms**, and they are NOT
+atomic:
 
-(Order matters: deploy the function and revoke *after* the client is ready to
-call the function, or do the revoke last so login isn't briefly broken. The
-implementation plan will sequence this.)
+- **Client** (`LoginForm.jsx`) → auto-deploys via **GitHub → Vercel** on push.
+- **Edge Function** → deployed manually with the **Supabase CLI**
+  (`supabase functions deploy`) — Vercel does not touch it.
+- **SQL revoke** → pasted into the **Supabase dashboard SQL editor** (same as
+  `daily_attempts.sql`).
+
+**Correct order (so login never breaks in a gap):**
+
+1. **Deploy the Edge Function first** (CLI) and set its `SERVICE_ROLE_KEY`
+   secret. At this point the function exists but nothing calls it yet — no user
+   impact.
+2. **Merge/push the client change** → Vercel auto-deploys. Now the app calls the
+   Edge Function for login. The old RPC is *still granted*, so even mid-rollout
+   (some users on old bundle, some on new) **both** paths work. No breakage.
+3. **Only after the new client is confirmed live and working**, run the SQL
+   revoke. This kills the old oracle. Because step 2 already moved everyone to
+   the Edge Function, revoking the RPC affects no working login path.
+
+Rollback at any step: re-grant the RPC and/or revert the client commit (Vercel
+redeploys the previous bundle). The function can stay deployed idle.
+
+The implementation plan spells out every exact CLI command (install → login →
+link → secret → deploy).
 
 ## Rollback
 
