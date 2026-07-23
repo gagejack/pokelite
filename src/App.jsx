@@ -176,6 +176,19 @@ export default function App() {
     }
   }
 
+  // Auto-save the run on every map-progress change so a page refresh (not just
+  // hitting Home) can restore it. Fire-and-forget: never blocks gameplay, and a
+  // failed write just means the last node isn't persisted. A finished run is
+  // never saved. Called from NodeMap's onProgressChange AFTER mapProgress is set.
+  function persistProgress() {
+    if (runEnded.current) return
+    const snapshot = buildRunSnapshot()
+    if (!snapshot) return
+    savedRunData.current = snapshot
+    setHasSavedRun(true)
+    saveRun(snapshot, user) // fire-and-forget
+  }
+
   // Home mid-run: persist a snapshot (account if logged in, else localStorage),
   // then return to the menu where "Resume Run" will appear. A finished run
   // (win/loss) is never saved as resumable.
@@ -523,7 +536,7 @@ export default function App() {
           onMapCleared={handleMapCleared}
           onBadgeEarned={recordBadgeEarned}
           onRunEnd={recordRunEnd}
-          onProgressChange={p => { mapProgress.current = p }}
+          onProgressChange={p => { mapProgress.current = p; persistProgress() }}
           initialMapData={mapProgress.current?.mapData}
           initialClearedNodes={mapProgress.current?.clearedNodes}
           initialCurrentNode={mapProgress.current?.currentNode}
