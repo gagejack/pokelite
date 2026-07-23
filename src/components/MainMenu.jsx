@@ -80,7 +80,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
             className="hover:scale-105 active:scale-95 transition-transform duration-150"
             style={{
               width: '320px', maxWidth: '100%', height: '40px',
-              backgroundColor: '#22c55e',
+              backgroundColor: '#3b82f6',
               border: borderStyle,
               boxShadow: shadowStyle,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
