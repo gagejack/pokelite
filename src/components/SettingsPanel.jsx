@@ -1,11 +1,19 @@
 import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
+import { supabase } from '../lib/supabase'
 
 const SPEEDS = [1, 1.5, 2, 2.5, 3]
 
-export default function SettingsPanel({ onClose }) {
+export default function SettingsPanel({ onClose, username }) {
   const { dark, cards, toggle } = useTheme()
   const { battleSpeed, setSpeed } = useSettings()
+
+  // Sign out via Supabase; onAuthStateChange (Layout/App) clears the session
+  // everywhere, so we just close the panel afterward.
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    onClose()
+  }
 
   const borderStyle = cards ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = cards ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
@@ -97,6 +105,23 @@ export default function SettingsPanel({ onClose }) {
             ))}
           </div>
         </div>
+
+        {/* Logout — only when signed in. */}
+        {username && (
+          <div style={{ padding: '0 14px 10px' }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                fontFamily: 'Upheaval', fontSize: '10px', color: '#fff',
+                border: borderStyle, backgroundColor: '#ef4444',
+                padding: '8px', cursor: 'pointer',
+              }}
+            >
+              Log Out{username ? ` (${username})` : ''}
+            </button>
+          </div>
+        )}
 
         {/* Close */}
         <div style={{ padding: '0 14px 14px' }}>
