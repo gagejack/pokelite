@@ -5,7 +5,7 @@ import LoginForm from './LoginForm'
 import MainPlayButton from '../assets/collage.webp'
 import { supabase } from '../lib/supabase'
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, pokedexOpen, setPokedexOpen }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const [loggedIn, setLoggedIn] = useState(false)
 
@@ -55,6 +55,22 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, pokedexOpen, s
           >
             <span style={{ fontSize: '26px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>PLAY</span>
           </div>
+        </button>
+
+        {/* Daily Challenge — red box below Play; opens the daily modal (same one
+            reachable from the region-select screen). */}
+        <button
+          onClick={onOpenDaily}
+          className="hover:scale-105 active:scale-95 transition-transform duration-150"
+          style={{
+            width: '320px', maxWidth: '100%', height: '40px',
+            backgroundColor: '#ef4444',
+            border: borderStyle,
+            boxShadow: shadowStyle,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontSize: '22px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>DAILY CHALLENGE</span>
         </button>
 
         {/* Resume Run — same green box as Play, shown only when a run is saved. */}

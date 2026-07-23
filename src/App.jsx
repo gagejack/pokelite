@@ -450,6 +450,7 @@ export default function App() {
           onPlay={() => setScreen('region')}
           hasSavedRun={hasSavedRun}
           onResume={resumeRun}
+          onOpenDaily={() => setDailyOpen(true)}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />

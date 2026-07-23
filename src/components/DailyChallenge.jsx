@@ -4,6 +4,17 @@ import { dailyFor, getTodayAttempts, getLeaderboard, MAX_ATTEMPTS, SCORED_ATTEMP
 import { msUntilNextUtcDay } from '../game/dailyDerive.js'
 import SeedCodeChip from './SeedCodeChip'
 
+// PokéAPI front sprites for the day's two box legendaries (version mascots),
+// keyed by region — the same duo shown on that region's card in RegionSelect.
+const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+const BOX_LEGENDARIES = {
+  Kanto:  [150, 151], // Mewtwo, Mew
+  Johto:  [249, 250], // Lugia, Ho-Oh
+  Hoenn:  [382, 383], // Kyogre, Groudon
+  Sinnoh: [483, 484], // Dialga, Palkia
+  Unova:  [643, 644], // Reshiram, Zekrom
+}
+
 // Format ms as "Hh Mm" for the reset countdown.
 function fmtCountdown(ms) {
   const h = Math.floor(ms / 3600000)
@@ -61,15 +72,34 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
         display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '12px',
         width: '100%', maxWidth: '440px', maxHeight: '90dvh', overflowY: 'auto',
       }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: text, textAlign: 'center' }}>
-          🗓️ Daily Challenge
-        </span>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
-          {date} · {daily.region} · resets in {fmtCountdown(countdown)}
-        </span>
-        {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it too). */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <SeedCodeChip code={daily.code} dark={dark} />
+        {/* Header: title/date/seed form a centered V, so the day's two box
+            legendaries (version mascots) fill the empty space on either side. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+          {(BOX_LEGENDARIES[daily.region]?.[0] != null) ? (
+            <img src={SPRITE(BOX_LEGENDARIES[daily.region][0])} alt="" style={{
+              width: '72px', height: '72px', objectFit: 'contain', imageRendering: 'pixelated',
+              filter: 'drop-shadow(1px 2px 2px rgba(0,0,0,0.5))', flexShrink: 0,
+              transform: 'scaleX(-1)',
+            }} />
+          ) : <div style={{ width: '72px', flexShrink: 0 }} />}
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: text, textAlign: 'center' }}>
+              🗓️ Daily Challenge
+            </span>
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
+              {date} · {daily.region} · resets in {fmtCountdown(countdown)}
+            </span>
+            {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it too). */}
+            <SeedCodeChip code={daily.code} dark={dark} />
+          </div>
+
+          {(BOX_LEGENDARIES[daily.region]?.[1] != null) ? (
+            <img src={SPRITE(BOX_LEGENDARIES[daily.region][1])} alt="" style={{
+              width: '72px', height: '72px', objectFit: 'contain', imageRendering: 'pixelated',
+              filter: 'drop-shadow(1px 2px 2px rgba(0,0,0,0.5))', flexShrink: 0,
+            }} />
+          ) : <div style={{ width: '72px', flexShrink: 0 }} />}
         </div>
 
         {!user ? (
