@@ -17,21 +17,32 @@ export default function LoginForm({ onAuthSuccess }) {
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
 
-  // Login by username: resolve username → email via the secure RPC, then sign in.
+  // Login by username via the login-with-username Edge Function. The email is
+  // resolved + the password verified SERVER-SIDE; only session tokens come back
+  // (no email ever reaches the client). Any failure is a single generic message.
   async function handleLogin() {
     setAuthError(null)
     if (!username.trim() || !password) { setAuthError('Enter username and password'); return }
     setAuthLoading(true)
-    const { data: foundEmail, error: rpcError } = await supabase.rpc('get_email_for_username', { uname: username.trim() })
-    if (rpcError || !foundEmail) {
+
+    const { data, error } = await supabase.functions.invoke('login-with-username', {
+      body: { username: username.trim(), password },
+    })
+
+    // functions.invoke surfaces a non-2xx (our 401) as `error` with data: null.
+    if (error || !data?.access_token) {
       setAuthLoading(false)
       setAuthError('Invalid username or password')
       return
     }
-    const { error } = await supabase.auth.signInWithPassword({ email: foundEmail, password })
+
+    // Establish the session from the tokens the function returned.
+    const { error: sessErr } = await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+    })
     setAuthLoading(false)
-    // Generic message so we don't leak whether the username or password was wrong.
-    if (error) { setAuthError('Invalid username or password'); return }
+    if (sessErr) { setAuthError('Invalid username or password'); return }
     onAuthSuccess?.()
   }
 
