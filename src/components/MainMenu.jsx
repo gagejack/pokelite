@@ -25,13 +25,22 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
       <div style={{
         flex: 1,
+        minHeight: 0,
+        // Scroll if the stacked buttons + login card are taller than the
+        // viewport (e.g. register mode on short phones), so the register/create
+        // button can never end up trapped below the browser's bottom nav bar.
+        // `justifyContent: center` when it fits; the inner wrapper's auto margins
+        // keep it centered while staying fully scrollable on overflow.
+        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
         padding: '16px',
       }}>
+        <div style={{
+          margin: 'auto',   // vertical-centers the stack when short; releases on overflow
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+          width: '100%',
+        }}>
 
         {/* Play button */}
         <button onClick={onPlay} className="hover:scale-105 active:scale-95 transition-transform duration-150 relative" style={{ width: '320px', maxWidth: '100%' }}>
@@ -93,6 +102,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         {/* Auth card — hidden once logged in */}
         {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
 
+        </div>
       </div>
     </Layout>
   )
