@@ -100,8 +100,11 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
             <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
               {date} · {daily.region} · resets in {fmtCountdown(countdown)}
             </span>
-            {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it too). */}
-            <SeedCodeChip code={daily.code} dark={dark} />
+            {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it
+                too). Nudged down a little to sit lower in the header. */}
+            <div style={{ marginTop: '15px' }}>
+              <SeedCodeChip code={daily.code} dark={dark} />
+            </div>
           </div>
 
           {(BOX_LEGENDARIES[daily.region]?.[1] != null) ? (
