@@ -67,6 +67,18 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           style={{ position: 'absolute', top: '5px', left: '5px', width: '18px', height: '18px', imageRendering: 'pixelated', zIndex: 1 }}
         />
       )}
+      {pokemon.shiny && (
+        <span
+          title="Shiny!"
+          style={{
+            position: 'absolute', top: '5px', right: '6px', zIndex: 1,
+            fontFamily: 'Upheaval', fontSize: '10px', color: '#facc15',
+            letterSpacing: '0.5px', textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+          }}
+        >
+          SHINY!
+        </span>
+      )}
       <img
         src={pokemon.sprite}
         alt={pokemon.name}
