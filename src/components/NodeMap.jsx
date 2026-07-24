@@ -96,6 +96,11 @@ function MapSvg({
     py: mapOffsetY + svgY * scaleY,
   })
 
+  // The first reachable node, in render order — carries the tutorial marker so
+  // the first-run coachmark can spotlight a node the player can actually click.
+  const firstReachableNodeId = Object.values(nodePositions)
+    .find(({ node }) => !clearedNodes.has(node.id) && isReachable(node.id))?.node.id
+
   return (
     <div
       ref={mapContainerRef}
@@ -270,6 +275,9 @@ function MapSvg({
       {mapScale > 0 && Object.values(nodePositions).map(({ x, y, node }) => {
         const cleared = clearedNodes.has(node.id)
         const reachable = !cleared && isReachable(node.id)
+        // Tag the first reachable node so the first-run tutorial can spotlight it
+        // ("click here to begin"). Only one node carries the marker.
+        const isTutorialTarget = reachable && node.id === firstReachableNodeId
         const { px, py } = toPixel(x, y)
         const size = NODE_SIZE * mapScale * NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
         const isHovered = hoveredNode?.id === node.id
@@ -280,6 +288,7 @@ function MapSvg({
         return (
           <button
             key={node.id}
+            data-tutorial={isTutorialTarget ? 'firstNode' : undefined}
             onClick={(e) => {
               if (holdActivatedRef.current) { holdActivatedRef.current = false; return }
               handleNodeClick(node)

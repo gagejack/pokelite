@@ -7,10 +7,9 @@
 //
 // Scoring: a user's score is the BEST of their first SCORED_ATTEMPTS attempts,
 // ranked by maps_cleared DESC then elapsed_ms ASC. Attempts beyond that are
-// playable but never scored.
+// playable but never scored. Total attempts per day are UNLIMITED.
 
-export const MAX_ATTEMPTS = 10
-export const SCORED_ATTEMPTS = 3
+export const SCORED_ATTEMPTS = 10
 
 // Order two attempt-like objects: more maps first, then less time.
 function betterScore(a, b) {
@@ -20,17 +19,21 @@ function betterScore(a, b) {
   return b.elapsed_ms < a.elapsed_ms ? b : a
 }
 
-// Best of a user's attempts 1..SCORED_ATTEMPTS (maps DESC, elapsed ASC), or null.
+// Best of a user's first SCORED_ATTEMPTS attempts (maps DESC, elapsed ASC), or
+// null. Carries the `starter` of the winning (scoring) attempt through.
 export function bestOfFirst3(rows) {
   let best = null
   for (const r of rows) {
     if (r.attempt_no > SCORED_ATTEMPTS) continue
     best = betterScore(best, r)
   }
-  return best ? { maps_cleared: best.maps_cleared, elapsed_ms: best.elapsed_ms } : null
+  return best
+    ? { maps_cleared: best.maps_cleared, elapsed_ms: best.elapsed_ms, starter: best.starter ?? null }
+    : null
 }
 
-// Reduce all rows to one best-of-first-3 entry per user, sorted for display.
+// Reduce all rows to one best-of-first-N entry per user, sorted for display.
+// The `starter` shown is the one from each user's scoring (best) attempt.
 export function rankLeaderboard(rows) {
   const byUser = new Map()
   for (const r of rows) {
@@ -40,6 +43,10 @@ export function rankLeaderboard(rows) {
     byUser.set(r.user_id, { ...better, user_id: r.user_id, username: r.username })
   }
   return [...byUser.values()]
-    .map(e => ({ user_id: e.user_id, username: e.username, maps_cleared: e.maps_cleared, elapsed_ms: e.elapsed_ms }))
+    .map(e => ({
+      user_id: e.user_id, username: e.username,
+      maps_cleared: e.maps_cleared, elapsed_ms: e.elapsed_ms,
+      starter: e.starter ?? null,
+    }))
     .sort((a, b) => b.maps_cleared - a.maps_cleared || a.elapsed_ms - b.elapsed_ms)
 }

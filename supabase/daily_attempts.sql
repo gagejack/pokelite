@@ -1,11 +1,12 @@
 -- Daily-challenge attempts + leaderboard for Speedmon (Experimental 2.3, Phase 2).
 --
--- One row per FINISHED daily run (written at death/clear). A user gets up to 10
--- attempts per UTC day; only the first 3 (attempt_no <= 3) are ranked, best of
--- those is their leaderboard score. Ranking: maps_cleared DESC, elapsed_ms ASC.
+-- One row per FINISHED daily run (written at death/clear). A user may play an
+-- UNLIMITED number of attempts per UTC day; only the first 10 (attempt_no <= 10)
+-- are ranked, best of those is their leaderboard score. Ranking: maps_cleared
+-- DESC, elapsed_ms ASC.
 --
--- Trust-client model: no server-side verification. RLS lets any authenticated
--- user READ the board and lets a user INSERT only their own rows.
+-- Trust-client model: no server-side verification. RLS lets ANYONE (including
+-- signed-out guests) READ the board and lets a user INSERT only their own rows.
 --
 -- Run once in the Supabase SQL editor (Dashboard → SQL Editor → New query).
 -- Idempotent — safe to re-run.
@@ -20,15 +21,21 @@ create table if not exists public.daily_attempts (
   attempt_no   int         not null,
   maps_cleared int         not null default 0,
   elapsed_ms   bigint      not null default 0,
+  starter      int,        -- species id of the run's chosen starter (nullable: old rows)
   created_at   timestamptz not null default now()
 );
 
--- attempt_no must be 1..10.
+-- Add `starter` to tables created before this column existed (idempotent).
+alter table public.daily_attempts
+  add column if not exists starter int;
+
+-- attempt_no must be positive. Attempts are UNLIMITED, so there is no upper
+-- bound; scoring caps ranking to the first 10 in application code (dailyScore.js).
 alter table public.daily_attempts
   drop constraint if exists daily_attempts_attempt_range;
 alter table public.daily_attempts
   add constraint daily_attempts_attempt_range
-  check (attempt_no between 1 and 10);
+  check (attempt_no >= 1);
 
 -- One row per (user, day, attempt_no) — blocks duplicate attempts from two tabs.
 create unique index if not exists daily_attempts_user_day_attempt
@@ -41,11 +48,14 @@ create index if not exists daily_attempts_day
 -- 2. Row Level Security -------------------------------------------------------
 alter table public.daily_attempts enable row level security;
 
--- Any authenticated user may READ (the leaderboard is shared among players).
+-- ANYONE may READ, including signed-out guests — the leaderboard is public so a
+-- visitor can see today's standings before signing in. (`anon` + `authenticated`
+-- together cover the `public` role's members; listing both is explicit.)
 drop policy if exists "daily_attempts_select_authed" on public.daily_attempts;
-create policy "daily_attempts_select_authed"
+drop policy if exists "daily_attempts_select_public" on public.daily_attempts;
+create policy "daily_attempts_select_public"
   on public.daily_attempts for select
-  to authenticated
+  to anon, authenticated
   using (true);
 
 -- A user may INSERT only rows for themselves. No update/delete policies exist,

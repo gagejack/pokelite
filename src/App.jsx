@@ -301,6 +301,7 @@ export default function App() {
         region: selectedRegion?.name ?? dailyFor(dailyDate.current).region,
         maps_cleared: mapsCleared.current,
         elapsed_ms: Math.max(0, Date.now() - (runStartedAt.current || Date.now())),
+        starter: selectedStarter?.id ?? null,
       })
       // Surface failures (e.g. a two-tab unique-index rejection) — same pattern
       // as recordCatch/recordBadgeEarned; never blocks the run.

@@ -14,6 +14,7 @@ const SEEN_KEY = 'speedmon.tutorialSeen'
 const BOX_W = 240
 
 const STEPS = [
+  { key: 'firstNode', text: 'Tap a glowing node to travel there and start your next battle. Reachable nodes glow gold.' },
   { key: 'home',     text: 'Home — return to the main menu anytime. Your run auto-saves.' },
   { key: 'pokedex',  text: 'Pokédex — every species you’ve caught or seen.' },
   { key: 'stats',    text: 'Stats — your run history, catches, and badges.' },
@@ -40,25 +41,33 @@ export default function TutorialOverlay() {
     setDone(true)
   }, [])
 
-  // Advance past any step whose target isn't in the DOM; finish if none remain.
-  const measure = useCallback((s) => {
-    let i = s
-    while (i < STEPS.length) {
+  // Show the step at index `s`, retrying briefly if its target isn't laid out
+  // yet — the map's first node only mounts after an async resize/measure, so a
+  // present-but-late target must be waited for, not skipped. If it's still
+  // missing after `tries` frames we treat it as truly absent and move on;
+  // finish if no remaining step has a target. Returns a cancel fn for cleanup.
+  const measure = useCallback((s, tries = 20) => {
+    let cancelled = false
+    let raf = 0
+    const attempt = (i, left) => {
+      if (cancelled || i >= STEPS.length) { if (i >= STEPS.length) finish(); return }
       const r = rectFor(STEPS[i].key)
       if (r) { setStep(i); setRect(r); return }
-      i++
+      if (left > 0) { raf = requestAnimationFrame(() => attempt(i, left - 1)); return }
+      attempt(i + 1, tries) // give up on this one; try the next
     }
-    finish()
+    attempt(s, tries)
+    return () => { cancelled = true; cancelAnimationFrame(raf) }
   }, [finish])
 
-  // Measure on mount (after a frame so the nav has laid out) and whenever step
-  // changes; re-measure on resize/orientation change so nothing drifts.
+  // Measure on mount and whenever step changes; re-measure on resize/orientation
+  // change so nothing drifts.
   useEffect(() => {
     if (done) return
-    const raf = requestAnimationFrame(() => measure(step))
+    const cancel = measure(step)
     const onResize = () => { const r = rectFor(STEPS[step].key); if (r) setRect(r) }
     window.addEventListener('resize', onResize)
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize) }
+    return () => { cancel(); window.removeEventListener('resize', onResize) }
   }, [step, done, measure])
 
   if (done || !rect) return null
@@ -68,10 +77,17 @@ export default function TutorialOverlay() {
   const text = dark ? '#DBDBDB' : '#333333'
   const border = dark ? '2px solid #121212' : '2px solid #444444'
 
-  // Text box sits below the nav bar, horizontally near the target, clamped
-  // on-screen. The arrow points from the box up to the icon.
+  // Text box sits near the target, horizontally clamped on-screen. It normally
+  // hangs below the target (nav icons live at the top); but a spotlit map node
+  // can be low on the screen, so flip the box above the target when there isn't
+  // room below. The arrow points from the box toward the target either way.
   const pad = 6
-  const boxTop = rect.bottom + 18
+  const EST_BOX_H = 120 // rough box height, only for the flip decision
+  const flipUp = rect.bottom + 18 + EST_BOX_H > window.innerHeight
+  // Below: anchor by top just under the target. Above: anchor by bottom just
+  // over the target, so the box grows upward regardless of its real height.
+  const boxTop = flipUp ? undefined : rect.bottom + 18
+  const boxBottom = flipUp ? window.innerHeight - (rect.top - 18) : undefined
   const targetCx = rect.left + rect.width / 2
   const boxLeft = Math.min(
     Math.max(8, targetCx - BOX_W / 2),
@@ -97,19 +113,24 @@ export default function TutorialOverlay() {
         pointerEvents: 'none',
       }} />
 
-      {/* Arrow (pointing up to the icon). */}
+      {/* Arrow pointing toward the target — up from a box below, down from a
+          box above. Sits in the ~18px gap between box and target either way. */}
       <div style={{
-        position: 'absolute', top: boxTop - 9, left: boxLeft + arrowLeft - 9,
+        position: 'absolute',
+        top: flipUp ? rect.top - 18 : boxTop - 9,
+        left: boxLeft + arrowLeft - 9,
         width: 0, height: 0,
         borderLeft: '9px solid transparent',
         borderRight: '9px solid transparent',
-        borderBottom: `10px solid ${cardBg}`,
+        ...(flipUp
+          ? { borderTop: `10px solid ${cardBg}` }
+          : { borderBottom: `10px solid ${cardBg}` }),
         pointerEvents: 'none',
       }} />
 
       {/* Text box. */}
       <div style={{
-        position: 'absolute', top: boxTop, left: boxLeft, width: BOX_W,
+        position: 'absolute', top: boxTop, bottom: boxBottom, left: boxLeft, width: BOX_W,
         backgroundColor: cardBg, border, padding: '12px',
         display: 'flex', flexDirection: 'column', gap: '10px',
         boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #444444',

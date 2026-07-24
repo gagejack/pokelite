@@ -10,9 +10,9 @@ import { supabase } from './supabase'
 import { regionNames } from '../game/regionRegistry'
 import { hashDateToSeed, pickDailyRegion } from '../game/dailyDerive.js'
 import { encodeSeed } from '../game/seed.js'
-import { bestOfFirst3, rankLeaderboard, MAX_ATTEMPTS, SCORED_ATTEMPTS } from '../game/dailyScore.js'
+import { bestOfFirst3, rankLeaderboard, SCORED_ATTEMPTS } from '../game/dailyScore.js'
 
-export { bestOfFirst3, rankLeaderboard, MAX_ATTEMPTS, SCORED_ATTEMPTS }
+export { bestOfFirst3, rankLeaderboard, SCORED_ATTEMPTS }
 
 // Current UTC day as "YYYY-MM-DD".
 export function todayUtc() {
@@ -30,7 +30,7 @@ export function dailyFor(dateStr) {
 export async function getTodayAttempts(userId, dateStr) {
   const { data, error } = await supabase
     .from('daily_attempts')
-    .select('attempt_no, maps_cleared, elapsed_ms')
+    .select('attempt_no, maps_cleared, elapsed_ms, starter')
     .eq('user_id', userId)
     .eq('daily_date', dateStr)
   if (error || !data) return { used: 0, best: null }
@@ -41,8 +41,9 @@ export async function getTodayAttempts(userId, dateStr) {
   }
 }
 
-// Insert one finished-run attempt for `dailyDate`. No-op once at MAX_ATTEMPTS.
-export async function submitAttempt({ userId, username, dailyDate, region, maps_cleared, elapsed_ms }) {
+// Insert one finished-run attempt for `dailyDate`. Total attempts are unlimited;
+// only the first SCORED_ATTEMPTS are ranked (enforced in scoring, not here).
+export async function submitAttempt({ userId, username, dailyDate, region, maps_cleared, elapsed_ms, starter }) {
   const { data, error: countErr } = await supabase
     .from('daily_attempts')
     .select('attempt_no')
@@ -50,7 +51,6 @@ export async function submitAttempt({ userId, username, dailyDate, region, maps_
     .eq('daily_date', dailyDate)
   if (countErr) return { error: countErr.message }
   const used = data?.length ?? 0
-  if (used >= MAX_ATTEMPTS) return { ok: true, skipped: true }
   const { error } = await supabase.from('daily_attempts').insert({
     user_id: userId,
     username: username ?? null,
@@ -59,15 +59,16 @@ export async function submitAttempt({ userId, username, dailyDate, region, maps_
     attempt_no: used + 1,
     maps_cleared,
     elapsed_ms,
+    starter: starter ?? null,
   })
   return error ? { error: error.message } : { ok: true }
 }
 
-// The day's leaderboard (best-of-first-3 per user, ranked), capped at `limit`.
+// The day's leaderboard (best-of-first-N per user, ranked), capped at `limit`.
 export async function getLeaderboard(dateStr, limit = 20) {
   const { data, error } = await supabase
     .from('daily_attempts')
-    .select('user_id, username, attempt_no, maps_cleared, elapsed_ms')
+    .select('user_id, username, attempt_no, maps_cleared, elapsed_ms, starter')
     .eq('daily_date', dateStr)
   if (error || !data) return []
   return rankLeaderboard(data).slice(0, limit)
