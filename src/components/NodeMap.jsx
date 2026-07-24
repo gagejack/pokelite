@@ -153,14 +153,16 @@ function MapSvg({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          {/* Resting white stroke for the immediately-available (reachable)
-              nodes — a plain outline, no glow, so the player sees where they can
-              go next. Hover upgrades to #hover-outline (white + yellow glow). */}
+          {/* Resting outline for the immediately-available (reachable) nodes —
+              white stroke plus a soft gold glow, so the player sees where they
+              can go next. Hover upgrades to #hover-outline (stronger glow). */}
           <filter id="white-outline" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
             <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
             <feFlood floodColor="#ffffff" result="white" />
             <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#facc15" floodOpacity="0.75" result="glow" />
             <feMerge>
+              <feMergeNode in="glow" />
               <feMergeNode in="outline" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
@@ -189,8 +191,10 @@ function MapSvg({
             <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
             <feFlood floodColor="#ffffff" result="white" />
             <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#facc15" floodOpacity="0.75" result="glow" />
             <feMerge>
               <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
               <feMergeNode in="outline" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
