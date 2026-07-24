@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 const Pokedex = lazy(() => import('./Pokedex'))
 const Stats = lazy(() => import('./Stats'))
 const SettingsPanel = lazy(() => import('./SettingsPanel'))
+const TutorialOverlay = lazy(() => import('./TutorialOverlay'))
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
@@ -17,17 +18,18 @@ import resetIcon from '../assets/Icons/reset.png'
 function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClose, setAutoClose, onRestart, onSkipMap, setSettingsOpen, bg, borderStyle, textColor, role }) {
   return (
     <>
-      <button onClick={onHome} className="hover:opacity-60 transition-opacity">
+      <button data-tutorial="home" onClick={onHome} className="hover:opacity-60 transition-opacity">
         <img src={homeIcon} alt="Home" style={{ width: '22px', height: '22px' }} />
       </button>
-      <button onClick={() => setPokedexOpen(true)} className="hover:opacity-60 transition-opacity">
+      <button data-tutorial="pokedex" onClick={() => setPokedexOpen(true)} className="hover:opacity-60 transition-opacity">
         <img src={pokedexIcon} alt="Pokedex" style={{ width: '22px', height: '22px' }} />
       </button>
-      <button onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
+      <button data-tutorial="stats" onClick={() => setStatsOpen(true)} className="hover:opacity-60 transition-opacity">
         <img src={statsIcon} alt="Stats" style={{ width: '22px', height: '22px' }} />
       </button>
       <div style={{ marginLeft: row ? 'auto' : undefined, display: 'flex', gap: '12px', alignItems: 'center' }}>
         <button
+          data-tutorial="auto"
           onClick={() => setAutoClose(!autoClose)}
           title={autoClose ? 'Auto-close battle: ON' : 'Auto-close battle: OFF'}
           style={{
@@ -45,7 +47,7 @@ function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClo
             <img src={resetIcon} alt="Restart" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
           </button>
         )}
-        <button onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
+        <button data-tutorial="settings" onClick={() => setSettingsOpen(true)} className="hover:opacity-60 transition-opacity" title="Settings">
           <img src={settingsIcon} alt="Settings" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
         </button>
         {role === 'admin' && onSkipMap && (
@@ -62,7 +64,7 @@ function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClo
   )
 }
 
-export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen }) {
+export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen, showTutorial }) {
   const { dark } = useTheme()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -151,6 +153,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} role={role} />}
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} username={username} />}
+        {showTutorial && <TutorialOverlay />}
       </Suspense>
     </div>
   )
