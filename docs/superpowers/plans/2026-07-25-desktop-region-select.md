@@ -12,7 +12,7 @@
 
 - **Desktop breakpoint is 768px**, from `useIsDesktop()` in `src/lib/useIsDesktop.js`. No second breakpoint, no media queries.
 - **The mobile path must not change at all.** Mobile PLAY still calls `onPlay()` → `setScreen('region')` → the existing `RegionSelect`. `mode` state must never affect the mobile branch.
-- **Menu bars stay 320px × 40px. Region bars are 320px × 56px.** The extra height exists so starter sprites render at ~44px.
+- **Menu bars stay 320px × 40px. Region bars are 320px × 68px.** The extra height exists so starter sprites render at 64px. (Originally specced at 56px/44px; enlarged during visual iteration.)
 - **Styling language is fixed:** `borderStyle` = `dark ? '2px solid #121212' : '2px solid #2e2e2e'`; `shadowStyle` = `dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e'`; `bevel` = `` `${shadowStyle}, inset 2px 2px 0 0 rgba(255,255,255,0.35), inset -2px -2px 0 0 rgba(0,0,0,0.3)` ``. Fonts: `Upheaval` (bars/headings), `Orange Kid` (small text). Accent yellow is `#facc15`.
 - **No SQL, no new Supabase policies, no RPCs.**
 - **No test framework exists in this project.** Verification is `npm run lint`, `npm run build`, and visual inspection. Do not add a test runner or write test files.
