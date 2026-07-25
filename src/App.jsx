@@ -46,6 +46,7 @@ export default function App() {
   const pokemonCaught = useRef(0)
   const pokemonCaughtIds = useRef([])
   const pokemonSeenIds = useRef([])
+  const pokemonSeenShinyIds = useRef([])
 
   // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
   // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
@@ -165,6 +166,7 @@ export default function App() {
         pokemonCaught: pokemonCaught.current,
         pokemonCaughtIds: pokemonCaughtIds.current,
         pokemonSeenIds: pokemonSeenIds.current,
+        pokemonSeenShinyIds: pokemonSeenShinyIds.current,
       },
       map: mapProgress.current, // { mapData, clearedNodes, currentNode }
       savedAt: Date.now(),
@@ -229,6 +231,7 @@ export default function App() {
     pokemonCaught.current = run.stats?.pokemonCaught ?? 0
     pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = run.stats?.pokemonSeenIds ?? []
+    pokemonSeenShinyIds.current = run.stats?.pokemonSeenShinyIds ?? []
     // Feed the current map's layout + node progress to NodeMap on mount.
     mapProgress.current = run.map ?? null
     runEnded.current = false
@@ -272,6 +275,7 @@ export default function App() {
       pokemon_caught: pokemonCaught.current,
       pokemon_caught_ids: pokemonCaughtIds.current,
       pokemon_seen_ids: pokemonSeenIds.current,
+      pokemon_seen_shiny_ids: pokemonSeenShinyIds.current,
     }
     if (result === 'win' && winRoster?.length) {
       payload.winning_roster = winRoster.map(p => ({
@@ -344,8 +348,15 @@ export default function App() {
 
   // Add a species to the Pokédex "seen" set — shown in color but without the
   // Poké Ball icon. Triggered by enemies fought and wild Pokémon offered.
-  function recordSpeciesSeen(pokemonId) {
-    if (pokemonId == null || pokemonSeenIds.current.includes(pokemonId)) return
+  function recordSpeciesSeen(pokemonId, isShiny = false) {
+    if (pokemonId == null) return
+    // Shiny is tracked separately and recorded BEFORE the already-seen guard
+    // below: a species can be met normal first and shiny later, and that later
+    // shiny still has to register.
+    if (isShiny && !pokemonSeenShinyIds.current.includes(pokemonId)) {
+      pokemonSeenShinyIds.current = [...pokemonSeenShinyIds.current, pokemonId]
+    }
+    if (pokemonSeenIds.current.includes(pokemonId)) return
     pokemonSeenIds.current = [...pokemonSeenIds.current, pokemonId]
   }
 
@@ -375,6 +386,7 @@ export default function App() {
     pokemonCaught.current = 0
     pokemonCaughtIds.current = []
     pokemonSeenIds.current = []
+    pokemonSeenShinyIds.current = []
   }
 
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
