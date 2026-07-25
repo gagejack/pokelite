@@ -142,7 +142,7 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
   const headingShadow = dark ? '0 2px 6px rgba(0,0,0,0.8)' : 'none'
 
   return (
-    <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+    <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter>
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: isDesktop ? 'center' : 'flex-start', gap: '24px',

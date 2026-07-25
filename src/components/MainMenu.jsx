@@ -28,7 +28,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   const bevel = `${shadowStyle}, inset 2px 2px 0 0 rgba(255,255,255,0.35), inset -2px -2px 0 0 rgba(0,0,0,0.3)`
 
   return (
-    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter>
       <div style={{
         flex: 1,
         minHeight: 0,

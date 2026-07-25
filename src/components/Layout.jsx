@@ -1,7 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
+import FloatingNav from './FloatingNav'
 // Modals load on demand — none is needed for the initial render, and the
 // Pokédex/Stats pull in their own data + layout weight.
 const Pokedex = lazy(() => import('./Pokedex'))
@@ -65,11 +67,16 @@ function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClo
   )
 }
 
-export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen, showTutorial }) {
+export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen, showTutorial, mobileFooter = false, statsOpen: statsOpenProp, setStatsOpen: setStatsOpenProp }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const { autoClose, setAutoClose } = useSettings()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [statsOpen, setStatsOpen] = useState(false)
+  const [statsOpenInternal, setStatsOpenInternal] = useState(false)
+  // Stats is optionally controlled by the screen (MainMenu's STATS button);
+  // uncontrolled screens keep the old internal behavior.
+  const statsOpen = statsOpenProp ?? statsOpenInternal
+  const setStatsOpen = setStatsOpenProp ?? setStatsOpenInternal
   const [username, setUsername] = useState(null)
   const [role, setRole] = useState(null)
 
@@ -112,66 +119,78 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       height: '100dvh', display: 'flex', flexDirection: 'column',
       backgroundColor: pageBg,
     }}>
-      <div data-navbar style={{
-        position: 'relative',
-        display: 'flex', alignItems: 'center', gap: '16px',
-        padding: '8px 12px',
-        backgroundColor: bg,
-        border: borderStyle,
-        boxShadow: shadowStyle,
-        flexShrink: 0,
-        zIndex: 150,
-      }}>
-        <NavButtons
-          row
+      {isDesktop ? (
+        <div data-navbar style={{
+          position: 'relative',
+          display: 'flex', alignItems: 'center', gap: '16px',
+          padding: '8px 12px',
+          backgroundColor: bg,
+          border: borderStyle,
+          boxShadow: shadowStyle,
+          flexShrink: 0,
+          zIndex: 150,
+        }}>
+          <NavButtons
+            row
+            onHome={onHome}
+            setPokedexOpen={setPokedexOpen}
+            setStatsOpen={setStatsOpen}
+            autoClose={autoClose}
+            setAutoClose={setAutoClose}
+            onRestart={onRestart}
+            onSkipMap={onSkipMap}
+            setSettingsOpen={setSettingsOpen}
+            bg={bg}
+            borderStyle={borderStyle}
+            textColor={textColor}
+            role={role}
+          />
+          {/* Centered brand. Replaces the username, which now only appears in
+              the settings panel. The logo art is wide, so it's height-constrained
+              and lets width follow naturally. */}
+          <img
+            src={speedmonLogo}
+            alt="Speedmon"
+            style={{
+              position: 'absolute', left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%)',
+              height: '30px', width: 'auto', display: 'block',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+      ) : (
+        <FloatingNav
           onHome={onHome}
+          setSettingsOpen={setSettingsOpen}
           setPokedexOpen={setPokedexOpen}
           setStatsOpen={setStatsOpen}
-          autoClose={autoClose}
-          setAutoClose={setAutoClose}
-          onRestart={onRestart}
-          onSkipMap={onSkipMap}
-          setSettingsOpen={setSettingsOpen}
-          bg={bg}
-          borderStyle={borderStyle}
-          textColor={textColor}
-          role={role}
         />
-        {/* Centered brand. Replaces the username, which now only appears in
-            the settings panel. The logo art is wide, so it's height-constrained
-            and lets width follow naturally. */}
-        <img
-          src={speedmonLogo}
-          alt="Speedmon"
-          style={{
-            position: 'absolute', left: '50%', top: '50%',
-            transform: 'translate(-50%, -50%)',
-            height: '30px', width: 'auto', display: 'block',
-            pointerEvents: 'none',
-          }}
-        />
-      </div>
+      )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
       </div>
-      {/* Attribution footer — a hairline rule and one line of fine print,
-          present on every screen since Layout wraps them all. Kept out of the
-          flex flow's growth (flexShrink: 0) so it never steals space from the
-          game area. */}
-      <div style={{
-        flexShrink: 0,
-        borderTop: `1px solid ${dark ? '#333' : '#c4c4c4'}`,
-        padding: '6px 12px',
-        textAlign: 'center',
-      }}>
-        <span style={{
-          fontFamily: 'Orange Kid', fontSize: '11px',
-          color: dark ? '#777' : '#8a8a8a',
-          lineHeight: 1.3,
+      {/* Attribution footer — a hairline rule and one line of fine print.
+          Always shown on desktop; on mobile only the screens that opt in via
+          `mobileFooter` render it, since most mobile screens need the height
+          back for the game area. Kept out of the flex flow's growth
+          (flexShrink: 0) so it never steals space from the game area. */}
+      {(isDesktop || mobileFooter) && (
+        <div style={{
+          flexShrink: 0,
+          borderTop: `1px solid ${dark ? '#333' : '#c4c4c4'}`,
+          padding: '6px 12px',
+          textAlign: 'center',
         }}>
-          Speedmon is a fan-made project. No affiliation, endorsement, or sponsorship from Nintendo, Game Freak, or The Pokémon Company. All sprites and assets belong to their respective owners.
-        </span>
-      </div>
+          <span style={{
+            fontFamily: 'Orange Kid', fontSize: '11px',
+            color: dark ? '#777' : '#8a8a8a',
+            lineHeight: 1.3,
+          }}>
+            Speedmon is a fan-made project. No affiliation, endorsement, or sponsorship from Nintendo, Game Freak, or The Pokémon Company. All sprites and assets belong to their respective owners.
+          </span>
+        </div>
+      )}
       <Suspense fallback={null}>
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} role={role} />}
