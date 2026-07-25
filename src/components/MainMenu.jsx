@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import Layout from './Layout'
 import LoginForm from './LoginForm'
+import MenuButton from './menu/MenuButton'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
@@ -19,14 +20,24 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     return () => subscription.unsubscribe()
   }, [])
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
+  // Single source of truth for the menu bars. Both layouts map over this, so
+  // adding a mode or changing a size happens in exactly one place.
+  const buttonDefs = [
+    { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
+      color: '#fff', fontSize: '26px', onClick: onPlay, visible: true },
+    { id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)',
+      color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
+    { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
+      color: '#fff', fontSize: '22px', onClick: onResume, visible: !!hasSavedRun },
+  ].filter(d => d.visible)
 
-  // Inner bevel for the menu bars: a hard white highlight along the top/left
-  // and a dark edge along the bottom/right, so each bar reads as raised. Hard
-  // (0 blur) to match the pixel-art styling, and appended after the drop shadow
-  // so both render.
-  const bevel = `${shadowStyle}, inset 2px 2px 0 0 rgba(255,255,255,0.35), inset -2px -2px 0 0 rgba(0,0,0,0.3)`
+  // Dex + Stats share one bar's footprint, so they are defined separately.
+  const halfDefs = [
+    { id: 'dex',   label: 'DEX',   background: '#facc15', color: '#1a1a1a', fontSize: '16px',
+      onClick: () => setPokedexOpen(true), visible: true },
+    { id: 'stats', label: 'STATS', background: '#6b7280', color: '#fff', fontSize: '16px',
+      onClick: () => setStatsOpen(true), visible: true },
+  ]
 
   return (
     <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
@@ -57,90 +68,16 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           style={{ width: '320px', maxWidth: '100%', height: 'auto', display: 'block' }}
         />
 
-        {/* Play button — a plain green bar, matching Daily/Resume below. */}
-        <button
-          onClick={onPlay}
-          className="hover:scale-105 active:scale-95 transition-transform duration-150"
-          style={{
-            width: '320px', maxWidth: '100%', height: '40px',
-            // Same lit-from-above treatment as Daily: darker green at the
-            // bottom rising to a brighter one.
-            background: 'linear-gradient(to top, #16a34a, #4ade80)',
-            border: borderStyle,
-            boxShadow: bevel,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <span style={{ fontSize: '26px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>PLAY</span>
-        </button>
-
-        {/* Daily Challenge — red box below Play; opens the daily modal (same one
-            reachable from the region-select screen). */}
-        <button
-          onClick={onOpenDaily}
-          className="daily-glow hover:scale-105 active:scale-95 transition-transform duration-150"
-          style={{
-            width: '320px', maxWidth: '100%', height: '40px',
-            // Subtle orange-to-red: `to top` puts the darker red at the bottom,
-            // so the bar reads as lit from above like the inner bevel.
-            background: 'linear-gradient(to top, #dc2626, #f97316)',
-            border: borderStyle,
-            // The glow animation composes with this via --btn-shadow (index.css),
-            // so the offset shadow AND the inner bevel survive the animated
-            // box-shadow (which would otherwise replace them outright).
-            '--btn-shadow': bevel,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <span style={{ fontSize: '22px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>DAILY CHALLENGE</span>
-        </button>
-
-        {/* Resume Run — same green box as Play, shown only when a run is saved. */}
-        {hasSavedRun && (
-          <button
-            onClick={onResume}
-            className="hover:scale-105 active:scale-95 transition-transform duration-150"
-            style={{
-              width: '320px', maxWidth: '100%', height: '40px',
-              backgroundColor: '#3b82f6',
-              border: borderStyle,
-              boxShadow: bevel,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <span style={{ fontSize: '22px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>RESUME RUN</span>
-          </button>
-        )}
+        {buttonDefs.map(def => (
+          <MenuButton key={def.id} def={def} dark={dark} />
+        ))}
 
         {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
             Same border/shadow/bevel language as the bars above. */}
         <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => setPokedexOpen(true)}
-            className="hover:scale-105 active:scale-95 transition-transform duration-150"
-            style={{
-              flex: 1, height: '40px',
-              backgroundColor: '#facc15',
-              border: borderStyle,
-              boxShadow: bevel,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <span style={{ fontSize: '16px', color: '#1a1a1a', letterSpacing: '2px', fontFamily: 'Upheaval' }}>DEX</span>
-          </button>
-          <button
-            onClick={() => setStatsOpen(true)}
-            className="hover:scale-105 active:scale-95 transition-transform duration-150"
-            style={{
-              flex: 1, height: '40px',
-              backgroundColor: '#6b7280',
-              border: borderStyle,
-              boxShadow: bevel,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <span style={{ fontSize: '16px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>STATS</span>
-          </button>
+          {halfDefs.map(def => (
+            <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+          ))}
         </div>
 
         {/* Version tag — sits under the last button (Resume when a run is
