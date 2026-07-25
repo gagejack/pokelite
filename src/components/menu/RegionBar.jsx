@@ -68,7 +68,7 @@ export default function RegionBar({ region, dark, onSelect }) {
             // Overlap, like the region cards' legendary pair — tightens the
             // trio so it reads as one cluster rather than three icons, and
             // buys back width for the region name at this sprite size.
-            marginLeft: i === 0 ? 0 : '-10px',
+            marginLeft: i === 0 ? 0 : '-22px',
             filter: 'drop-shadow(2px 3px 4px rgba(0,0,0,0.9))',
           }} />
         )) : (
