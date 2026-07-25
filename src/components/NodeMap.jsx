@@ -11,6 +11,7 @@ import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
 import { rivalTeamSpecs } from '../game/rivals.js'
+import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
@@ -555,7 +556,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // themed pools are authored as base forms, so we roll each mon's evolution
       // stage by its level (same gating as catch nodes). Classes with no themed
       // pool fall back to the map's shared species pool (uniform, no roll).
-      const themed = config.trainerTypePools?.[node.trainer]
+      // Themed pools are gated by the region's speciesMinMap so a specialist
+      // only sends out species the run has reached (no Alomomola on map 1).
+      // Regions without the table pass through unchanged.
+      const themedAll = config.trainerTypePools?.[node.trainer]
+      const themed = themedAll?.length
+        ? filterPoolByMap(themedAll, config.speciesMinMap, mapIndex)
+        : themedAll
       const pool = themed?.length
         ? themed
         : config.trainerSpeciesPools?.[Math.min(mapIndex, (config.trainerSpeciesPools?.length ?? 1) - 1)] ?? []
