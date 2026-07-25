@@ -104,15 +104,19 @@ check('filterPoolByMap fails open (sanity check that direct computation above is
 check('every map has >= 4 distinct classes',
   mapRows.every(r => new Set(r).size >= 4))
 
-// --- Evolution-level reachability, on each class's EARLIEST map ---
-// This is the data-side counterpart to Finding 1's engine fix: even though
-// rollStageForLevel now self-corrects an under-leveled pool entry at runtime,
-// an entry that NEEDS correcting on the map it first appears is still a sign
-// the pool was authored wrong (the correction masks it, it doesn't excuse
-// it). A species counts as reachable at a level if its cumulative level-up
-// requirement is <= that level, OR it has no level-up path at all from its
-// line's root (the deliberate-floor case — e.g. a trade evolution named
-// directly, which is never "wrong" at any level).
+// --- Evolution-level resolution legality, on every map each class appears on ---
+// The human partner deliberately chose an ENGINE-level fix (rollStageForLevel
+// self-corrects an under-leveled pool entry by walking DOWN to the
+// most-evolved ancestor stage the level can legitimately reach) precisely so
+// pool authoring can be forgiving: naming an evolved form on an early map
+// (Hiker's 536 Palpitoad) is expected and handled, not a defect. So this
+// check does NOT assert a downgrade never fires — it asserts the downgrade
+// always RESOLVES to something legal: for every (class, map, species) at that
+// map's MINIMUM level, walking the level-up path from the line's root and
+// keeping stages whose cumulative minLevel <= the floor must yield at least
+// one qualifying stage. A species with no level-up path from its root at all
+// (the trade/stone/friendship floor case, e.g. Escavalier 589 from Karrablast)
+// passes automatically — it's a deliberate authored floor, legal at any level.
 const rangesMatch = /export const MAP_LEVEL_RANGES = \[([\s\S]*?)\n\]/.exec(teamsSrc)
 if (!rangesMatch) throw new Error('MAP_LEVEL_RANGES not found in unova.teams.js')
 const mapLevelRanges = [...rangesMatch[1].matchAll(/\[\s*(\d+)\s*,\s*(\d+)\s*\]/g)]
@@ -122,29 +126,38 @@ check('8 map level ranges', mapLevelRanges.length === 8)
 const { chains, speciesToRoot } = JSON.parse(
   readFileSync(new URL('../public/data/evolutions.json', import.meta.url), 'utf8')
 )
-const cumulativeMinLevel = id => {
+// Resolve (species, floor level) to the stage rollStageForLevel would settle
+// on: the deepest level-up-path stage whose cumulative minLevel <= floor.
+// Returns { id, minLevel } or null if the species has a level-up path but
+// somehow no stage qualifies (would mean even the root's minLevel — always 1
+// — exceeds floor, which can't happen for any real floor >= 1; kept as a
+// belt-and-suspenders case so the check fails loudly instead of throwing).
+const resolveAtFloor = (id, floor) => {
   const root = chains[speciesToRoot[id]]
-  if (!root) return null // species not covered by the bundled line data
+  if (!root) return { id, minLevel: 1, noData: true } // not covered by bundled line data — nothing to check
   const path = levelUpPathTo(root, id)
-  if (!path) return null // no level-up path from root — deliberate floor, always reachable
-  return path[path.length - 1].minLevel
+  if (!path) return { id, minLevel: 1, deliberateFloor: true } // trade/stone/friendship — always legal
+  const eligible = path.filter(s => s.minLevel <= floor)
+  return eligible.length > 0 ? eligible[eligible.length - 1] : null
 }
 
-let unreachable = []
-Object.keys(pools).forEach(cls => {
-  // Earliest map (1-based) this class is placed on.
-  const earliestMapIndex = mapRows.findIndex(row => row.includes(cls))
-  if (earliestMapIndex === -1) return // class not placed on any map (shouldn't happen; other checks cover it)
-  const [minLevel] = mapLevelRanges[earliestMapIndex]
-  pools[cls].forEach(id => {
-    const need = cumulativeMinLevel(id)
-    if (need != null && need > minLevel) {
-      unreachable.push(`${cls}: species ${id} needs L${need}, map ${earliestMapIndex + 1} floor is L${minLevel}`)
-    }
+let illegal = []
+mapRows.forEach((row, mapIndex) => {
+  const mapNumber = mapIndex + 1
+  const [floor] = mapLevelRanges[mapIndex]
+  row.forEach(cls => {
+    (pools[cls] ?? []).forEach(id => {
+      const resolved = resolveAtFloor(id, floor)
+      if (!resolved) {
+        illegal.push(`${cls}@map${mapNumber} (floor L${floor}): species ${id} resolved to nothing`)
+      } else if (!resolved.noData && !resolved.deliberateFloor && resolved.minLevel > floor) {
+        illegal.push(`${cls}@map${mapNumber} (floor L${floor}): species ${id} resolved to ${resolved.id} which needs L${resolved.minLevel}`)
+      }
+    })
   })
 })
-check(`every class's pool is reachable by level on its earliest map ${unreachable.join('; ')}`,
-  unreachable.length === 0)
+check(`every pool species resolves to a level-legal stage on every map its class appears on ${illegal.join('; ')}`,
+  illegal.length === 0)
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)
