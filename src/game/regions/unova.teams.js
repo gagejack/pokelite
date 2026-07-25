@@ -5,9 +5,12 @@
 
 // Trainer Pokémon species per MAP (not per trainer type).
 //
-// Every trainer on a map draws from that map's species pool. This is keyed by
-// map — not trainer type — because the same trainer type (e.g. Backpacker)
-// appears on many maps, and its Pokémon must match the ROUTE it's on. Pools are
+// This is the FALLBACK pool, used only by a trainer class with no themed pool
+// in unova.js's TRAINER_TYPE_POOLS. Every Unova route class is a type
+// specialist and has one, so nothing reaches this today — it stays as the
+// safety net for a class added without a themed pool. It is keyed by map (not
+// trainer type) because a roaming class appears on many maps and its Pokémon
+// must match the ROUTE it's on. Pools are
 // evolution-gated by band, mirroring the catch pools: a species only appears on
 // a map whose band can reach its evolution level, so early maps hold base forms
 // and late maps hold evolved forms (no Lv40 Patrat).

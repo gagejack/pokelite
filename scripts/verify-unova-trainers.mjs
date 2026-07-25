@@ -159,5 +159,23 @@ mapRows.forEach((row, mapIndex) => {
 check(`every pool species resolves to a level-legal stage on every map its class appears on ${illegal.join('; ')}`,
   illegal.length === 0)
 
+// --- Sprite parity ---
+// A class missing a sprite entry renders as a blank trainer node, and a sprite
+// left behind for a removed class is dead weight that reads as still-supported.
+// Both are silent failures, so assert the key sets directly.
+const spriteKeys = (name) => {
+  const m = new RegExp(`const ${name}\\s*=\\s*\\{([\\s\\S]*?)\\n\\}`).exec(src)
+  return m ? [...m[1].matchAll(/^\s*'([^']+)':/gm)].map(x => x[1]) : []
+}
+const ow = spriteKeys('TRAINER_SPRITES')
+const full = spriteKeys('TRAINER_FULL_SPRITES')
+const missingOw = EXPECTED_CLASSES.filter(c => !ow.includes(c))
+const missingFull = EXPECTED_CLASSES.filter(c => !full.includes(c))
+const keptOw = REMOVED.filter(c => ow.includes(c) || full.includes(c))
+
+check(`every class has an overworld sprite ${missingOw.join(', ')}`, missingOw.length === 0)
+check(`every class has a full sprite ${missingFull.join(', ')}`, missingFull.length === 0)
+check(`no removed class kept a sprite entry ${keptOw.join(', ')}`, keptOw.length === 0)
+
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)
