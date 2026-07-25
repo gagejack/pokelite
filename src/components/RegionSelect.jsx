@@ -3,25 +3,8 @@ import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { getRegionConfig } from '../game/regionRegistry'
 import Layout from './Layout'
-// Card-background thumbnails (800px JPEG) — the full-res source PNGs were
-// 0.8–8.3 MB each and only ever render blurred/darkened here, so they were
-// downscaled + recompressed (~14 MB → ~1 MB total).
-import KantoMap from '../assets/regions/KantoMap.jpg'
-import JohtoMap from '../assets/regions/JohtoMap.jpg'
-import HoennMap from '../assets/regions/HoennMap.jpg'
-import SinnohMap from '../assets/regions/SinnohMap.jpg'
-import UnovaMap from '../assets/regions/UnovaMap.jpg'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
-
-const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
-
-const REGIONS = [
-  { name: 'Kanto',  gen: 'Gen 1', map: KantoMap,  starters: [1, 4, 7],       legendaries: [150, 151] }, // Mewtwo, Mew
-  { name: 'Johto',  gen: 'Gen 2', map: JohtoMap,  starters: [152, 155, 158], legendaries: [249, 250] }, // Lugia, Ho-Oh
-  { name: 'Hoenn',  gen: 'Gen 3', map: HoennMap,  starters: [252, 255, 258], legendaries: [382, 383] }, // Kyogre, Groudon
-  { name: 'Sinnoh', gen: 'Gen 4', map: SinnohMap, starters: [387, 390, 393], legendaries: [483, 484] }, // Dialga, Palkia
-  { name: 'Unova',  gen: 'Gen 5', map: UnovaMap,  starters: [495, 498, 501], legendaries: [643, 644] }, // Reshiram, Zekrom
-]
+import { REGIONS, SPRITE } from '../game/regions/regionList'
 
 // Defined at module scope (not nested inside RegionSelect) so its component
 // identity is stable across parent re-renders. Nesting it caused every card to
