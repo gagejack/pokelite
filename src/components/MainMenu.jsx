@@ -101,6 +101,15 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           </button>
         )}
 
+        {/* Version tag — sits under the last button (Resume when a run is
+            saved, otherwise Daily Challenge). */}
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '14px',
+          color: dark ? '#888' : '#999',
+        }}>
+          v 1.0
+        </span>
+
         {/* Auth card — hidden once logged in */}
         {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
 

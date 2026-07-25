@@ -8,6 +8,7 @@ const Pokedex = lazy(() => import('./Pokedex'))
 const Stats = lazy(() => import('./Stats'))
 const SettingsPanel = lazy(() => import('./SettingsPanel'))
 const TutorialOverlay = lazy(() => import('./TutorialOverlay'))
+import speedmonLogo from '../assets/SpeedmonLogoNoLine.png'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
@@ -72,7 +73,8 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   const [username, setUsername] = useState(null)
   const [role, setRole] = useState(null)
 
-  // Show the logged-in player's username in the center of the nav bar.
+  // The logged-in player's username, passed to the settings panel. The nav bar
+  // itself shows the Speedmon logo (see below), not the name.
   // Kept self-contained: Layout reads the session and profile itself.
   useEffect(() => {
     let cancelled = false
@@ -135,16 +137,19 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
           textColor={textColor}
           role={role}
         />
-        {username && (
-          <span style={{
+        {/* Centered brand. Replaces the username, which now only appears in
+            the settings panel. The logo art is wide, so it's height-constrained
+            and lets width follow naturally. */}
+        <img
+          src={speedmonLogo}
+          alt="Speedmon"
+          style={{
             position: 'absolute', left: '50%', top: '50%',
             transform: 'translate(-50%, -50%)',
-            fontFamily: 'Upheaval', fontSize: '13px', color: textColor,
-            pointerEvents: 'none', whiteSpace: 'nowrap',
-          }}>
-            {username}
-          </span>
-        )}
+            height: '35px', width: 'auto', display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
