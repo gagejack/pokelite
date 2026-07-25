@@ -21,7 +21,7 @@ below it.
 ## Goal
 
 Give the map the reclaimed height and let it run nearly the full width
-(a 5–10px gutter each side keeps its border visible),
+(a 5px gutter each side keeps its border visible),
 without cropping any of the map art or moving the roster/bag/badges out of
 reach.
 
@@ -68,7 +68,7 @@ The map card currently sizes to the background image's aspect ratio and centers
 inside its slot. Keep that — only relax the width constraint so the card can
 reach near the side edges.
 
-**Keep a small side gutter: 5–10px each side.** Not flush to the edge — the
+**Keep a small side gutter: 5px each side.** Not flush to the edge — the
 card's border must stay visible on both sides, and a hairline of background
 reads as intentional framing rather than a clipped layout.
 
@@ -86,7 +86,7 @@ const width = Math.min(w, h * ratio)   // NodeMap.jsx:895
 
 It fits to whichever axis binds, so with a wider slot the map grows until
 height becomes the limit — the only change needed is the slot's available
-width (full width minus the 5–10px gutters). Consequences:
+width (full width minus the 5px gutters). Consequences:
 
 - **Every node stays visible.** No cropping, so `nodePositions` and the overlay
   hit-buttons need no rework — they are laid out against the image box, which
@@ -143,7 +143,7 @@ width of a full bar.
 | File | Change |
 |---|---|
 | `src/components/Layout.jsx` | Delete the mobile nav bar; render the floating stack; gate the footer by screen |
-| `src/components/NodeMap.jsx` | Widen the map slot to full width minus a 5–10px gutter; drop the map's `boxShadow` on mobile (line 110) |
+| `src/components/NodeMap.jsx` | Widen the map slot to full width minus a 5px gutter; drop the map's `boxShadow` on mobile (line 110) |
 | `src/components/MainMenu.jsx` | Add the Dex + Stats row |
 | new: `src/components/FloatingNav.jsx` | The top-right stack |
 
@@ -154,8 +154,6 @@ Desktop paths must be untouched — the app already branches on `useIsDesktop()`
 
 - **Icon contrast** over arbitrary map backgrounds may need a subtle scrim or
   outline behind the stack.
-- **Exact gutter width** — 5px or 10px. Pick whichever keeps the border
-  clearly visible without looking inset; settle it in the browser.
 
 ## Out of scope
 
