@@ -40,7 +40,11 @@ export const BALANCE = deepFreeze({
     ],
     // Master Ball (legendary) node chance ramps linearly from `start` at
     // `startIndex` to `end` at `endIndex` (map indices).
-    masterBall: { startIndex: 2, endIndex: 7, start: 0.005, end: 0.10 },
+    masterBall: { startIndex: 3, endIndex: 7, start: 0.005, end: 0.10 },
+    // Weight of the MASTER_BALL outcome when a Mystery node resolves, relative
+    // to the other outcomes (which are weight 1 each). 4 non-legendary outcomes
+    // + w must put legendary at 12%: w / (4 + w) = 0.12 → w = 6/11.
+    mysteryLegendaryWeight: 6 / 11,
     mysteryRerolls: 2,
   },
 
