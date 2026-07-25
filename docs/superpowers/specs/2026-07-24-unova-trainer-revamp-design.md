@@ -47,9 +47,12 @@ classes only when it is genuinely dual-typed (see "Dual-type overlap").
 | Pokémon Ranger M/F | Grass | 8 |
 | Janitor | Poison | 3 |
 | Roughneck | Dark | 7 |
-| Youngster | Normal | 8 |
-| Nursery Aide | Normal | 8 |
+| Youngster | Normal (early-route half) | 4 |
+| Nursery Aide | Normal (caretaker half) | 4 |
 | Hiker | Ground **or** Rock | 9 |
+
+The complete species list for every class, with evolution stages and unlock
+maps, is in [Appendix A](#appendix-a--complete-trainer-rosters).
 
 **Selection rule:** any Unova-dex species carrying that type qualifies,
 including dual-types. Starters (495–503) and legendaries/mythicals (638–649)
@@ -172,10 +175,13 @@ Pilot             1   3   4   4   5   6   6   8
 Ranger            1   4   7   7   8   8   8   8
 Janitor           1   2   3   3   3   3   3   3
 Roughneck         4   4   4   5   5   5   5   7
-Youngster         3   4   4   4   6   7   7   8
-Nursery Aide      3   4   4   4   6   7   7   8
+Youngster         3   3   3   3   3   3   3   4
+Nursery Aide      0   1   1   1   3   4   4   4
 Hiker             1   4   5   5   7   7   8   9
 ```
+
+Nursery Aide's 0 on map 1 is intentional — Audino, its earliest line, debuts on
+map 2, and Nursery Aide is a fixed class not placed on map 1.
 
 Depot Agent's 0 on map 1 is intentional — Steel is a genuinely late type in
 BW, and Depot Agent is a fixed mid/late class that never appears on map 1.
@@ -227,3 +233,210 @@ reused as-is.
 3. No class draws a species whose `SPECIES_MIN_MAP` exceeds the current map.
 4. `npm run build` passes.
 5. Play a Kanto run to confirm zero regression (shared code path).
+
+---
+
+# Appendix A — Complete Trainer Rosters
+
+Every class, its type rule, and every evolution line it can draw from.
+
+**How to read this:**
+
+- **Base** is the species id authored in `TRAINER_TYPE_POOLS`. Only base forms
+  are listed; the engine (`rollStageForLevel`) rolls the stage at battle time.
+- **Line** shows each stage and the level it becomes reachable. A trainer on
+  map 2 (band 10–19) sending out the Tympole line gets Tympole; on map 6
+  (band 42–55) the same pool entry yields Seismitoad.
+- **From map** is `SPECIES_MIN_MAP` — the first map this line can appear at all.
+
+Level bands per map: `[3,10] [10,19] [18,28] [26,37] [34,46] [42,55] [50,64]
+[58,73]`.
+
+Species appearing in two classes are dual-typed and intentionally shared — see
+"Dual-type overlap" above.
+
+### Fisher — Water (roaming)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 515 | panpour | water | 1 |
+| 535 | tympole → palpitoad (L25) → seismitoad (L36) | water | 1 |
+| 550 | basculin | water | 3 |
+| 564 | tirtouga → carracosta (L37) | water/rock | 5 |
+| 580 | ducklett → swanna (L35) | water/flying | 6 |
+| 592 | frillish → jellicent (L40) | water/ghost | 6 |
+| 594 | alomomola | water | 6 |
+
+### Bug Catcher — Bug (roaming)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 540 | sewaddle → swadloon (L20) | bug/grass | 1 |
+| 543 | venipede → whirlipede (L22) → scolipede (L30) | bug/poison | 1 |
+| 595 | joltik → galvantula (L36) | bug/electric | 2 |
+| 557 | dwebble → crustle (L34) | bug/rock | 3 |
+| 588 | karrablast | bug | 8 |
+| 616 | shelmet | bug | 8 |
+| 632 | durant | bug/steel | 8 |
+| 636 | larvesta → volcarona (L59) | bug/fire | 8 |
+
+### Baker — Fire (roaming)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 513 | pansear | fire | 1 |
+| 554 | darumaka → darmanitan (L35) | fire | 2 |
+| 607 | litwick → lampent (L41) | ghost/fire | 7 |
+| 631 | heatmor | fire | 7 |
+| 636 | larvesta → volcarona (L59) | bug/fire | 8 |
+
+### Youngster — Normal (early-route) (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 504 | patrat → watchog (L20) | normal | 1 |
+| 506 | lillipup → herdier (L16) → stoutland (L32) | normal | 1 |
+| 519 | pidove → tranquill (L21) → unfezant (L32) | normal/flying | 1 |
+| 627 | rufflet → braviary (L54) | normal/flying | 8 |
+
+### Nursery Aide — Normal (caretaker) (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 531 | audino | normal | 2 |
+| 585 | deerling → sawsbuck (L34) | normal/grass | 5 |
+| 626 | bouffalant | normal | 5 |
+| 572 | minccino | normal | 6 |
+
+### Hiker — Ground / Rock (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 551 | sandile → krokorok (L29) → krookodile (L40) | ground/dark | 1 |
+| 524 | roggenrola → boldore (L25) | rock | 2 |
+| 529 | drilbur → excadrill (L31) | ground | 2 |
+| 536 | palpitoad → seismitoad (L36) | water/ground | 2 |
+| 557 | dwebble → crustle (L34) | bug/rock | 3 |
+| 564 | tirtouga → carracosta (L37) | water/rock | 5 |
+| 566 | archen → archeops (L37) | rock/flying | 5 |
+| 622 | golett → golurk (L43) | ground/ghost | 7 |
+| 618 | stunfisk | ground/electric | 8 |
+
+### Black Belt — Fighting (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 559 | scraggy → scrafty (L39) | dark/fighting | 1 |
+| 532 | timburr → gurdurr (L25) | fighting | 2 |
+| 539 | sawk | fighting | 3 |
+| 538 | throh | fighting | 5 |
+| 619 | mienfoo → mienshao (L50) | fighting | 7 |
+
+### Cyclist M — Electric (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 522 | blitzle → zebstrika (L27) | electric | 1 |
+| 587 | emolga | electric/flying | 2 |
+| 595 | joltik → galvantula (L36) | bug/electric | 2 |
+| 602 | tynamo → eelektrik (L39) | electric | 3 |
+| 618 | stunfisk | ground/electric | 8 |
+
+### Cyclist F — Electric (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 522 | blitzle → zebstrika (L27) | electric | 1 |
+| 587 | emolga | electric/flying | 2 |
+| 595 | joltik → galvantula (L36) | bug/electric | 2 |
+| 602 | tynamo → eelektrik (L39) | electric | 3 |
+| 618 | stunfisk | ground/electric | 8 |
+
+### Depot Agent — Steel (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 530 | excadrill | ground/steel | 2 |
+| 599 | klink → klang (L38) → klinklang (L49) | steel | 2 |
+| 597 | ferroseed → ferrothorn (L40) | grass/steel | 3 |
+| 624 | pawniard → bisharp (L52) | dark/steel | 4 |
+| 589 | escavalier | bug/steel | 8 |
+| 632 | durant | bug/steel | 8 |
+
+### Pilot — Flying (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 519 | pidove → tranquill (L21) → unfezant (L32) | normal/flying | 1 |
+| 527 | woobat | psychic/flying | 2 |
+| 587 | emolga | electric/flying | 2 |
+| 561 | sigilyph | psychic/flying | 3 |
+| 566 | archen → archeops (L37) | rock/flying | 5 |
+| 580 | ducklett → swanna (L35) | water/flying | 6 |
+| 627 | rufflet → braviary (L54) | normal/flying | 8 |
+| 629 | vullaby → mandibuzz (L54) | dark/flying | 8 |
+
+### Pokemon Ranger M — Grass (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 540 | sewaddle → swadloon (L20) | bug/grass | 1 |
+| 511 | pansage | grass | 2 |
+| 546 | cottonee | grass/fairy | 2 |
+| 548 | petilil | grass | 2 |
+| 556 | maractus | grass | 3 |
+| 590 | foongus → amoonguss (L39) | grass/poison | 3 |
+| 597 | ferroseed → ferrothorn (L40) | grass/steel | 3 |
+| 585 | deerling → sawsbuck (L34) | normal/grass | 5 |
+
+### Pokemon Ranger F — Grass (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 540 | sewaddle → swadloon (L20) | bug/grass | 1 |
+| 511 | pansage | grass | 2 |
+| 546 | cottonee | grass/fairy | 2 |
+| 548 | petilil | grass | 2 |
+| 556 | maractus | grass | 3 |
+| 590 | foongus → amoonguss (L39) | grass/poison | 3 |
+| 597 | ferroseed → ferrothorn (L40) | grass/steel | 3 |
+| 585 | deerling → sawsbuck (L34) | normal/grass | 5 |
+
+### Janitor — Poison (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 543 | venipede → whirlipede (L22) → scolipede (L30) | bug/poison | 1 |
+| 568 | trubbish → garbodor (L36) | poison | 2 |
+| 590 | foongus → amoonguss (L39) | grass/poison | 3 |
+
+### Roughneck — Dark (fixed)
+
+| Base | Line (stage @ level) | Types | From map |
+|---|---|---|---|
+| 509 | purrloin → liepard (L20) | dark | 1 |
+| 551 | sandile → krokorok (L29) → krookodile (L40) | ground/dark | 1 |
+| 559 | scraggy → scrafty (L39) | dark/fighting | 1 |
+| 570 | zorua → zoroark (L30) | dark | 1 |
+| 624 | pawniard → bisharp (L52) | dark/steel | 4 |
+| 629 | vullaby → mandibuzz (L54) | dark/flying | 8 |
+| 633 | deino → zweilous (L50) → hydreigon (L64) | dark/dragon | 8 |
+
+
+## Stage reachability check
+
+Every multi-stage line reaches its final form inside the level bands — no line
+is authored that can never evolve:
+
+| Line | m1 | m2 | m3 | m4 | m5 | m6 | m7 | m8 |
+|---|---|---|---|---|---|---|---|---|
+| Tympole | Tympole | Tympole | Palpitoad | Seismitoad | Seismitoad | Seismitoad | Seismitoad | Seismitoad |
+| Sandile | Sandile | Sandile | Sandile | Krokorok | Krookodile | Krookodile | Krookodile | Krookodile |
+| Klink | Klink | Klink | Klink | Klink | Klang | Klinklang | Klinklang | Klinklang |
+| Mienfoo | Mienfoo | Mienfoo | Mienfoo | Mienfoo | Mienfoo | Mienshao | Mienshao | Mienshao |
+| Deino | Deino | Deino | Deino | Deino | Deino | Zweilous | Hydreigon | Hydreigon |
+| Larvesta | Larvesta | Larvesta | Larvesta | Larvesta | Larvesta | Larvesta | Volcarona | Volcarona |
+
+Deino and Larvesta only reach their final stage on maps 7–8, which is correct —
+both are pseudo-legendary-tier lines that should read as a late-game payoff.
+
