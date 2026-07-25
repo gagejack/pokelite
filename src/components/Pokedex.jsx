@@ -154,7 +154,7 @@ export default function Pokedex({ onClose }) {
             <div className="flex flex-col gap-1">
               <div className="flex justify-between">
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{selectedGen}</span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{genPct}%</span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{genCaught}/{genRange.limit} · {genPct}%</span>
               </div>
               <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #2e2e2e', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e' }}>
                 <div style={{ width: `${genPct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
@@ -163,7 +163,7 @@ export default function Pokedex({ onClose }) {
             <div className="flex flex-col gap-1">
               <div className="flex justify-between">
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>All Gens</span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{allPct}%</span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{caughtSet.size}/{GEN_RANGES['All'].limit} · {allPct}%</span>
               </div>
               <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #2e2e2e', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e' }}>
                 <div style={{ width: `${allPct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
