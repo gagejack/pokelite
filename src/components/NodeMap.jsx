@@ -588,7 +588,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       return buildPokemonInstance(base, level)
     }))
     // Every enemy Pokémon fought counts as "seen" in the Pokédex.
-    team.forEach(p => onSpeciesSeen?.(p.pokeId))
+    team.forEach(p => onSpeciesSeen?.(p.pokeId, !!p.shiny))
 
     const isGrass = node.type === NODE_TYPES.GRASS
     const trainerSprite = isGrass && team.length > 0
@@ -626,7 +626,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       return { ...instance, level, rarity }
     }))
     // Wild Pokémon offered at a Pokéball node count as "seen".
-    offered.forEach(p => onSpeciesSeen?.(p.pokeId))
+    offered.forEach(p => onSpeciesSeen?.(p.pokeId, !!p.shiny))
     return offered
   }
 

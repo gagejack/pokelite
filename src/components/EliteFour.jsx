@@ -59,7 +59,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       const enemyTeam = await Promise.all(
         specs.map(async s => buildPokemonInstance(await fetchPokemonBase(s.id), s.level))
       )
-      enemyTeam.forEach(p => onSpeciesSeen?.(p.pokeId))
+      enemyTeam.forEach(p => onSpeciesSeen?.(p.pokeId, !!p.shiny))
       // A synthetic BOSS node gives the battle the prep screen (with roster
       // reorder), the +2 level reward, and the "X wants to battle!" label.
       setPendingBattle({
