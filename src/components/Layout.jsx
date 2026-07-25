@@ -175,7 +175,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       <Suspense fallback={null}>
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} role={role} />}
-        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} username={username} />}
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} username={username} onRestart={onRestart} />}
         {showTutorial && <TutorialOverlay />}
       </Suspense>
     </div>

@@ -1,12 +1,14 @@
 import { useTheme } from '../lib/theme'
 import { useSettings } from '../lib/settings'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 
 const SPEEDS = [1, 1.5, 2, 2.5, 3]
 
-export default function SettingsPanel({ onClose, username }) {
+export default function SettingsPanel({ onClose, username, onRestart }) {
   const { dark, cards, toggle } = useTheme()
-  const { battleSpeed, setSpeed } = useSettings()
+  const isDesktop = useIsDesktop()
+  const { battleSpeed, setSpeed, autoClose, setAutoClose } = useSettings()
 
   // Sign out via Supabase; onAuthStateChange (Layout/App) clears the session
   // everywhere, so we just close the panel afterward.
@@ -105,6 +107,50 @@ export default function SettingsPanel({ onClose, username }) {
             ))}
           </div>
         </div>
+
+        {/* Auto-close battle — mobile only: the nav bar's Auto button doesn't
+            exist on mobile (FloatingNav replaces the bar), so the toggle
+            lives here. Desktop keeps the nav bar button and hides this row. */}
+        {!isDesktop && (
+          <div style={{
+            padding: '14px', borderTop: borderStyle,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
+              Auto-Close Battle
+            </span>
+            <button
+              onClick={() => setAutoClose(!autoClose)}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '9px',
+                color: autoClose ? '#1a1a1a' : textColor,
+                border: borderStyle, padding: '4px 10px',
+                backgroundColor: autoClose ? '#facc15' : innerBg, cursor: 'pointer',
+              }}
+            >
+              {autoClose ? 'On' : 'Off'}
+            </button>
+          </div>
+        )}
+
+        {/* Restart Run — mobile only, and only when the current screen has a
+            run to restart (Layout passes onRestart through from NodeMap /
+            EliteFour; menu screens don't). */}
+        {!isDesktop && onRestart && (
+          <div style={{ padding: '0 14px 10px' }}>
+            <button
+              onClick={() => { onRestart(); onClose() }}
+              style={{
+                width: '100%',
+                fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
+                border: borderStyle, backgroundColor: innerBg,
+                padding: '8px', cursor: 'pointer',
+              }}
+            >
+              Restart Run
+            </button>
+          </div>
+        )}
 
         {/* Logout — only when signed in. */}
         {username && (
