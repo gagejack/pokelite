@@ -897,7 +897,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   })()
 
   const mapSvgProps = {
-    dark, borderStyle, shadowStyle,
+    dark, borderStyle,
+    // Mobile drops the offset drop shadow: at near-full width it pushes the
+    // card visually left and eats the 5px gutter. The border stays.
+    shadowStyle: isDesktop ? shadowStyle : 'none',
     nodePositions, edges, svgWidth, svgHeight,
     clearedNodes, currentNode, loadingNode, hoveredNode,
     mapContainerRef, holdTimerRef, holdActivatedRef,
@@ -1077,7 +1080,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, backgroundColor: dark ? '#1a1a1a' : '#c8c8c8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 0 8px' }}>
+        <div style={{ flex: 1, minHeight: 0, backgroundColor: dark ? '#1a1a1a' : '#c8c8c8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 5px' }}>
           {/* Map slot — fills the height above the Bag + Roster rows and centers
               the card. The card is sized (in JS) to the image's aspect ratio, fit
               to whichever slot axis binds, so the whole map shows centered with no
