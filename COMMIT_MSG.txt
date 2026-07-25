@@ -1,0 +1,19 @@
+feat(mobile): admin skip-map in FloatingNav, gray icons, logo cleanup
+
+FloatingNav
+- Add admin-only Skip Map button (poke-ball icon), gated on role === 'admin'
+  and onSkipMap being passed — matches the desktop nav bar's gate.
+- Reorder buttons: Home, Dex, Stats, Settings (Settings moves to the bottom).
+- Swap blueSettingsIcon for graySettingsIcon.
+- Drop the pill's borderRadius; add imageRendering: 'pixelated' so the
+  sprite icons stay crisp; support a per-button title tooltip.
+
+Layout
+- Pass onSkipMap and role through to FloatingNav.
+- Point the header logo at SpeedmonLogoGradientBevel.png.
+- Swap blueSettingsIcon for graySettingsIcon.
+
+Assets
+- Move logo/settings art under src/assets/Icons/ (blue -> black settings
+  icon renamed, gray/white variants added, Logo2 + speedmonLogoV1 added).
+- Remove the unused root-level SpeedmonLogo* originals and NoLine variants.

@@ -10,11 +10,11 @@ const Pokedex = lazy(() => import('./Pokedex'))
 const Stats = lazy(() => import('./Stats'))
 const SettingsPanel = lazy(() => import('./SettingsPanel'))
 const TutorialOverlay = lazy(() => import('./TutorialOverlay'))
-import speedmonLogo from '../assets/SpeedmonLogoNoLine.png'
+import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
-import settingsIcon from '../assets/Icons/blueSettingsIcon.png'
+import settingsIcon from '../assets/Icons/graySettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
 
 // onSkipMap is accepted and shown when the user is an admin.
@@ -171,6 +171,8 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
             setSettingsOpen={setSettingsOpen}
             setPokedexOpen={setPokedexOpen}
             setStatsOpen={setStatsOpen}
+            onSkipMap={onSkipMap}
+            role={role}
           />
         )
       )}
