@@ -6,14 +6,21 @@ import LoginForm from './LoginForm'
 import MenuButton from './menu/MenuButton'
 import WeeklyStat from './menu/WeeklyStat'
 import CallingCard from './menu/CallingCard'
+import RegionBar from './menu/RegionBar'
+import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  // Desktop only: 'region' swaps the button column in place instead of
+  // changing screens, so the background art and logo never unmount.
+  const [mode, setMode] = useState('menu')
+  const [seedInput, setSeedInput] = useState('')
+  const [seedError, setSeedError] = useState(null)
 
   // Track auth state so the login/register card hides once signed in.
   useEffect(() => {
@@ -28,7 +35,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   // adding a mode or changing a size happens in exactly one place.
   const buttonDefs = [
     { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
-      color: '#fff', fontSize: '26px', onClick: onPlay, visible: true },
+      color: '#fff', fontSize: '26px', onClick: () => (isDesktop ? setMode('region') : onPlay()), visible: true },
     { id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)',
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
@@ -99,6 +106,51 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     </div>
   )
 
+  // Region mode's column: Daily moves up into PLAY's slot, the five regions
+  // become bars, and Back + the seed input share one row like DEX/STATS.
+  const dailyDef = buttonDefs.find(d => d.id === 'daily')
+  const regionColumn = (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+      <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
+      {dailyDef && <MenuButton def={dailyDef} dark={dark} />}
+      {REGIONS.map(region => (
+        <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion} />
+      ))}
+      <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
+        <MenuButton
+          def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => setMode('menu') }}
+          dark={dark}
+          style={{ flex: 1, width: 'auto' }}
+        />
+        <input
+          value={seedInput}
+          onChange={e => { setSeedInput(e.target.value); setSeedError(null) }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              const res = onCustomSeed?.(seedInput)
+              if (res?.error) setSeedError(res.error)
+            }
+          }}
+          placeholder="KANTO-7Q2"
+          style={{
+            flex: 1, height: '40px', minWidth: 0,
+            fontFamily: 'Orange Kid', fontSize: '14px', padding: '6px 8px',
+            textTransform: 'uppercase', textAlign: 'center',
+            border: dark ? '2px solid #121212' : '2px solid #2e2e2e',
+            backgroundColor: dark ? '#1a1a1a' : '#fff',
+            color: dark ? '#DBDBDB' : '#333333',
+          }}
+        />
+      </div>
+      {/* Error sits BELOW the row so an invalid seed never resizes the column. */}
+      {seedError && (
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#ef4444', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
+          {seedError}
+        </span>
+      )}
+    </div>
+  )
+
   // Desktop: the artwork is the hero. fullArtwork.webp is MIRRORED
   // (scaleX(-1)) because every subject in the original sits on the left —
   // unmirrored, the logo and buttons would cover Pikachu and the whole group.
@@ -130,17 +182,19 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         padding: '32px 40px', overflowY: 'auto',
       }}>
         {/* Upper-left: logo + button stack over the night sky */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
-          <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
-          {buttonDefs.map(def => (
-            <MenuButton key={def.id} def={def} dark={dark} />
-          ))}
-          <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
-            {halfDefs.map(def => (
-              <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+        {mode === 'region' ? regionColumn : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+            <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
+            {buttonDefs.map(def => (
+              <MenuButton key={def.id} def={def} dark={dark} />
             ))}
+            <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
+              {halfDefs.map(def => (
+                <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Bottom row: weekly stat left, calling card right */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '24px' }}>
@@ -160,7 +214,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   )
 
   return (
-    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+    <Layout onHome={() => { setPokedexOpen(false); setMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
       {isDesktop ? desktopLayout : mobileLayout}
     </Layout>
   )
