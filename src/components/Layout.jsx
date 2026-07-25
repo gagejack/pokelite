@@ -146,13 +146,31 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
           style={{
             position: 'absolute', left: '50%', top: '50%',
             transform: 'translate(-50%, -50%)',
-            height: '35px', width: 'auto', display: 'block',
+            height: '30px', width: 'auto', display: 'block',
             pointerEvents: 'none',
           }}
         />
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
+      </div>
+      {/* Attribution footer — a hairline rule and one line of fine print,
+          present on every screen since Layout wraps them all. Kept out of the
+          flex flow's growth (flexShrink: 0) so it never steals space from the
+          game area. */}
+      <div style={{
+        flexShrink: 0,
+        borderTop: `1px solid ${dark ? '#333' : '#c4c4c4'}`,
+        padding: '6px 12px',
+        textAlign: 'center',
+      }}>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '11px',
+          color: dark ? '#777' : '#8a8a8a',
+          lineHeight: 1.3,
+        }}>
+          Speedmon is a fan-made project. No affiliation, endorsement, or sponsorship from Nintendo, Game Freak, or The Pokémon Company. All sprites and assets belong to their respective owners.
+        </span>
       </div>
       <Suspense fallback={null}>
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}

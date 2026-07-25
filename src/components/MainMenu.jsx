@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import Layout from './Layout'
 import LoginForm from './LoginForm'
-import MainPlayButton from '../assets/collage.webp'
+import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
 export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen }) {
@@ -20,6 +20,12 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
   const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
+
+  // Inner bevel for the menu bars: a hard white highlight along the top/left
+  // and a dark edge along the bottom/right, so each bar reads as raised. Hard
+  // (0 blur) to match the pixel-art styling, and appended after the drop shadow
+  // so both render.
+  const bevel = `${shadowStyle}, inset 2px 2px 0 0 rgba(255,255,255,0.35), inset -2px -2px 0 0 rgba(0,0,0,0.3)`
 
   return (
     <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
@@ -42,28 +48,29 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           width: '100%',
         }}>
 
-        {/* Play button */}
-        <button onClick={onPlay} className="hover:scale-105 active:scale-95 transition-transform duration-150 relative" style={{ width: '320px', maxWidth: '100%' }}>
-          <img
-            src={MainPlayButton}
-            alt="Play"
-            style={{
-              width: '100%',
-              display: 'block',
-              boxShadow: shadowStyle,
-              border: borderStyle,
-            }}
-          />
-          <div
-            className="absolute bottom-0 left-0 w-full flex items-center justify-center"
-            style={{
-              height: '40px',
-              backgroundColor: '#22c55e',
-              border: borderStyle,
-            }}
-          >
-            <span style={{ fontSize: '26px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>PLAY</span>
-          </div>
+        {/* Brand logo — same width as the button stack below it, so the whole
+            column reads as one block. No border/shadow: the art has its own. */}
+        <img
+          src={speedmonLogo}
+          alt="Speedmon"
+          style={{ width: '320px', maxWidth: '100%', height: 'auto', display: 'block' }}
+        />
+
+        {/* Play button — a plain green bar, matching Daily/Resume below. */}
+        <button
+          onClick={onPlay}
+          className="hover:scale-105 active:scale-95 transition-transform duration-150"
+          style={{
+            width: '320px', maxWidth: '100%', height: '40px',
+            // Same lit-from-above treatment as Daily: darker green at the
+            // bottom rising to a brighter one.
+            background: 'linear-gradient(to top, #16a34a, #4ade80)',
+            border: borderStyle,
+            boxShadow: bevel,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontSize: '26px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>PLAY</span>
         </button>
 
         {/* Daily Challenge — red box below Play; opens the daily modal (same one
@@ -73,11 +80,14 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           className="daily-glow hover:scale-105 active:scale-95 transition-transform duration-150"
           style={{
             width: '320px', maxWidth: '100%', height: '40px',
-            backgroundColor: '#ef4444',
+            // Subtle orange-to-red: `to top` puts the darker red at the bottom,
+            // so the bar reads as lit from above like the inner bevel.
+            background: 'linear-gradient(to top, #dc2626, #f97316)',
             border: borderStyle,
             // The glow animation composes with this via --btn-shadow (index.css),
-            // so the offset shadow survives the animated box-shadow.
-            '--btn-shadow': shadowStyle,
+            // so the offset shadow AND the inner bevel survive the animated
+            // box-shadow (which would otherwise replace them outright).
+            '--btn-shadow': bevel,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -93,7 +103,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
               width: '320px', maxWidth: '100%', height: '40px',
               backgroundColor: '#3b82f6',
               border: borderStyle,
-              boxShadow: shadowStyle,
+              boxShadow: bevel,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -107,7 +117,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           fontFamily: 'Orange Kid', fontSize: '14px',
           color: dark ? '#888' : '#999',
         }}>
-          v 1.0
+          v1.0
         </span>
 
         {/* Auth card — hidden once logged in */}
