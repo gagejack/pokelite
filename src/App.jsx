@@ -455,6 +455,34 @@ export default function App() {
     setTimeout(() => setScreen('nodemap'), 0)
   }
 
+  // Shared by RegionSelect (mobile) and MainMenu's desktop region mode.
+  function handleSelectRegion(region) {
+    setRunSeed(null)        // normal run
+    setRunMode('normal')
+    setSelectedRegion(region)
+    const config = getRegionConfig(region.name)
+    if (config) prewarmCache(config)
+    setScreen('starter')
+  }
+
+  function handleCustomSeed(code) {
+    const decoded = decodeSeed(code)
+    if (!decoded) return { error: 'Invalid seed' }
+    // Match the decoded REGION against the playable region list — the
+    // single source of truth (regionRegistry), so this never drifts
+    // from what RegionSelect shows as playable.
+    const region = regionNames({ playableOnly: true })
+      .find(n => n.toUpperCase() === decoded.region)
+    if (!region) return { error: 'Unknown region' }
+    // decoded.code is already the normalized canonical string.
+    setRunSeed({ region, seed: decoded.seed, code: decoded.code })
+    setRunMode('custom')
+    setSelectedRegion({ name: region })
+    prewarmCache(getRegionConfig(region))
+    setScreen('starter')
+    return { ok: true }
+  }
+
   return (
     <ThemeProvider>
     <SettingsProvider>
@@ -465,6 +493,8 @@ export default function App() {
           hasSavedRun={hasSavedRun}
           onResume={resumeRun}
           onOpenDaily={() => setDailyOpen(true)}
+          onSelectRegion={handleSelectRegion}
+          onCustomSeed={handleCustomSeed}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -472,31 +502,8 @@ export default function App() {
       {screen === 'region' && (
         <RegionSelect
           onBack={() => setScreen('menu')}
-          onSelectRegion={region => {
-            setRunSeed(null)        // normal run
-            setRunMode('normal')
-            setSelectedRegion(region)
-            const config = getRegionConfig(region.name)
-            if (config) prewarmCache(config)
-            setScreen('starter')
-          }}
-          onCustomSeed={code => {
-            const decoded = decodeSeed(code)
-            if (!decoded) return { error: 'Invalid seed' }
-            // Match the decoded REGION against the playable region list — the
-            // single source of truth (regionRegistry), so this never drifts
-            // from what RegionSelect shows as playable.
-            const region = regionNames({ playableOnly: true })
-              .find(n => n.toUpperCase() === decoded.region)
-            if (!region) return { error: 'Unknown region' }
-            // decoded.code is already the normalized canonical string.
-            setRunSeed({ region, seed: decoded.seed, code: decoded.code })
-            setRunMode('custom')
-            setSelectedRegion({ name: region })
-            prewarmCache(getRegionConfig(region))
-            setScreen('starter')
-            return { ok: true }
-          }}
+          onSelectRegion={handleSelectRegion}
+          onCustomSeed={handleCustomSeed}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           onOpenDaily={() => setDailyOpen(true)}
