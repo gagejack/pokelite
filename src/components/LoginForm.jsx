@@ -15,8 +15,8 @@ export default function LoginForm({ onAuthSuccess }) {
   const [authError, setAuthError] = useState(null)
   const [authLoading, setAuthLoading] = useState(false)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e'
 
   // Login by username via the login-with-username Edge Function. The email is
   // resolved + the password verified SERVER-SIDE; only session tokens come back

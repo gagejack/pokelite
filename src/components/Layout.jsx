@@ -105,8 +105,8 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
   }, [])
 
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e'
   const textColor = dark ? '#DBDBDB' : '#666666'
 
   // Flat page background — dark grey in dark mode, off-white in light. (Was a

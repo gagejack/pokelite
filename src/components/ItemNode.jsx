@@ -14,8 +14,8 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
   const [hoveredOffer, setHoveredOffer] = useState(null)
   const [rerollsLeft, setRerollsLeft] = useState(MYSTERY_REROLLS)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const textColor = dark ? '#DBDBDB' : '#333333'

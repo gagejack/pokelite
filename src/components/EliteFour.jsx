@@ -30,8 +30,8 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   const [loadingIndex, setLoadingIndex] = useState(null)
   const [won, setWon] = useState(false)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'

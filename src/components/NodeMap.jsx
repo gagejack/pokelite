@@ -482,8 +482,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return () => ro.disconnect()
   }, [isDesktop])
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
 
   const nodePositions = {}
   mapData.rows.forEach((row, rowIndex) => {
@@ -1016,8 +1016,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                 onDrop={e => { if (isMovingItem) { e.preventDefault(); resolveItemMove({ kind: 'bag' }) } }}
                 style={{
                   width: '90px',
-                  border: isMovingItem ? '2px solid #facc15' : (dark ? '2px solid #121212' : '2px solid #3f3f3f'),
-                  boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'),
+                  border: isMovingItem ? '2px solid #facc15' : (dark ? '2px solid #121212' : '2px solid #2e2e2e'),
+                  boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'),
                   backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', flexShrink: 0,
                   cursor: isMovingItem ? 'pointer' : 'default',
@@ -1121,7 +1121,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               style={{
                 flexShrink: 0,
                 border: isMovingItem ? '2px solid #facc15' : borderStyle,
-                boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f'),
+                boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e'),
                 backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
                 display: 'flex', flexDirection: 'row', alignItems: 'center',
                 padding: '4px 8px', gap: '6px', overflowX: 'auto',

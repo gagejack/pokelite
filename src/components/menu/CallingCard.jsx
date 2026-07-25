@@ -35,8 +35,8 @@ export default function CallingCard({ dark }) {
     return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e'
   const rows = [
     ['RUNS',  stats ? stats.totalRuns : '—'],
     ['BEST',  stats ? `${stats.bestMaps} maps` : '—'],

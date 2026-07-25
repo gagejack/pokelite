@@ -24,8 +24,8 @@ export default function StarterSelect({ region, onBack, onSelectStarter, caughtS
     ).then(results => { setStarters(results); setLoading(false) })
   }, [region])
 
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f'
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
+  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
 
   return (
     <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>

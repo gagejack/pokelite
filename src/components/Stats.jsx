@@ -54,7 +54,7 @@ export default function Stats({ onClose, role = null }) {
 
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
-  const panelBorder = dark ? '2px solid #121212' : '2px solid #3f3f3f'
+  const panelBorder = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
 
@@ -128,7 +128,7 @@ export default function Stats({ onClose, role = null }) {
   const Stat = ({ label, value }) => (
     <div style={{
       backgroundColor: innerBg, border: panelBorder,
-      boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
+      boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
       padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
     }}>
       <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>{value}</span>
@@ -146,8 +146,8 @@ export default function Stats({ onClose, role = null }) {
         className="relative flex flex-col"
         style={{
           width: '90vw', maxWidth: isDesktop ? '900px' : '600px', height: '85vh',
-          backgroundColor: cardBg, border: dark ? '2px solid #fce329' : '2px solid #3f3f3f',
-          boxShadow: dark ? '-4px 6px 0 0 #00558e' : '-4px 6px 0 0 #3f3f3f',
+          backgroundColor: cardBg, border: dark ? '2px solid #fce329' : '2px solid #2e2e2e',
+          boxShadow: dark ? '-4px 6px 0 0 #00558e' : '-4px 6px 0 0 #2e2e2e',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -211,7 +211,7 @@ export default function Stats({ onClose, role = null }) {
                 style={{
                   fontFamily: 'Upheaval', fontSize: '14px', color: '#fff',
                   backgroundColor: '#22c55e', border: panelBorder,
-                  boxShadow: dark ? '-3px 4px 0 0 #121212' : '-3px 4px 0 0 #3f3f3f',
+                  boxShadow: dark ? '-3px 4px 0 0 #121212' : '-3px 4px 0 0 #2e2e2e',
                   padding: '10px 28px', cursor: 'pointer',
                 }}
               >
@@ -233,7 +233,7 @@ export default function Stats({ onClose, role = null }) {
                 stats.winRosters.map((roster, i) => (
                   <div key={i} style={{
                     backgroundColor: innerBg, border: panelBorder,
-                    boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
+                    boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
                     padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
                   }}>
                     <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: '#facc15' }}>
@@ -314,7 +314,7 @@ export default function Stats({ onClose, role = null }) {
                     style={{
                       background: box.gradient,
                       padding: '3px',
-                      boxShadow: dark ? '-3px 4px 0 0 #121212' : '-3px 4px 0 0 #3f3f3f',
+                      boxShadow: dark ? '-3px 4px 0 0 #121212' : '-3px 4px 0 0 #2e2e2e',
                     }}
                   >
                     <button
@@ -346,7 +346,7 @@ export default function Stats({ onClose, role = null }) {
               <div onClick={e => e.stopPropagation()} style={{
                 width: '86%', maxWidth: '640px', maxHeight: '82%', display: 'flex', flexDirection: 'column',
                 backgroundColor: cardBg, border: panelBorder,
-                boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f',
+                boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e',
               }}>
                 <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: panelBorder }}>
                   <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor }}>
@@ -367,7 +367,7 @@ export default function Stats({ onClose, role = null }) {
                       {list.map(m => (
                         <div key={m.id} style={{
                           backgroundColor: innerBg, border: panelBorder,
-                          boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
+                          boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
                           display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 4px', gap: '2px',
                         }}>
                           <img src={spriteFor(m.id)} alt={m.name}

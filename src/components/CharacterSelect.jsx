@@ -14,8 +14,8 @@ export default function CharacterSelect({ region, onBack, onSelectCharacter, pok
   const characters = config?.characters ?? []
 
   // Match the PokemonCard color scheme (dark surface in dark mode, white in light)
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const panelBg = dark ? '#1a1a1a' : '#ffffff'
   const tileBg = dark ? '#1a1a1a' : '#ffffff'
   const tileShadow = dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666'
