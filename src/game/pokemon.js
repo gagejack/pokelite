@@ -500,9 +500,13 @@ export async function evolveInto(instance, speciesId) {
 //   choices  — { index, fromId, fromName, sprite, options: [{ id }] } pending
 //              player picks; those Pokémon stay un-evolved until evolveInto.
 export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false, maxSpeciesId = Infinity } = {}) {
-  // Fainted Pokémon earn nothing from the win — no levels, and no victory heal
-  // below. They have to be revived (Pokécenter / boss full-heal) first.
-  let roster = finalPlayerTeam.map(fp => (fp._base && !fp.fainted) ? levelUp(fp, fp._base, levelsGained) : fp)
+  // Levels are earned by taking part in the win. A Pokémon that fought and
+  // fainted during the battle still levels up; only one that was ALREADY fainted
+  // when the battle started (`_enteredFainted`) earns nothing — it never
+  // participated, and has to be revived (Pokécenter / boss full-heal) first.
+  // Older callers that don't set the flag fall back to the post-battle state.
+  const earnedLevels = fp => (fp._enteredFainted !== undefined ? !fp._enteredFainted : !fp.fainted)
+  let roster = finalPlayerTeam.map(fp => (fp._base && earnedLevels(fp)) ? levelUp(fp, fp._base, levelsGained) : fp)
   // Victory heal: every surviving Pokémon recovers a fraction of max HP (capped).
   const healPct = BALANCE.pokemon.victoryHealPct
   roster = roster.map(p =>

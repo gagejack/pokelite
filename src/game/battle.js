@@ -114,8 +114,12 @@ function nextAlive(team, from) {
 export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
   const playerDmg = typeof damage === 'number' ? damage : (damage?.player ?? 2)
   const enemyDmg  = typeof damage === 'number' ? damage : (damage?.enemy ?? 2)
-  // Deep-clone teams so original roster isn't mutated (carry heldItem reference)
-  const player = playerTeam.map(p => ({ ...p, stats: { ...p.stats } }))
+  // Deep-clone teams so original roster isn't mutated (carry heldItem reference).
+  // `_enteredFainted` records the pre-battle state: a Pokémon that was already
+  // fainted when the battle started never participated, so it earns nothing from
+  // a win. One that faints DURING the battle still fought, and still levels up
+  // (see applyBattleVictory).
+  const player = playerTeam.map(p => ({ ...p, stats: { ...p.stats }, _enteredFainted: !!p.fainted }))
   const enemy  = enemyTeam.map(p => ({ ...p, stats: { ...p.stats } }))
 
   const log = []
