@@ -31,33 +31,20 @@ import badgeLegend from '../../assets/regions/Unova/Badges/Legendbadge.webp'
 
 // Trainer overworld sprites
 import trainerYoungster from '../../assets/regions/Unova/Trainers Overworlds/Youngster.webp'
-import trainerLass from '../../assets/regions/Unova/Trainers Overworlds/Lass.webp'
-import trainerPreschoolerM from '../../assets/regions/Unova/Trainers Overworlds/Preschooler M.webp'
-import trainerPreschoolerF from '../../assets/regions/Unova/Trainers Overworlds/Preschooler F.webp'
-import trainerSchoolkidM from '../../assets/regions/Unova/Trainers Overworlds/Schoolkid M.webp'
-import trainerSchoolkidF from '../../assets/regions/Unova/Trainers Overworlds/Schoolkid F.webp'
-import trainerBackpackerM from '../../assets/regions/Unova/Trainers Overworlds/Backpacker M.webp'
-import trainerBackpackerF from '../../assets/regions/Unova/Trainers Overworlds/Backpacker F.webp'
 import trainerJanitor from '../../assets/regions/Unova/Trainers Overworlds/Janitor.webp'
 import trainerNurseryAide from '../../assets/regions/Unova/Trainers Overworlds/Nursery Aide.webp'
-import trainerTwins from '../../assets/regions/Unova/Trainers Overworlds/Twins.webp'
 import trainerHiker from '../../assets/regions/Unova/Trainers Overworlds/Hiker.webp'
-import trainerWorkerM from '../../assets/regions/Unova/Trainers Overworlds/Worker M.webp'
-import trainerWorkerF from '../../assets/regions/Unova/Trainers Overworlds/Worker F.webp'
 import trainerRoughneck from '../../assets/regions/Unova/Trainers Overworlds/Roughneck.webp'
 import trainerCyclistM from '../../assets/regions/Unova/Trainers Overworlds/Cyclist M.webp'
 import trainerCyclistF from '../../assets/regions/Unova/Trainers Overworlds/Cyclist F.webp'
-import trainerBiker from '../../assets/regions/Unova/Trainers Overworlds/Biker.webp'
 import trainerDepotAgent from '../../assets/regions/Unova/Trainers Overworlds/Depot Agent.webp'
 import trainerRangerM from '../../assets/regions/Unova/Trainers Overworlds/Pokemon Ranger M.webp'
 import trainerRangerF from '../../assets/regions/Unova/Trainers Overworlds/Pokemon Ranger F.webp'
 import trainerPilot from '../../assets/regions/Unova/Trainers Overworlds/Pilot.webp'
-import trainerAceTrainerM from '../../assets/regions/Unova/Trainers Overworlds/Ace Trainer M.webp'
-import trainerAceTrainerF from '../../assets/regions/Unova/Trainers Overworlds/Ace Trainer F.webp'
 import trainerBlackBelt from '../../assets/regions/Unova/Trainers Overworlds/Black Belt.webp'
-import trainerBattleGirl from '../../assets/regions/Unova/Trainers Overworlds/Battle Girl.webp'
-import trainerVeteranM from '../../assets/regions/Unova/Trainers Overworlds/Veteran M.webp'
-import trainerVeteranF from '../../assets/regions/Unova/Trainers Overworlds/Veteran F.webp'
+import trainerFisher from '../../assets/regions/Unova/Trainers Overworlds/Fisher.webp'
+import trainerBugCatcher from '../../assets/regions/Unova/Trainers Overworlds/Bug Catcher.webp'
+import trainerBaker from '../../assets/regions/Unova/Trainers Overworlds/Baker.webp'
 // Gym leader overworlds
 import trainerChili from '../../assets/regions/Unova/Characters Overworlds/Chili.webp'
 import trainerCilan from '../../assets/regions/Unova/Characters Overworlds/Cilan.webp'
@@ -77,18 +64,13 @@ import owMarshal from '../../assets/regions/Unova/Characters Overworlds/Marshal.
 import owAlder from '../../assets/regions/Unova/Characters Overworlds/Alder.webp'
 
 // Trainer full battle sprites
-import fullAceTrainer1 from '../../assets/regions/Unova/Trainer Full Sprites/Ace Trainer 1.webp'
-import fullAceTrainer2 from '../../assets/regions/Unova/Trainer Full Sprites/Ace Trainer 2.webp'
 import fullArtist from '../../assets/regions/Unova/Trainer Full Sprites/Artist.webp'
 import fullBackers1 from '../../assets/regions/Unova/Trainer Full Sprites/Backers 1.webp'
 import fullBackers2 from '../../assets/regions/Unova/Trainer Full Sprites/Backers 2.webp'
-import fullBackpacker1 from '../../assets/regions/Unova/Trainer Full Sprites/Backpacker 1.webp'
-import fullBackpacker2 from '../../assets/regions/Unova/Trainer Full Sprites/Backpacker 2.webp'
 import fullBaker from '../../assets/regions/Unova/Trainer Full Sprites/Baker.webp'
-import fullBattleGirl from '../../assets/regions/Unova/Trainer Full Sprites/Battle Girl.webp'
 import fullBeauty from '../../assets/regions/Unova/Trainer Full Sprites/Beauty.webp'
-import fullBiker from '../../assets/regions/Unova/Trainer Full Sprites/Biker.webp'
 import fullBlackBelt from '../../assets/regions/Unova/Trainer Full Sprites/Black Belt.webp'
+import fullBugCatcher from '../../assets/regions/Unova/Trainer Full Sprites/Bug Catcher.webp'
 import fullCyclist1 from '../../assets/regions/Unova/Trainer Full Sprites/Cyclist 1.webp'
 import fullCyclist2 from '../../assets/regions/Unova/Trainer Full Sprites/Cyclist 2.webp'
 import fullDancer from '../../assets/regions/Unova/Trainer Full Sprites/Dancer.webp'
@@ -102,7 +84,6 @@ import fullHoopster from '../../assets/regions/Unova/Trainer Full Sprites/Hoopst
 import fullInfielder from '../../assets/regions/Unova/Trainer Full Sprites/Infielder.webp'
 import fullJanitor from '../../assets/regions/Unova/Trainer Full Sprites/Janitor.webp'
 import fullLady from '../../assets/regions/Unova/Trainer Full Sprites/Lady.webp'
-import fullLass from '../../assets/regions/Unova/Trainer Full Sprites/Lass.webp'
 import fullLinebacker from '../../assets/regions/Unova/Trainer Full Sprites/Linebacker.webp'
 import fullSocialite from '../../assets/regions/Unova/Trainer Full Sprites/Socialite.webp'
 import fullMaid from '../../assets/regions/Unova/Trainer Full Sprites/Maid.webp'
@@ -126,14 +107,10 @@ import fullPokemonBreeder1 from '../../assets/regions/Unova/Trainer Full Sprites
 import fullPokemonBreeder2 from '../../assets/regions/Unova/Trainer Full Sprites/Pokemon Breeder 2.webp'
 import fullPokemonRanger1 from '../../assets/regions/Unova/Trainer Full Sprites/Pokemon Ranger 1.webp'
 import fullPokemonRanger2 from '../../assets/regions/Unova/Trainer Full Sprites/Pokemon Ranger 2.webp'
-import fullPreschooler1 from '../../assets/regions/Unova/Trainer Full Sprites/Preschooler 1.webp'
-import fullPreschooler2 from '../../assets/regions/Unova/Trainer Full Sprites/Preschooler 2.webp'
 import fullPsychic1 from '../../assets/regions/Unova/Trainer Full Sprites/Psychic 1.webp'
 import fullPsychic2 from '../../assets/regions/Unova/Trainer Full Sprites/Psychic 2.webp'
 import fullRichBoy from '../../assets/regions/Unova/Trainer Full Sprites/Rich Boy.webp'
 import fullRoughneck from '../../assets/regions/Unova/Trainer Full Sprites/Roughneck.webp'
-import fullSchoolkid1 from '../../assets/regions/Unova/Trainer Full Sprites/Schoolkid 1.webp'
-import fullSchoolkid2 from '../../assets/regions/Unova/Trainer Full Sprites/Schoolkid 2.webp'
 import fullScientist1 from '../../assets/regions/Unova/Trainer Full Sprites/Scientist 1.webp'
 import fullScientist2 from '../../assets/regions/Unova/Trainer Full Sprites/Scientist 2.webp'
 import fullShadowTriad from '../../assets/regions/Unova/Trainer Full Sprites/Shadow Triad.webp'
@@ -142,13 +119,8 @@ import fullStriker from '../../assets/regions/Unova/Trainer Full Sprites/Striker
 import fullSuitActor from '../../assets/regions/Unova/Trainer Full Sprites/Suit Actor.webp'
 import fullSwimmer1 from '../../assets/regions/Unova/Trainer Full Sprites/Swimmer 1.webp'
 import fullSwimmer2 from '../../assets/regions/Unova/Trainer Full Sprites/Swimmer 2.webp'
-import fullTwins from '../../assets/regions/Unova/Trainer Full Sprites/Twins.webp'
-import fullVeteran1 from '../../assets/regions/Unova/Trainer Full Sprites/Veteran 1.webp'
-import fullVeteran2 from '../../assets/regions/Unova/Trainer Full Sprites/Veteran 2.webp'
 import fullWaiter from '../../assets/regions/Unova/Trainer Full Sprites/Waiter.webp'
 import fullWaitress from '../../assets/regions/Unova/Trainer Full Sprites/Waitress.webp'
-import fullWorker1 from '../../assets/regions/Unova/Trainer Full Sprites/Worker 1.webp'
-import fullWorker2 from '../../assets/regions/Unova/Trainer Full Sprites/Worker 2.webp'
 import fullYoungster from '../../assets/regions/Unova/Trainer Full Sprites/Youngster.webp'
 
 // Boss full sprites (from character full sprites folder)
@@ -374,32 +346,35 @@ const CHARACTERS = [
 
 // --- Trainer full battle sprites ---
 const TRAINER_FULL_SPRITES = {
-  'Ace Trainer M':      fullAceTrainer1,
-  'Ace Trainer F':      fullAceTrainer2,
-  'Artist':             fullArtist,
-  'Backers M':          fullBackers1,
-  'Backers F':          fullBackers2,
-  'Backpacker M':       fullBackpacker1,
-  'Backpacker F':       fullBackpacker2,
+  // Roaming type specialists — appear on every map
+  'Fisher':             fullFisher,
+  'Bug Catcher':        fullBugCatcher,
   'Baker':              fullBaker,
-  'Battle Girl':        fullBattleGirl,
-  'Beauty':             fullBeauty,
-  'Biker':              fullBiker,
+  // Fixed-route specialists
+  'Youngster':          fullYoungster,
+  'Nursery Aide':       fullNurseryAide,
+  'Hiker':              fullHiker,
   'Black Belt':         fullBlackBelt,
   'Cyclist M':          fullCyclist1,
   'Cyclist F':          fullCyclist2,
-  'Dancer':             fullDancer,
   'Depot Agent':        fullDepotAgent,
+  'Pilot':              fullPilot,
+  'Pokemon Ranger M':   fullPokemonRanger1,
+  'Pokemon Ranger F':   fullPokemonRanger2,
+  'Janitor':            fullJanitor,
+  'Roughneck':          fullRoughneck,
+  // Non-route trainer classes (not part of TRAINER_POOLS placement)
+  'Artist':             fullArtist,
+  'Backers M':          fullBackers1,
+  'Backers F':          fullBackers2,
+  'Beauty':             fullBeauty,
+  'Dancer':             fullDancer,
   'Doctor':             fullDoctor,
-  'Fisher':             fullFisher,
   'Gentleman':          fullGentleman,
   'Harlequin':          fullHarlequin,
-  'Hiker':              fullHiker,
   'Hoopster':           fullHoopster,
   'Infielder':          fullInfielder,
-  'Janitor':            fullJanitor,
   'Lady':               fullLady,
-  'Lass':               fullLass,
   'Linebacker':         fullLinebacker,
   'Socialite':          fullSocialite,
   'Maid':               fullMaid,
@@ -408,29 +383,20 @@ const TRAINER_FULL_SPRITES = {
   'Neo Plasma Grunt M': fullNeoPlasmaGrunt1,
   'Neo Plasma Grunt F': fullNeoPlasmaGrunt2,
   'Nurse':              fullNurse,
-  'Nursery Aide':       fullNurseryAide,
   'Clerk M':            fullClerk1,
   'Clerk F':            fullClerk2,
   'Clerk':              fullClerk3,
   'Policeman':          fullPoliceman,
   'Parasol Lady':       fullParasolLady,
-  'Pilot':              fullPilot,
   'Plasma Grunt M':     fullPlasmaGrunt1,
   'Plasma Grunt F':     fullPlasmaGrunt2,
   'Poke Fan M':         fullPokeFan1,
   'Poke Fan F':         fullPokeFan2,
   'Pokemon Breeder M':  fullPokemonBreeder1,
   'Pokemon Breeder F':  fullPokemonBreeder2,
-  'Pokemon Ranger M':   fullPokemonRanger1,
-  'Pokemon Ranger F':   fullPokemonRanger2,
-  'Preschooler M':      fullPreschooler1,
-  'Preschooler F':      fullPreschooler2,
   'Psychic M':          fullPsychic1,
   'Psychic F':          fullPsychic2,
   'Rich Boy':           fullRichBoy,
-  'Roughneck':          fullRoughneck,
-  'Schoolkid M':        fullSchoolkid1,
-  'Schoolkid F':        fullSchoolkid2,
   'Scientist M':        fullScientist1,
   'Scientist F':        fullScientist2,
   'Shadow Triad':       fullShadowTriad,
@@ -439,14 +405,8 @@ const TRAINER_FULL_SPRITES = {
   'Suit Actor':         fullSuitActor,
   'Swimmer M':          fullSwimmer1,
   'Swimmer F':          fullSwimmer2,
-  'Twins':              fullTwins,
-  'Veteran M':          fullVeteran1,
-  'Veteran F':          fullVeteran2,
   'Waiter':             fullWaiter,
   'Waitress':           fullWaitress,
-  'Worker M':           fullWorker1,
-  'Worker F':           fullWorker2,
-  'Youngster':          fullYoungster,
   // Bosses
   'Chili':   fullChili,
   'Cilan':   fullCilan,
@@ -468,42 +428,23 @@ const TRAINER_FULL_SPRITES = {
 
 // --- Trainer overworld sprites ---
 const TRAINER_SPRITES = {
-  // Map 1
+  // Roaming type specialists — appear on every map
+  'Fisher':           trainerFisher,
+  'Bug Catcher':      trainerBugCatcher,
+  'Baker':            trainerBaker,
+  // Fixed-route specialists
   'Youngster':        trainerYoungster,
-  'Lass':             trainerLass,
-  'Preschooler M':    trainerPreschoolerM,
-  'Preschooler F':    trainerPreschoolerF,
-  'Schoolkid M':      trainerSchoolkidM,
-  'Schoolkid F':      trainerSchoolkidF,
-  'Backpacker M':     trainerBackpackerM,
-  'Backpacker F':     trainerBackpackerF,
-  'Janitor':          trainerJanitor,
-  // Map 2
   'Nursery Aide':     trainerNurseryAide,
-  'Twins':            trainerTwins,
-  // Map 3
   'Hiker':            trainerHiker,
-  'Worker M':         trainerWorkerM,
-  'Worker F':         trainerWorkerF,
-  'Roughneck':        trainerRoughneck,
-  // Map 4
+  'Black Belt':       trainerBlackBelt,
   'Cyclist M':        trainerCyclistM,
   'Cyclist F':        trainerCyclistF,
-  'Biker':            trainerBiker,
   'Depot Agent':      trainerDepotAgent,
-  // Map 5
+  'Pilot':            trainerPilot,
   'Pokemon Ranger M': trainerRangerM,
   'Pokemon Ranger F': trainerRangerF,
-  // Map 6
-  'Pilot':            trainerPilot,
-  'Ace Trainer M':    trainerAceTrainerM,
-  'Ace Trainer F':    trainerAceTrainerF,
-  // Map 7
-  'Black Belt':       trainerBlackBelt,
-  'Battle Girl':      trainerBattleGirl,
-  // Map 8
-  'Veteran M':        trainerVeteranM,
-  'Veteran F':        trainerVeteranF,
+  'Janitor':          trainerJanitor,
+  'Roughneck':        trainerRoughneck,
   // Gym leaders
   'Chili':            trainerChili,
   'Cilan':            trainerCilan,
@@ -591,44 +532,74 @@ const LEGENDARY_POOLS = [
 ]
 
 // --- Trainer pools per map ---
-// --- Themed trainer pools (per class) ---
-// Keys match the trainer names in TRAINER_POOLS. Base forms only — the engine
-// rolls the evolution stage by the mon's level. Classes not listed fall back to
-// the map route pool (Schoolkid M/F, Ace Trainer M/F, Veteran M/F stay generic).
+// --- Themed species pools per trainer class ---
+// Every route trainer is a type specialist: the pool is every Unova line
+// carrying that type (dual-types included), minus starters and legendaries.
+// Base forms only — rollStageForLevel picks the evolution stage by level, so
+// one entry covers the whole line (Tympole on map 2, Seismitoad on map 6).
+// Availability per map is gated by SPECIES_MIN_MAP below.
 const TRAINER_TYPE_POOLS = {
-  'Youngster':        [504, 506, 519],                     // Patrat, Lillipup, Pidove
-  'Lass':             [506, 509, 572, 531],                // Lillipup, Purrloin, Minccino, Audino
-  'Preschooler M':    [504, 519, 517, 527],                // Patrat, Pidove, Munna, Woobat
-  'Preschooler F':    [504, 519, 517, 527],
-  'Backpacker M':     [551, 524, 529, 557],                // Sandile, Roggenrola, Drilbur, Dwebble
-  'Backpacker F':     [551, 524, 529, 557],
-  'Janitor':          [572, 522, 568],                     // Minccino, Blitzle, Trubbish
-  'Nursery Aide':     [531, 517, 546, 548],                // Audino, Munna, Cottonee, Petilil
-  'Twins':            [572, 548, 546, 527],                // Minccino, Petilil, Cottonee, Woobat
-  'Hiker':            [524, 529, 551, 557],                // Roggenrola, Drilbur, Sandile, Dwebble
-  'Worker M':         [532, 529, 524, 599],                // Timburr, Drilbur, Roggenrola, Klink
-  'Worker F':         [532, 529, 524, 599],
-  'Roughneck':        [559, 509, 543, 568],                // Scraggy, Purrloin, Venipede, Trubbish
-  'Cyclist M':        [522, 587, 595],                     // Blitzle, Emolga, Joltik
-  'Cyclist F':        [522, 587, 595],
-  'Biker':            [543, 559, 568, 624],                // Venipede, Scraggy, Trubbish, Pawniard
-  'Depot Agent':      [599, 595, 522, 602],                // Klink, Joltik, Blitzle, Tynamo
-  'Pokemon Ranger M': [540, 546, 548, 585, 590],           // Sewaddle, Cottonee, Petilil, Deerling, Foongus
-  'Pokemon Ranger F': [540, 546, 548, 585, 590],
-  'Pilot':            [519, 527, 580, 627],                // Pidove, Woobat, Ducklett, Rufflet
-  'Black Belt':       [532, 538, 539, 619],                // Timburr, Throh, Sawk, Mienfoo
-  'Battle Girl':      [532, 619, 559],                     // Timburr, Mienfoo, Scraggy
+  // Water
+  'Fisher':           [515, 535, 550, 564, 580, 592, 594],
+  // Bug
+  'Bug Catcher':      [540, 543, 557, 588, 595, 616, 632, 636],
+  // Fire
+  'Baker':            [513, 554, 607, 631, 636],
+  // Normal — early-route half (Nursery Aide takes the caretaker half)
+  'Youngster':        [504, 506, 519, 627],
+  // Normal — caretaker half
+  'Nursery Aide':     [531, 572, 585, 626],
+  // Ground / Rock
+  'Hiker':            [524, 529, 536, 551, 557, 564, 566, 618, 622],
+  // Fighting
+  'Black Belt':       [532, 538, 539, 559, 619],
+  // Electric
+  'Cyclist M':        [522, 587, 595, 602, 618],
+  'Cyclist F':        [522, 587, 595, 602, 618],
+  // Steel
+  'Depot Agent':      [530, 589, 597, 599, 624, 632],
+  // Flying
+  'Pilot':            [519, 527, 561, 566, 580, 587, 627, 629],
+  // Grass
+  'Pokemon Ranger M': [511, 540, 546, 548, 556, 585, 590, 597],
+  'Pokemon Ranger F': [511, 540, 546, 548, 556, 585, 590, 597],
+  // Poison
+  'Janitor':          [543, 568, 590],
+  // Dark
+  'Roughneck':        [509, 551, 559, 570, 624, 629, 633],
 }
 
+// First map (1-based) each species may appear on a trainer's team. Seeded from
+// CATCH_POOLS (when the line first becomes catchable), then hand-corrected
+// earlier where a specialist would otherwise have fewer than two lines on
+// early maps — when a trainer should own a species is a different question
+// from when the player can catch one.
+const SPECIES_MIN_MAP = {
+  504: 1, 506: 1, 509: 1, 513: 1, 515: 1, 519: 1, 522: 1, 535: 1,
+  540: 1, 543: 1, 551: 1, 559: 1, 570: 1,
+  511: 2, 524: 2, 527: 2, 529: 2, 530: 2, 531: 2, 532: 2, 536: 2,
+  546: 2, 548: 2, 554: 2, 568: 2, 587: 2, 595: 2, 599: 2,
+  539: 3, 550: 3, 556: 3, 557: 3, 561: 3, 590: 3, 597: 3, 602: 3,
+  624: 4,
+  538: 5, 564: 5, 566: 5, 585: 5, 626: 5,
+  572: 6, 580: 6, 592: 6, 594: 6,
+  607: 7, 619: 7, 622: 7, 631: 7,
+  588: 8, 589: 8, 616: 8, 618: 8, 627: 8, 629: 8, 632: 8, 633: 8, 636: 8,
+}
+
+// Which trainer classes can appear on each map. The three roaming specialists
+// (Fisher, Bug Catcher, Baker) are on every map — their species pool changes
+// with progression, not their presence. The rest are placed to match their
+// Black/White route and city locations.
 const TRAINER_POOLS = [
-  ['Youngster', 'Lass', 'Preschooler M', 'Preschooler F', 'Schoolkid M', 'Schoolkid F', 'Backpacker M', 'Backpacker F', 'Janitor'],
-  ['Nursery Aide', 'Youngster', 'Lass', 'Twins', 'Backpacker M', 'Backpacker F'],
-  ['Hiker', 'Worker M', 'Worker F', 'Backpacker M', 'Backpacker F', 'Roughneck'],
-  ['Cyclist M', 'Cyclist F', 'Roughneck', 'Biker', 'Depot Agent', 'Backpacker M', 'Backpacker F'],
-  ['Hiker', 'Worker M', 'Worker F', 'Pokemon Ranger M', 'Pokemon Ranger F', 'Backpacker M', 'Backpacker F'],
-  ['Pilot', 'Backpacker M', 'Backpacker F', 'Ace Trainer M', 'Ace Trainer F', 'Pokemon Ranger M', 'Pokemon Ranger F'],
-  ['Roughneck', 'Biker', 'Black Belt', 'Battle Girl', 'Ace Trainer M', 'Ace Trainer F'],
-  ['Ace Trainer M', 'Ace Trainer F', 'Veteran M', 'Veteran F', 'Pokemon Ranger M', 'Pokemon Ranger F'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Youngster', 'Roughneck', 'Hiker'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Youngster', 'Nursery Aide', 'Pokemon Ranger M', 'Pokemon Ranger F'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Hiker', 'Janitor', 'Black Belt', 'Roughneck'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Cyclist M', 'Cyclist F', 'Depot Agent', 'Roughneck'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Hiker', 'Pokemon Ranger M', 'Pokemon Ranger F', 'Nursery Aide'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Pilot', 'Pokemon Ranger M', 'Pokemon Ranger F', 'Depot Agent'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Black Belt', 'Roughneck', 'Hiker', 'Janitor'],
+  ['Fisher', 'Bug Catcher', 'Baker', 'Depot Agent', 'Pilot', 'Roughneck', 'Hiker'],
 ]
 
 // Fixed boss per map (Map 1 is starter-assigned, handled in generate())
@@ -686,6 +657,8 @@ export const unovaConfig = {
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
   trainerTypePools: TRAINER_TYPE_POOLS,
+  // Gates themed pools by progression (game/trainerPools.js).
+  speciesMinMap: SPECIES_MIN_MAP,
   bossTeams: BOSS_TEAMS,
   eliteFourTeams: ELITE_FOUR_TEAMS,
   mapLevelRanges: MAP_LEVEL_RANGES,
