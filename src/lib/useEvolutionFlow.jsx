@@ -34,7 +34,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     const { roster: updatedRoster, evolutionNotices: notices, evolutionChoices: choices } =
       await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal, maxSpeciesId })
     // Each evolved form is a new owned species for the Pokédex.
-    notices.forEach(n => onSpeciesOwned?.(n.pokeId))
+    notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
     setRoster(updatedRoster)
     if (notices.length > 0) setEvolutionNotices(notices)
     if (choices.length > 0) setEvolutionChoices(choices)
@@ -61,7 +61,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     }
     if (result?.evolved) {
       setRoster(prev => prev.map((p, i) => i === pokeIndex && p.pokeId === target.pokeId ? result.evolved : p))
-      onSpeciesOwned?.(result.evolved.pokeId)
+      onSpeciesOwned?.(result.evolved.pokeId, !!result.evolved.shiny)
       setEvolutionNotices(prev => [...prev, { from: target.name, to: result.evolved.name, pokeId: result.evolved.pokeId }])
       return true
     }
@@ -78,7 +78,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     const evolved = current ? await evolveInto(current, speciesId) : null
     if (evolved) {
       setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
-      onSpeciesOwned?.(evolved.pokeId)
+      onSpeciesOwned?.(evolved.pokeId, !!evolved.shiny)
       setEvolutionNotices(prev => [...prev, { from: choice.fromName, to: evolved.name, pokeId: evolved.pokeId }])
     }
     setEvolutionChoices(prev => prev.slice(1))

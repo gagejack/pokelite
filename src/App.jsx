@@ -122,7 +122,7 @@ export default function App() {
     const instance = buildPokemonInstance(base, 5, true)
     setRoster([instance])
     // The starter is an owned species for the Pokédex (not a wild catch).
-    recordSpeciesOwned(instance.pokeId)
+    recordSpeciesOwned(instance.pokeId, !!instance.shiny)
   }
 
   function startRun(starter) {
@@ -313,9 +313,9 @@ export default function App() {
     }
   }
 
-  function handlePokemonCaught(pokemonId) {
+  function handlePokemonCaught(pokemonId, isShiny = false) {
     pokemonCaught.current += 1
-    recordSpeciesOwned(pokemonId)
+    recordSpeciesOwned(pokemonId, isShiny)
   }
 
   // Record a catch (wild or legendary), non-deduped, so the stats screen can
@@ -340,8 +340,11 @@ export default function App() {
   // counting it as a wild catch. Used for the starter and for evolutions —
   // both are species the player has owned, but neither is a Pokéball catch.
   // Owning a species also means it's been seen.
-  function recordSpeciesOwned(pokemonId) {
-    recordSpeciesSeen(pokemonId)
+  function recordSpeciesOwned(pokemonId, isShiny = false) {
+    // Owning a shiny counts as seeing one. Starters and evolutions never write
+    // a `catches` row (only Pokéball catches do), so without this a shiny
+    // starter or evolution would never appear in the Dex's shiny mode.
+    recordSpeciesSeen(pokemonId, isShiny)
     if (pokemonId == null || pokemonCaughtIds.current.includes(pokemonId)) return
     pokemonCaughtIds.current = [...pokemonCaughtIds.current, pokemonId]
   }

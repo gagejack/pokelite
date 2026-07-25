@@ -781,7 +781,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     } else {
       setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
     }
-    onPokemonCaught?.(pokemon.pokeId)
+    onPokemonCaught?.(pokemon.pokeId, !!pokemon.shiny)
     onCatchRecorded?.(pokemon)
     setClearedNodes(prev => new Set([...prev, node.id]))
     setCurrentNode(node.id)
@@ -798,7 +798,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     } else {
       setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
     }
-    onPokemonCaught?.(pokemon.pokeId)
+    onPokemonCaught?.(pokemon.pokeId, !!pokemon.shiny)
     onCatchRecorded?.(pokemon)
     setClearedNodes(prev => new Set([...prev, node.id]))
     setCurrentNode(node.id)

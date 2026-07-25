@@ -529,7 +529,7 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
       evolutionChoices.push({ index: i, fromId: p.pokeId, fromName: p.name, sprite: p.sprite, options: result.options })
       nextRoster.push(p)
     } else if (result?.evolved) {
-      evolutionNotices.push({ from: p.name, to: result.evolved.name, pokeId: result.evolved.pokeId })
+      evolutionNotices.push({ from: p.name, to: result.evolved.name, pokeId: result.evolved.pokeId, shiny: !!result.evolved.shiny })
       nextRoster.push(result.evolved)
     } else {
       nextRoster.push(p)
