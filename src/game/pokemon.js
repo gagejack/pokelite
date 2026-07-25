@@ -1,5 +1,5 @@
 import { getTypeMove, tierForLevel } from './typeMoves.js'
-import { slimChain, speciesIdFromUrl } from './evolutionChain.js'
+import { slimChain, speciesIdFromUrl, levelUpPathTo, downgradeTarget } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
 
@@ -332,17 +332,36 @@ export async function allSpeciesInLine(pokeId) {
 // form from a later gen (PokéAPI files every form under one species id, so
 // Meowth's chain lists both Persian and Galarian Perrserker as level-up
 // branches, and Mr. Mime's ONLY level-up branch is Gen-8 Mr. Rime).
-export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity) {
+//
+// `level`, when given, self-corrects an UNDER-LEVELED request: if pokeId's own
+// cumulative level-up requirement exceeds `level` (e.g. a themed pool names
+// Palpitoad, which needs L25, on an early map whose band tops out at L10),
+// walk DOWN pokeId's level-up path to the most-evolved stage that level can
+// legitimately reach, and resolve forward from THERE instead. This only fires
+// when pokeId is reachable by a pure level-up path from its line's root —
+// species behind a trade/stone/friendship step (Escavalier from Karrablast,
+// Pikachu from Pichu) have no such path and are left exactly where the pool
+// named them, at any level: that is the existing deliberate-floor case (see
+// below) and downgrading it would silently swap a trade-evolution mon for its
+// pre-evolution, which is wrong at every level, not just low ones.
+export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity, level) {
   const root = await loadEvolutionChain(pokeId)
   if (!root) return []
 
-  // Start at the REQUESTED species, not the chain root. A pool entry partway up
-  // a line (e.g. Pikachu, whose root is Pichu) is a deliberate floor — walking
-  // from the root would offer the pre-evolution the pool didn't ask for, and
-  // for non-level-up steps like Pichu→Pikachu the walk below would stop dead
-  // there and *only* ever yield Pichu.
+  let effectiveId = pokeId
+  if (level != null) {
+    const path = levelUpPathTo(root, pokeId)
+    if (path) effectiveId = downgradeTarget(path, level)
+  }
+
+  // Start at the REQUESTED (or, if downgraded, the reachable) species, not the
+  // chain root. A pool entry partway up a line (e.g. Pikachu, whose root is
+  // Pichu) is a deliberate floor — walking from the root would offer the
+  // pre-evolution the pool didn't ask for, and for non-level-up steps like
+  // Pichu→Pikachu the walk below would stop dead there and *only* ever yield
+  // Pichu.
   const findNode = node => {
-    if (node.id === pokeId) return node
+    if (node.id === effectiveId) return node
     for (const child of node.evolvesTo ?? []) {
       const hit = findNode(child)
       if (hit) return hit
@@ -381,7 +400,7 @@ export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity) {
 export async function rollStageForLevel(id, level, maxSpeciesId = Infinity) {
   let stages
   try {
-    stages = await resolveEvolutionLine(id, maxSpeciesId)
+    stages = await resolveEvolutionLine(id, maxSpeciesId, level)
   } catch {
     return id
   }

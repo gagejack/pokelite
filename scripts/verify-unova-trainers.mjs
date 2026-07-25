@@ -2,8 +2,10 @@
 // the module imports .webp assets, which plain node cannot resolve.
 import { readFileSync } from 'fs'
 import { filterPoolByMap } from '../src/game/trainerPools.js'
+import { levelUpPathTo } from '../src/game/evolutionChain.js'
 
 const src = readFileSync(new URL('../src/game/regions/unova.js', import.meta.url), 'utf8')
+const teamsSrc = readFileSync(new URL('../src/game/regions/unova.teams.js', import.meta.url), 'utf8')
 let failed = 0
 const check = (name, cond) => { if (!cond) { console.error('FAIL:', name); failed++ } else console.log('ok:', name) }
 
@@ -74,19 +76,75 @@ check('roaming classes on all 8 maps',
   ROAMING.every(c => mapRows.every(r => r.includes(c))))
 
 // The real payoff: every class, on every map it is placed, must have at
-// least one species available after gating.
+// least one species GENUINELY unlocked (SPECIES_MIN_MAP <= mapNumber) — not
+// just "the gate would have produced something". filterPoolByMap is the
+// production function and deliberately fails OPEN (returns the unfiltered
+// pool when gating would empty it), so calling it here would let this check
+// pass no matter how badly SPECIES_MIN_MAP is tuned: an empty-after-gating
+// pool comes back as the full ungated pool, which always has entries. Compute
+// availability directly from the parsed data instead, so a genuinely starved
+// class actually fails this check.
 let starved = []
 mapRows.forEach((row, mapIndex) => {
+  const mapNumber = mapIndex + 1
   row.forEach(cls => {
-    const got = filterPoolByMap(pools[cls], minMap, mapIndex)
-    if (got.length === 0) starved.push(`${cls}@map${mapIndex + 1}`)
+    const unlocked = (pools[cls] ?? []).filter(id => (minMap[id] ?? 1) <= mapNumber)
+    if (unlocked.length === 0) starved.push(`${cls}@map${mapNumber}`)
   })
 })
 check(`no class starved on a map it appears on ${starved.join(', ')}`, starved.length === 0)
 
+// Sanity check on the check itself: filterPoolByMap's fail-open behavior
+// really would have masked a starved class, confirming the direct computation
+// above is not redundant with it.
+check('filterPoolByMap fails open (sanity check that direct computation above is necessary)',
+  filterPoolByMap([999], { 999: 8 }, 0).length > 0)
+
 // Variety: no map row should be a single class repeated.
 check('every map has >= 4 distinct classes',
   mapRows.every(r => new Set(r).size >= 4))
+
+// --- Evolution-level reachability, on each class's EARLIEST map ---
+// This is the data-side counterpart to Finding 1's engine fix: even though
+// rollStageForLevel now self-corrects an under-leveled pool entry at runtime,
+// an entry that NEEDS correcting on the map it first appears is still a sign
+// the pool was authored wrong (the correction masks it, it doesn't excuse
+// it). A species counts as reachable at a level if its cumulative level-up
+// requirement is <= that level, OR it has no level-up path at all from its
+// line's root (the deliberate-floor case — e.g. a trade evolution named
+// directly, which is never "wrong" at any level).
+const rangesMatch = /export const MAP_LEVEL_RANGES = \[([\s\S]*?)\n\]/.exec(teamsSrc)
+if (!rangesMatch) throw new Error('MAP_LEVEL_RANGES not found in unova.teams.js')
+const mapLevelRanges = [...rangesMatch[1].matchAll(/\[\s*(\d+)\s*,\s*(\d+)\s*\]/g)]
+  .map(m => [Number(m[1]), Number(m[2])])
+check('8 map level ranges', mapLevelRanges.length === 8)
+
+const { chains, speciesToRoot } = JSON.parse(
+  readFileSync(new URL('../public/data/evolutions.json', import.meta.url), 'utf8')
+)
+const cumulativeMinLevel = id => {
+  const root = chains[speciesToRoot[id]]
+  if (!root) return null // species not covered by the bundled line data
+  const path = levelUpPathTo(root, id)
+  if (!path) return null // no level-up path from root — deliberate floor, always reachable
+  return path[path.length - 1].minLevel
+}
+
+let unreachable = []
+Object.keys(pools).forEach(cls => {
+  // Earliest map (1-based) this class is placed on.
+  const earliestMapIndex = mapRows.findIndex(row => row.includes(cls))
+  if (earliestMapIndex === -1) return // class not placed on any map (shouldn't happen; other checks cover it)
+  const [minLevel] = mapLevelRanges[earliestMapIndex]
+  pools[cls].forEach(id => {
+    const need = cumulativeMinLevel(id)
+    if (need != null && need > minLevel) {
+      unreachable.push(`${cls}: species ${id} needs L${need}, map ${earliestMapIndex + 1} floor is L${minLevel}`)
+    }
+  })
+})
+check(`every class's pool is reachable by level on its earliest map ${unreachable.join('; ')}`,
+  unreachable.length === 0)
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)
