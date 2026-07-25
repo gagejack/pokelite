@@ -1213,7 +1213,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       )}
 
       {pendingBattle && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        // zIndex 160: must clear FloatingNav's 150. BattleCard's own root is a
+        // positioned zIndex:100 element, which creates a fresh stacking context —
+        // its DefeatScreen/VictoryScreen children (zIndex 120) are confined
+        // inside that context and can never escape it to outrank a root-level
+        // sibling like FloatingNav, no matter how high their own z-index goes.
+        // Raising this outer wrapper is what actually lifts the whole subtree.
+        <div style={{ position: 'fixed', inset: 0, zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <BattleCard
             node={pendingBattle.node}
             enemyTeam={pendingBattle.enemyTeam}

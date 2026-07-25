@@ -160,12 +160,19 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
           />
         </div>
       ) : (
-        <FloatingNav
-          onHome={onHome}
-          setSettingsOpen={setSettingsOpen}
-          setPokedexOpen={setPokedexOpen}
-          setStatsOpen={setStatsOpen}
-        />
+        // Hidden while a modal is open — the stack (zIndex 150) would
+        // otherwise float above the Pokédex/Stats header (zIndex 60) and
+        // block the close "X", which lands right under the stack on phone
+        // widths. Settings (zIndex 200) already outranks the stack, but we
+        // hide for it too rather than special-case it.
+        !(pokedexOpen || statsOpen || settingsOpen) && (
+          <FloatingNav
+            onHome={onHome}
+            setSettingsOpen={setSettingsOpen}
+            setPokedexOpen={setPokedexOpen}
+            setStatsOpen={setStatsOpen}
+          />
+        )
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
