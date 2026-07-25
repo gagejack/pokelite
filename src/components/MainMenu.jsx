@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
   const [loggedIn, setLoggedIn] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
 
   // Track auth state so the login/register card hides once signed in.
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   const bevel = `${shadowStyle}, inset 2px 2px 0 0 rgba(255,255,255,0.35), inset -2px -2px 0 0 rgba(0,0,0,0.3)`
 
   return (
-    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter>
+    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
       <div style={{
         flex: 1,
         minHeight: 0,
@@ -110,6 +111,37 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
             <span style={{ fontSize: '22px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>RESUME RUN</span>
           </button>
         )}
+
+        {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
+            Same border/shadow/bevel language as the bars above. */}
+        <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setPokedexOpen(true)}
+            className="hover:scale-105 active:scale-95 transition-transform duration-150"
+            style={{
+              flex: 1, height: '40px',
+              backgroundColor: '#facc15',
+              border: borderStyle,
+              boxShadow: bevel,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: '16px', color: '#1a1a1a', letterSpacing: '2px', fontFamily: 'Upheaval' }}>DEX</span>
+          </button>
+          <button
+            onClick={() => setStatsOpen(true)}
+            className="hover:scale-105 active:scale-95 transition-transform duration-150"
+            style={{
+              flex: 1, height: '40px',
+              backgroundColor: '#6b7280',
+              border: borderStyle,
+              boxShadow: bevel,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: '16px', color: '#fff', letterSpacing: '2px', fontFamily: 'Upheaval' }}>STATS</span>
+          </button>
+        </div>
 
         {/* Version tag — sits under the last button (Resume when a run is
             saved, otherwise Daily Challenge). */}
