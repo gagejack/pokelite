@@ -11,8 +11,8 @@ The map is too small on phones. Three things squeeze it:
    42px (22px icons + 8px padding × 2 + 2px border × 2).
 2. **The attribution footer** takes roughly another 30px off the bottom
    (11px text + 6px padding × 2 + 1px border).
-3. **The map card is centered and inset**, so it never reaches the screen's
-   side edges even when horizontal room is available.
+3. **The map card is centered and inset**, so it stays well short of the
+   screen's side edges even when horizontal room is available.
 
 Together the chrome costs about 72px of vertical space — ~11% of a 667px
 phone viewport — before the map competes with the roster, bag, and badge rows
@@ -20,7 +20,8 @@ below it.
 
 ## Goal
 
-Give the map the reclaimed height and let it run edge-to-edge horizontally,
+Give the map the reclaimed height and let it run nearly the full width
+(a 5–10px gutter each side keeps its border visible),
 without cropping any of the map art or moving the roster/bag/badges out of
 reach.
 
@@ -31,13 +32,12 @@ reach.
 Replaced by two pieces.
 
 **Floating stack, top-right.** Transparent grey, vertically stacked, rendered
-above all other content. Five buttons:
+above all other content. Four buttons:
 
 1. Home
 2. Settings
-3. Fullscreen (new — `requestFullscreen()` / `exitFullscreen()`)
-4. Dex
-5. Stats
+3. Dex
+4. Stats
 
 **Auto, Restart, and the admin Skip Map** move into the settings panel or are
 dropped on mobile.
@@ -47,8 +47,6 @@ dropped on mobile.
                                    │ ⌂ │  home
                                    ├───┤
                                    │ ⚙ │  settings
-                                   ├───┤
-                                   │ ⛶ │  fullscreen
                                    ├───┤
                                    │ ▤ │  dex
                                    ├───┤
@@ -67,8 +65,18 @@ Requirements:
 ### 2. Map fills the width, letterboxed
 
 The map card currently sizes to the background image's aspect ratio and centers
-inside its slot. Keep that — only remove the width constraint so the card can
-reach both side edges.
+inside its slot. Keep that — only relax the width constraint so the card can
+reach near the side edges.
+
+**Keep a small side gutter: 5–10px each side.** Not flush to the edge — the
+card's border must stay visible on both sides, and a hairline of background
+reads as intentional framing rather than a clipped layout.
+
+**Remove the map's drop shadow on mobile.** `NodeMap.jsx:110` currently applies
+both `border: borderStyle` and `boxShadow: shadowStyle` to the map container;
+the shadow is `-4px 6px 0 0` (`NodeMap.jsx:486`), an offset that pushes the
+card visually left and eats into the right gutter once the card is near
+full-width. Keep the border, drop the shadow. Desktop keeps both.
 
 The existing sizing logic already does the right thing:
 
@@ -77,7 +85,8 @@ const width = Math.min(w, h * ratio)   // NodeMap.jsx:895
 ```
 
 It fits to whichever axis binds, so with a wider slot the map grows until
-height becomes the limit. Consequences:
+height becomes the limit — the only change needed is the slot's available
+width (full width minus the 5–10px gutters). Consequences:
 
 - **Every node stays visible.** No cropping, so `nodePositions` and the overlay
   hit-buttons need no rework — they are laid out against the image box, which
@@ -134,7 +143,7 @@ width of a full bar.
 | File | Change |
 |---|---|
 | `src/components/Layout.jsx` | Delete the mobile nav bar; render the floating stack; gate the footer by screen |
-| `src/components/NodeMap.jsx` | Remove the map slot's width constraint |
+| `src/components/NodeMap.jsx` | Widen the map slot to full width minus a 5–10px gutter; drop the map's `boxShadow` on mobile (line 110) |
 | `src/components/MainMenu.jsx` | Add the Dex + Stats row |
 | new: `src/components/FloatingNav.jsx` | The top-right stack |
 
@@ -143,10 +152,10 @@ Desktop paths must be untouched — the app already branches on `useIsDesktop()`
 
 ## Open questions
 
-- **Fullscreen on iOS Safari.** `requestFullscreen()` is unsupported on iPhone.
-  The button needs a fallback or should hide where the API is unavailable.
 - **Icon contrast** over arbitrary map backgrounds may need a subtle scrim or
   outline behind the stack.
+- **Exact gutter width** — 5px or 10px. Pick whichever keeps the border
+  clearly visible without looking inset; settle it in the browser.
 
 ## Out of scope
 
@@ -157,10 +166,11 @@ Desktop paths must be untouched — the app already branches on `useIsDesktop()`
 
 ## Verification
 
-1. On a phone viewport, the map is measurably larger than before and touches
-   both side edges.
-2. Every map node is visible and tappable; no node is cropped.
-3. The floating stack is legible over both a light route map and a dark battle
+1. On a phone viewport, the map is measurably larger than before, with a small
+   gutter each side and its border fully visible on both.
+2. The map has no drop shadow on mobile; desktop still does.
+3. Every map node is visible and tappable; no node is cropped.
+4. The floating stack is legible over both a light route map and a dark battle
    background.
-4. Desktop layout is unchanged.
-5. Footer still present on the main menu and region select.
+5. Desktop layout is unchanged.
+6. Footer still present on the main menu and region select.
