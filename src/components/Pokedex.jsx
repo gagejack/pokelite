@@ -30,6 +30,9 @@ export default function Pokedex({ onClose }) {
   const [loadingPokemon, setLoadingPokemon] = useState(false)
   const [caughtSet, setCaughtSet] = useState(() => new Set())
   const [seenSet, setSeenSet] = useState(() => new Set())
+  const [shinyMode, setShinyMode] = useState(false)
+  const [shinyCaughtSet, setShinyCaughtSet] = useState(() => new Set())
+  const [shinySeenSet, setShinySeenSet] = useState(() => new Set())
 
   // Aggregate the caught + seen sets from the logged-in user's saved run history.
   // Logged out → empty sets (everything blacked out). Requires the runs SELECT RLS policy.
@@ -43,7 +46,7 @@ export default function Pokedex({ onClose }) {
       if (!user) return
       const { data, error } = await supabase
         .from('runs')
-        .select('pokemon_caught_ids, pokemon_seen_ids')
+        .select('pokemon_caught_ids, pokemon_seen_ids, pokemon_seen_shiny_ids')
         .eq('user_id', user.id)
       if (cancelled || error || !data) return
       const caught = new Set()
@@ -56,6 +59,22 @@ export default function Pokedex({ onClose }) {
       caught.forEach(id => seen.add(id))
       setCaughtSet(caught)
       setSeenSet(seen)
+
+      // Shiny caught comes from `catches` (which has carried a shiny flag all
+      // along); shiny seen comes from the per-run array added alongside it.
+      const { data: shinyRows } = await supabase
+        .from('catches')
+        .select('species_id')
+        .eq('user_id', user.id)
+        .eq('shiny', true)
+      if (cancelled) return
+      const shinyCaught = new Set((shinyRows ?? []).map(r => r.species_id))
+      const shinySeen = new Set()
+      data.forEach(row => (row.pokemon_seen_shiny_ids ?? []).forEach(id => shinySeen.add(id)))
+      // A shiny caught is implicitly a shiny seen.
+      shinyCaught.forEach(id => shinySeen.add(id))
+      setShinyCaughtSet(shinyCaught)
+      setShinySeenSet(shinySeen)
     })()
     return () => { cancelled = true }
   }, [])
@@ -88,10 +107,14 @@ export default function Pokedex({ onClose }) {
   }, [selectedGen])
 
   // Caught-completion percentages for the progress bars.
+  // Which sets drive the grid and the bars — swapped wholesale by the toggle.
+  const activeCaught = shinyMode ? shinyCaughtSet : caughtSet
+  const activeSeen = shinyMode ? shinySeenSet : seenSet
+
   const genRange = GEN_RANGES[selectedGen]
-  const genCaught = [...caughtSet].filter(id => id > genRange.offset && id <= genRange.offset + genRange.limit).length
+  const genCaught = [...activeCaught].filter(id => id > genRange.offset && id <= genRange.offset + genRange.limit).length
   const genPct = Math.round((genCaught / genRange.limit) * 100)
-  const allPct = Math.round((caughtSet.size / GEN_RANGES['All'].limit) * 100)
+  const allPct = Math.round((activeCaught.size / GEN_RANGES['All'].limit) * 100)
 
   return (
     <div
@@ -148,12 +171,26 @@ export default function Pokedex({ onClose }) {
                 {gen}
               </button>
             ))}
+            <button
+              onClick={() => setShinyMode(s => !s)}
+              className="py-1 px-3 hover:opacity-70 transition-opacity"
+              style={{
+                fontFamily: 'Upheaval',
+                fontSize: '12px',
+                color: shinyMode ? '#1a1a1a' : (dark ? '#DBDBDB' : '#333333'),
+                backgroundColor: shinyMode ? '#facc15' : (dark ? '#2e2e2e' : '#DBDBDB'),
+                border: dark ? '2px solid #121212' : '2px solid #2e2e2e',
+                boxShadow: dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e',
+              }}
+            >
+              Shiny
+            </button>
           </div>
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <div className="flex justify-between">
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{selectedGen}</span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{shinyMode ? `${selectedGen} Shiny` : selectedGen}</span>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{genCaught}/{genRange.limit} · {genPct}%</span>
               </div>
               <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #2e2e2e', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e' }}>
@@ -162,8 +199,8 @@ export default function Pokedex({ onClose }) {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between">
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>All Gens</span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{caughtSet.size}/{GEN_RANGES['All'].limit} · {allPct}%</span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{shinyMode ? 'All Gens Shiny' : 'All Gens'}</span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{activeCaught.size}/{GEN_RANGES['All'].limit} · {allPct}%</span>
               </div>
               <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #2e2e2e', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e' }}>
                 <div style={{ width: `${allPct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
@@ -184,8 +221,8 @@ export default function Pokedex({ onClose }) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(6, 1fr)' : 'repeat(3, 1fr)', gap: isDesktop ? '10px' : '6px' }}>
               {pokemon.map(p => {
-                const caught = caughtSet.has(p.id)
-                const seen = seenSet.has(p.id)
+                const caught = activeCaught.has(p.id)
+                const seen = activeSeen.has(p.id)
                 return (
                   <div
                     key={p.id}
@@ -210,7 +247,7 @@ export default function Pokedex({ onClose }) {
                       </span>
                     </div>
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyMode ? 'shiny/' : ''}${p.id}.png`}
                       alt={p.name}
                       style={{
                         width: isDesktop ? '72px' : '52px', height: isDesktop ? '72px' : '52px', imageRendering: 'pixelated',
