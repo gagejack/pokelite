@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import LoginForm from './LoginForm'
 import MenuButton from './menu/MenuButton'
+import WeeklyStat from './menu/WeeklyStat'
+import CallingCard from './menu/CallingCard'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
 export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
 
@@ -39,61 +43,122 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       onClick: () => setStatsOpen(true), visible: true },
   ]
 
-  return (
-    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+  const mobileLayout = (
+    <div style={{
+      flex: 1,
+      minHeight: 0,
+      // Scroll if the stacked buttons + login card are taller than the
+      // viewport (e.g. register mode on short phones), so the register/create
+      // button can never end up trapped below the browser's bottom nav bar.
+      // `justifyContent: center` when it fits; the inner wrapper's auto margins
+      // keep it centered while staying fully scrollable on overflow.
+      overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '16px',
+    }}>
       <div style={{
-        flex: 1,
-        minHeight: 0,
-        // Scroll if the stacked buttons + login card are taller than the
-        // viewport (e.g. register mode on short phones), so the register/create
-        // button can never end up trapped below the browser's bottom nav bar.
-        // `justifyContent: center` when it fits; the inner wrapper's auto margins
-        // keep it centered while staying fully scrollable on overflow.
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '16px',
+        margin: 'auto',   // vertical-centers the stack when short; releases on overflow
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+        width: '100%',
       }}>
-        <div style={{
-          margin: 'auto',   // vertical-centers the stack when short; releases on overflow
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-          width: '100%',
-        }}>
 
-        {/* Brand logo — same width as the button stack below it, so the whole
-            column reads as one block. No border/shadow: the art has its own. */}
-        <img
-          src={speedmonLogo}
-          alt="Speedmon"
-          style={{ width: '320px', maxWidth: '100%', height: 'auto', display: 'block' }}
-        />
+      {/* Brand logo — same width as the button stack below it, so the whole
+          column reads as one block. No border/shadow: the art has its own. */}
+      <img
+        src={speedmonLogo}
+        alt="Speedmon"
+        style={{ width: '320px', maxWidth: '100%', height: 'auto', display: 'block' }}
+      />
 
-        {buttonDefs.map(def => (
-          <MenuButton key={def.id} def={def} dark={dark} />
+      {buttonDefs.map(def => (
+        <MenuButton key={def.id} def={def} dark={dark} />
+      ))}
+
+      {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
+          Same border/shadow/bevel language as the bars above. */}
+      <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
+        {halfDefs.map(def => (
+          <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
         ))}
+      </div>
 
-        {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
-            Same border/shadow/bevel language as the bars above. */}
-        <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
-          {halfDefs.map(def => (
-            <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+      {/* Version tag — sits under the last button (Resume when a run is
+          saved, otherwise Daily Challenge). */}
+      <span style={{
+        fontFamily: 'Orange Kid', fontSize: '14px',
+        color: dark ? '#888' : '#999',
+      }}>
+        v1.0
+      </span>
+
+      {/* Auth card — hidden once logged in */}
+      {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
+
+      </div>
+    </div>
+  )
+
+  // Desktop: the artwork is the hero. fullArtwork.webp is MIRRORED
+  // (scaleX(-1)) because every subject in the original sits on the left —
+  // unmirrored, the logo and buttons would cover Pikachu and the whole group.
+  // Flipped, the night sky lands under the column and the cluster reads
+  // left-to-right on the right-hand side.
+  const desktopLayout = (
+    <div style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <img
+        src="/fullArtwork.webp"
+        alt=""
+        aria-hidden="true"
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'cover', objectPosition: 'center',
+          transform: 'scaleX(-1)',
+          pointerEvents: 'none',
+        }}
+      />
+      {/* Readability scrim: `cover` crops differently per aspect ratio, so on
+          wide viewports the bright hillside can creep under the column. */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(to right, rgba(0,0,0,0.55), transparent 45%)',
+      }} />
+
+      <div style={{
+        position: 'relative', height: '100%',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        padding: '32px 40px', overflowY: 'auto',
+      }}>
+        {/* Upper-left: logo + button stack over the night sky */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+          <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
+          {buttonDefs.map(def => (
+            <MenuButton key={def.id} def={def} dark={dark} />
           ))}
+          <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
+            {halfDefs.map(def => (
+              <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+            ))}
+          </div>
         </div>
 
-        {/* Version tag — sits under the last button (Resume when a run is
-            saved, otherwise Daily Challenge). */}
-        <span style={{
-          fontFamily: 'Orange Kid', fontSize: '14px',
-          color: dark ? '#888' : '#999',
-        }}>
-          v1.0
-        </span>
-
-        {/* Auth card — hidden once logged in */}
-        {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
-
+        {/* Bottom row: weekly stat left, calling card right */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <WeeklyStat dark={dark} />
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: dark ? '#888' : '#ccc', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
+              v1.0
+            </span>
+          </div>
+          <CallingCard dark={dark} />
         </div>
       </div>
+    </div>
+  )
+
+  return (
+    <Layout onHome={() => setPokedexOpen(false)} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+      {isDesktop ? desktopLayout : mobileLayout}
     </Layout>
   )
 }
