@@ -75,18 +75,36 @@ export const BLUE_STARTER_COUNTER = {
   7: { id: 3,  level: 78 }, // vs Squirtle → Venusaur
 }
 
+// Blue's early-game starter, same counter rule as BLUE_STARTER_COUNTER but at
+// the middle evolution stage — a fully-evolved starter would be absurd in a
+// L24 map-3 fight. Bulbasaur(1)→Charmeleon, Charmander(4)→Wartortle,
+// Squirtle(7)→Ivysaur. Level is filled in at battle time from the roster's
+// highest (see rivalTeamSpecs) so it always lands as the ace.
+export const BLUE_EARLY_STARTER_COUNTER = {
+  1: { id: 5 }, // vs Bulbasaur → Charmeleon
+  4: { id: 8 }, // vs Charmander → Wartortle
+  7: { id: 2 }, // vs Squirtle → Ivysaur
+}
+
 // Rival (Blue) teams for RIVAL nodes, keyed by variant so the same rival can be
 // placed at different game stages with a stage-appropriate roster. Flat
 // { id, level } specs, same format as BOSS_TEAMS; ace last.
+// `starterCounter` names a counter map whose entry is appended as the true ace
+// at the team's highest level — resolved by rivalTeamSpecs (game/rivals.js).
 export const RIVAL_TEAMS = {
   // Map 3 (Vermilion, band [18,28]) — canonical early-game Blue, just under the
-  // Lt. Surge gym (L26-28).
+  // Lt. Surge gym (L26-28). His starter is spliced in last at L24.
   blueEarlyGame: [
     { id: 17,  level: 22 }, // Pidgeotto
     { id: 20,  level: 22 }, // Raticate
     { id: 64,  level: 23 }, // Kadabra
-    { id: 102, level: 24 }, // Exeggcute (ace)
+    { id: 102, level: 24 }, // Exeggcute
   ],
+}
+
+// Which counter map each rival variant draws its starter ace from.
+export const RIVAL_STARTER_COUNTERS = {
+  blueEarlyGame: BLUE_EARLY_STARTER_COUNTER,
 }
 
 // Per-map level ranges (indexed by mapIndex). Same pacing as Unova.
