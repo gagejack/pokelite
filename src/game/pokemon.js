@@ -128,6 +128,12 @@ export async function prewarmCache(regionConfig) {
   Object.values(regionConfig.eliteFourTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   // Rival teams (keyed by variant → [{ id, level }])
   Object.values(regionConfig.rivalTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  // Starter-counter aces (rival nodes + the champion) — spliced in at battle
+  // time, so they aren't in the team arrays above. All branches warm: the
+  // player's starter isn't known here.
+  Object.values(regionConfig.rivalStarterCounters ?? {}).forEach(counter =>
+    Object.values(counter).forEach(({ id }) => ids.add(id)))
+  Object.values(regionConfig.blueStarterCounter ?? {}).forEach(({ id }) => ids.add(id))
   // Legendary (Master Ball) pools (per-map arrays of { id, level })
   regionConfig.legendaryPools?.forEach(pool => pool.forEach(({ id }) => ids.add(id)))
 
@@ -320,7 +326,13 @@ export async function allSpeciesInLine(pokeId) {
 // (base = 1). Branches are followed randomly, matching the "random branch"
 // catch-node design. Returns [] on failure (caller falls back to the pool's
 // own id). Used only by catch nodes — grass/trainers are untouched.
-export async function resolveEvolutionLine(pokeId) {
+//
+// `maxSpeciesId` gates branches to the run region's generation, exactly as
+// checkEvolution does. Without it a Gen-1 pool species can walk into a regional
+// form from a later gen (PokéAPI files every form under one species id, so
+// Meowth's chain lists both Persian and Galarian Perrserker as level-up
+// branches, and Mr. Mime's ONLY level-up branch is Gen-8 Mr. Rime).
+export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity) {
   const root = await loadEvolutionChain(pokeId)
   if (!root) return []
 
@@ -348,7 +360,8 @@ export async function resolveEvolutionLine(pokeId) {
     // Pick a random branch among LEVEL-UP evolutions; a stage is only
     // reachable by catching if it evolves by level (item/trade branches are
     // skipped so we never offer a form the player couldn't have leveled into).
-    const branches = node.evolvesTo.filter(b => b.levelUp)
+    // Out-of-generation branches are dropped so the region stays canonical.
+    const branches = node.evolvesTo.filter(b => b.levelUp && b.id <= maxSpeciesId)
     if (branches.length === 0) break
     const nextNode = branches[Math.floor(rng() * branches.length)]
     // Cumulative: a later stage can't be reached below its own evolution level.
@@ -363,11 +376,12 @@ export async function resolveEvolutionLine(pokeId) {
 // ≤ level, and picks one weighted toward the most-evolved (weight = stage index
 // + 1). Falls back to the original id if the line can't be resolved. Shared by
 // catch nodes (offered wild Pokémon) and themed trainer teams so both gate
-// evolution by level identically.
-export async function rollStageForLevel(id, level) {
+// evolution by level identically. Pass `maxSpeciesId`
+// (GEN_MAX_ID[config.generation]) to keep offers inside the region's gen.
+export async function rollStageForLevel(id, level, maxSpeciesId = Infinity) {
   let stages
   try {
-    stages = await resolveEvolutionLine(id)
+    stages = await resolveEvolutionLine(id, maxSpeciesId)
   } catch {
     return id
   }
@@ -467,7 +481,9 @@ export async function evolveInto(instance, speciesId) {
 //   choices  — { index, fromId, fromName, sprite, options: [{ id }] } pending
 //              player picks; those Pokémon stay un-evolved until evolveInto.
 export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false, maxSpeciesId = Infinity } = {}) {
-  let roster = finalPlayerTeam.map(fp => fp._base ? levelUp(fp, fp._base, levelsGained) : fp)
+  // Fainted Pokémon earn nothing from the win — no levels, and no victory heal
+  // below. They have to be revived (Pokécenter / boss full-heal) first.
+  let roster = finalPlayerTeam.map(fp => (fp._base && !fp.fainted) ? levelUp(fp, fp._base, levelsGained) : fp)
   // Victory heal: every surviving Pokémon recovers a fraction of max HP (capped).
   const healPct = BALANCE.pokemon.victoryHealPct
   roster = roster.map(p =>
