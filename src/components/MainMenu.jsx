@@ -150,7 +150,10 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
               v1.0
             </span>
           </div>
-          <CallingCard dark={dark} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
+            <CallingCard dark={dark} />
+            {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
+          </div>
         </div>
       </div>
     </div>
