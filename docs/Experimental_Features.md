@@ -14,7 +14,7 @@ in parentheses so older notes and commit messages still resolve.
 | Track | Implemented | Not implemented |
 |---|---|---|
 | Engineering | 3 | 7 |
-| Game features | 3 (one partial) | 5 |
+| Game features | 3 (one partial) | 6 |
 
 ---
 
@@ -249,6 +249,125 @@ via lifetime stats (already tracked in `runs`/`catches`/`badges` tables).
 conditions" config in `src/game/`; `StarterSelect.jsx` reads unlocked starters
 from it. Purely additive — no run-loop changes.
 
+### Desktop main-menu layout *(new)*
+> ⚠️ **Blocked on a schema check** — the weekly counters need a timestamp on
+> `runs` that may not exist. See *Blocker* below. The layout itself is
+> unblocked; build it with placeholder numbers if the column is missing.
+
+The main menu is one centered column — logo, then a stack of 320px bars — which
+reads fine on a phone but wastes most of a desktop viewport and gives the game
+no room to show off. Desktop gets a purpose-built layout instead of the mobile
+column stretched wide.
+
+**Layout (desktop only, ≥768px — the existing `useIsDesktop` breakpoint):**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  [SPEEDMON logo]                                    │
+│                                                     │
+│  ┌───────────────┐                                  │
+│  │     PLAY      │              (background         │
+│  ├───────────────┤               artwork fills      │
+│  │ DAILY CHALLENGE│              top-right and      │
+│  ├───────────────┤               center)            │
+│  │  extra modes  │                                  │
+│  ├───────────────┤                                  │
+│  │  extra modes  │                                  │
+│  └───────────────┘                                  │
+│                                                     │
+│  ● 47 playing now                                   │
+│  This week: 128 maps beaten          ┌────────────┐ │
+│  Community: 12,405 maps beaten       │ calling    │ │
+│                                      │ card       │ │
+│                                      └────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+Everything actionable is left-aligned in one column: logo top-left, button
+stack directly beneath it, live stats bottom-left. The player's profile
+calling card sits bottom-right. Top-right and center stay clear as a canvas
+for background artwork.
+
+Mobile keeps the current centered column unchanged.
+
+**Components:**
+- `MainMenu.jsx` branches on `useIsDesktop()` — a `DesktopMenu` and the
+  existing mobile column, sharing the same button definitions so a new mode is
+  added in one place.
+- `src/components/menu/StatsCorner.jsx` — the three live counters.
+- `src/components/menu/CallingCard.jsx` — the profile card.
+
+**Data (three new reads, all from existing tables):**
+- *Active players* — needs a presence signal. Cheapest version: count distinct
+  `user_id` in `runs` with an `ended_at` inside the last 15 minutes and label it
+  "playing recently". True realtime needs Supabase Presence; not worth it yet.
+- *Weekly user maps beaten* — `sum(maps_cleared)` from `runs` for this user
+  since the week's start.
+- *Weekly community maps beaten* — the same sum without the user filter.
+
+**Blocker:** `runs` rows carry no timestamp in the insert payload
+(`recordRunEnd` in `App.jsx` sends `user_id`, `result`, `maps_cleared`,
+`pokemon_caught*`, `winning_roster`). If the table has no `created_at` default,
+"weekly" is unanswerable — confirm the column exists before building, and add a
+`created_at timestamptz default now()` if not. Everything else here is a client
+query away.
+
+**Calling card** shows: username, total runs, best maps cleared, favorite
+starter, shiny count. All derivable from `runs` + `catches` today. It is the
+natural surface for meta-progression unlocks (see above) later — card frames,
+badges, titles.
+
+**Extra modes** are stubs for now. The stack is a data-driven array so adding
+one is a config line, not a layout change.
+
+**Out of scope:** the background artwork itself (placeholder until art exists),
+realtime presence, and any new game mode's actual rules.
+
+### Mobile floating nav *(new)*
+Delete the mobile nav bar. It eats a fixed strip of vertical space at the top
+of every screen — the scarcest resource on a phone, where the map and battle
+views are already tight.
+
+Replace it with two pieces:
+
+**1. Floating stack, top-right** — transparent grey, vertically stacked, above
+all other content. Three buttons:
+
+1. **Home**
+2. **Settings**
+3. **Fullscreen** (new — `requestFullscreen()` / `exitFullscreen()`)
+
+**2. Dex + Stats bar** — a separate rectangular section holding both as
+side-by-side buttons on one line. Each is shorter than a full-width bar, so the
+two sit on the same row rather than stacking.
+
+```
+                                    ┌───┐
+                                    │ ⌂ │
+                                    ├───┤
+                                    │ ⚙ │
+                                    ├───┤
+                                    │ ⛶ │
+                                    └───┘
+
+        ┌──────────┬──────────┐
+        │   DEX    │  STATS   │
+        └──────────┴──────────┘
+```
+
+Auto, Restart, and the admin Skip Map move into the settings panel or are
+dropped on mobile.
+
+**Notes:**
+- Floats above all assets — needs a z-index above the map/battle layers
+  (the nav bar sits at 150 today).
+- Transparent grey background so the artwork behind stays visible; each button
+  needs enough contrast to stay legible over both light map art and dark
+  battle backgrounds.
+- Mobile only. Desktop keeps its own layout (see above).
+- The Speedmon logo and the attribution footer both live in the nav
+  bar / `Layout` today — decide where each goes on mobile.
+
 ### Difficulty modes *(was 4.4)*
 Easy/Normal/Hard as a first-class knob also doubles as a balance
 experimentation harness.
@@ -273,4 +392,5 @@ landed, so the remaining queue is:
 | 3 | Item hook pipeline | Engineering | Makes the 2.x gameplay additions cheap |
 | 4 | Trim battle log schema | Engineering | Small; do before interactive battles |
 | 5 | Skip battle | Game feature | Cheap pacing win, self-contained |
-| 6 | Interactive battles | Game feature | Largest effort; do after 3 and 4 land |
+| 6 | Desktop main menu | Game feature | Self-contained; first impression of the game |
+| 7 | Interactive battles | Game feature | Largest effort; do after 3 and 4 land |
