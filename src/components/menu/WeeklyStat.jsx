@@ -10,9 +10,8 @@ export default function WeeklyStat({ dark }) {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (cancelled || !user) return
+    async function loadMaps(user) {
+      if (!user) { if (!cancelled) setMaps(null); return }
       // Start of the current week (Monday 00:00 local).
       const now = new Date()
       const day = (now.getDay() + 6) % 7            // Mon=0 … Sun=6
@@ -25,11 +24,13 @@ export default function WeeklyStat({ dark }) {
       if (cancelled) return
       if (error || !data) { setMaps(null); return }
       setMaps(data.reduce((s, r) => s + (r.maps_cleared ?? 0), 0))
-    })()
-    return () => { cancelled = true }
+    }
+    supabase.auth.getUser().then(({ data }) => loadMaps(data.user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      loadMaps(session?.user ?? null)
+    })
+    return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
-
-  if (maps === null) return null
 
   return (
     <span style={{
@@ -37,7 +38,7 @@ export default function WeeklyStat({ dark }) {
       color: dark ? '#e5e5e5' : '#f5f5f5',
       textShadow: '1px 1px 0 rgba(0,0,0,0.9)',
     }}>
-      This week: {maps} maps beaten
+      This week: {maps === null ? '—' : maps} maps beaten
     </span>
   )
 }

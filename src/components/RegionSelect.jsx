@@ -35,7 +35,7 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
     // would crash at config.maps[0] when a run starts.
     const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
     const isHovered = available && hovered === region.name
-    const restShadow = cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #666666'
+    const restShadow = cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #3f3f3f'
     const hoverShadow = cards ? '-7px 10px 0 0 #000000' : '-5px 7px 0 0 #444444'
     return (
       <button
@@ -108,7 +108,7 @@ function ComingSoonCell({ cards, borderStyle, isDesktop }) {
       style={{
         width: '100%', aspectRatio: '1',
         border: cards ? '3px solid #000000' : borderStyle,
-        boxShadow: cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #666666',
+        boxShadow: cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #3f3f3f',
         backgroundColor: '#1a1a1a',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
@@ -131,8 +131,8 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
 
-  const borderStyle = cards ? '3px solid #000000' : '2px solid #666666'
-  const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #666666'
+  const borderStyle = cards ? '3px solid #000000' : '2px solid #3f3f3f'
+  const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #3f3f3f'
   // The page heading/subtitle sit directly on the flat page background (not on
   // a card), so they have to flip with the theme — white-on-dark reads as
   // invisible against the light mode's off-white. Text inside the region cards

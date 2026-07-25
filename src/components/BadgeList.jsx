@@ -9,7 +9,7 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
   const { dark } = useTheme()
   if (!badges.length) return null
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
   const isHorizontal = layout === 'horizontal'
   // Green chip behind the "Badges" label (replaces the yellow).
   const labelBg = '#3f9d4f'
@@ -42,7 +42,7 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
     return (
       <div style={{
         width: '100%', flexShrink: 0, boxSizing: 'border-box',
-        border: borderStyle, boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
+        border: borderStyle, boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
         backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
         display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         padding: '4px 8px', gap: '6px',
@@ -55,7 +55,7 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
   // Desktop: titled vertical column.
   return (
     <div style={{
-      border: borderStyle, boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666',
+      border: borderStyle, boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f',
       backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       flexShrink: 0, alignSelf: 'flex-start',

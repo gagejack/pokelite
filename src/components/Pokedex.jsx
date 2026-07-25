@@ -106,15 +106,15 @@ export default function Pokedex({ onClose }) {
           maxWidth: isDesktop ? '900px' : '600px',
           height: '85vh',
           backgroundColor: dark ? '#af1919' : '#DBDBDB',
-          border: dark ? '2px solid #fce329' : '2px solid #666666',
-          boxShadow: dark ? '-4px 6px 0 0 #00558e' : '-4px 6px 0 0 #666666',
+          border: dark ? '2px solid #fce329' : '2px solid #3f3f3f',
+          boxShadow: dark ? '-4px 6px 0 0 #00558e' : '-4px 6px 0 0 #3f3f3f',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div
           className="flex items-center justify-between px-5 py-3"
-          style={{ borderBottom: dark ? '2px solid #121212' : '2px solid #666666' }}
+          style={{ borderBottom: dark ? '2px solid #121212' : '2px solid #3f3f3f' }}
         >
           <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: dark ? '#DBDBDB' : '#333333' }}>
             Pokedex
@@ -141,8 +141,8 @@ export default function Pokedex({ onClose }) {
                   fontSize: '12px',
                   color: dark ? '#DBDBDB' : '#333333',
                   backgroundColor: selectedGen === gen ? (dark ? '#444' : '#bbb') : (dark ? '#2e2e2e' : '#DBDBDB'),
-                  border: dark ? '2px solid #121212' : '2px solid #666666',
-                  boxShadow: dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666',
+                  border: dark ? '2px solid #121212' : '2px solid #3f3f3f',
+                  boxShadow: dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f',
                 }}
               >
                 {gen}
@@ -156,7 +156,7 @@ export default function Pokedex({ onClose }) {
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{selectedGen}</span>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{genPct}%</span>
               </div>
-              <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #666666', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666' }}>
+              <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #3f3f3f', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f' }}>
                 <div style={{ width: `${genPct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function Pokedex({ onClose }) {
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>All Gens</span>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: dark ? '#DBDBDB' : '#333333' }}>{allPct}%</span>
               </div>
-              <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #666666', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666' }}>
+              <div style={{ height: '14px', backgroundColor: dark ? '#1a1a1a' : '#bbb', border: dark ? '2px solid #121212' : '2px solid #3f3f3f', boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f' }}>
                 <div style={{ width: `${allPct}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
               </div>
             </div>
@@ -173,7 +173,7 @@ export default function Pokedex({ onClose }) {
         </div>
 
         {/* Divider */}
-        <div style={{ borderTop: dark ? '2px solid #121212' : '2px solid #666666' }} />
+        <div style={{ borderTop: dark ? '2px solid #121212' : '2px solid #3f3f3f' }} />
 
         {/* Scrollable Pokémon grid */}
         <div className="flex-1 overflow-y-auto p-4">
@@ -192,8 +192,8 @@ export default function Pokedex({ onClose }) {
                     className="flex flex-col items-center py-2 px-1"
                     style={{
                       backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-                      border: dark ? '2px solid #121212' : '2px solid #666666',
-                      boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
+                      border: dark ? '2px solid #121212' : '2px solid #3f3f3f',
+                      boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
                     }}
                   >
                     <div className="relative flex items-center justify-center w-full">

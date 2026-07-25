@@ -38,8 +38,8 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
   const levelsGained = node.type === NODE_TYPES.GRASS ? BALANCE.progression.levelsGained.grass : BALANCE.progression.levelsGained.default
 
-  const borderStyle = dark ? '2px solid #333333' : '2px solid #666666'
-  const shadowStyle = dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #666666'
+  const borderStyle = dark ? '2px solid #333333' : '2px solid #3f3f3f'
+  const shadowStyle = dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #3f3f3f'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'

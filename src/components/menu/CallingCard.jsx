@@ -11,9 +11,8 @@ export default function CallingCard({ dark }) {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (cancelled || !user) return
+    async function loadStats(user) {
+      if (!user) { if (!cancelled) setStats(null); return }
 
       const [{ data: profile }, { data: runs }, { data: catches }] = await Promise.all([
         supabase.from('profiles').select('username').eq('id', user.id).maybeSingle(),
@@ -28,12 +27,16 @@ export default function CallingCard({ dark }) {
         bestMaps: (runs ?? []).reduce((m, r) => Math.max(m, r.maps_cleared ?? 0), 0),
         shinies: (catches ?? []).filter(c => c.shiny).length,
       })
-    })()
-    return () => { cancelled = true }
+    }
+    supabase.auth.getUser().then(({ data }) => loadStats(data.user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      loadStats(session?.user ?? null)
+    })
+    return () => { cancelled = true; subscription.unsubscribe() }
   }, [])
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #666666'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
+  const shadowStyle = dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #3f3f3f'
   const rows = [
     ['RUNS',  stats ? stats.totalRuns : '—'],
     ['BEST',  stats ? `${stats.bestMaps} maps` : '—'],

@@ -17,8 +17,8 @@ export default function SettingsPanel({ onClose, username, onRestart }) {
     onClose()
   }
 
-  const borderStyle = cards ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = cards ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  const borderStyle = cards ? '2px solid #121212' : '2px solid #3f3f3f'
+  const shadowStyle = cards ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
   const cardBg = cards ? '#2e2e2e' : '#DBDBDB'
   const innerBg = cards ? '#1a1a1a' : '#c8c8c8'
   const textColor = cards ? '#DBDBDB' : '#333333'

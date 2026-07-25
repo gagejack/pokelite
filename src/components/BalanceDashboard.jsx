@@ -91,12 +91,12 @@ export default function BalanceDashboard() {
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
-  const panelBorder = dark ? '2px solid #121212' : '2px solid #666666'
+  const panelBorder = dark ? '2px solid #121212' : '2px solid #3f3f3f'
   const trackBg = dark ? '#333' : '#aaa'
 
   const theme = useMemo(() => ({
     textColor, mutedColor, innerBg, panelBorder, trackBg,
-    shadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
+    shadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
     titleSize: isDesktop ? '15px' : '13px',
     labelWidth: isDesktop ? '130px' : '92px',
   }), [textColor, mutedColor, innerBg, panelBorder, trackBg, dark, isDesktop])

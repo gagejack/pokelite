@@ -18,7 +18,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
   const { dark } = useTheme()
   const [hovered, setHovered] = useState(false)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
   const cardBg = dark ? '#1a1a1a' : '#ffffff'
   const cardText = dark ? '#fff' : '#1a1a1a'
   const cardMuted = dark ? '#aaa' : '#666'

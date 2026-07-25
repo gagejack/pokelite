@@ -8,8 +8,8 @@ export default function ItemInfoCard({ item, onEquip, onClose }) {
   const { dark } = useTheme()
   if (!item) return null
 
-  const border = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadow = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  const border = dark ? '2px solid #121212' : '2px solid #3f3f3f'
+  const shadow = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const textColor = dark ? '#DBDBDB' : '#333333'

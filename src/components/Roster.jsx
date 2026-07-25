@@ -188,8 +188,8 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
   // Touch drag state
   const touchFrom = useRef(null)
 
-  const borderStyle = dark ? '2px solid #121212' : '2px solid #666666'
-  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #666666'
+  const borderStyle = dark ? '2px solid #121212' : '2px solid #3f3f3f'
+  const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #3f3f3f'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = dark ? '#888' : '#777'
@@ -309,7 +309,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
         <div style={{
           width: fullWidth ? '100%' : '360px',
           border: borderStyle,
-          boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #666666',
+          boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #3f3f3f',
           backgroundColor: cardBg,
           display: 'flex',
           flexDirection: 'row',
@@ -437,7 +437,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         flex: horizontal ? 1 : undefined,
         width: horizontal ? undefined : '74px',
         flexShrink: 0,
-        borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #666666') : undefined,
+        borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #3f3f3f') : undefined,
         border: isDropTarget
           ? '2px solid #facc15'
           : horizontal ? undefined : borderStyle,
