@@ -183,12 +183,13 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             className="hover:opacity-70 transition-opacity"
             style={{
               fontFamily: 'Upheaval', fontSize: '12px',
-              color: cards ? '#DBDBDB' : '#333333',
+              // Red to match the Daily Challenge button on the main menu.
+              color: '#fff',
               border: borderStyle, boxShadow: shadowStyle,
-              backgroundColor: cards ? '#2e2e2e' : '#DBDBDB', padding: '8px 16px',
+              backgroundColor: '#ef4444', padding: '8px 16px',
             }}
           >
-            🗓️ Daily Challenge
+            Daily Challenge
           </button>
           <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cards ? '#DBDBDB' : '#333333' }}>
             Custom Seed:
@@ -219,9 +220,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             className="hover:opacity-70 transition-opacity"
             style={{
               fontFamily: 'Upheaval', fontSize: '12px',
-              color: cards ? '#DBDBDB' : '#333333',
+              // Green to match PLAY on the main menu — this is the "start" action.
+              color: '#fff',
               border: borderStyle, boxShadow: shadowStyle,
-              backgroundColor: cards ? '#2e2e2e' : '#DBDBDB', padding: '8px 16px',
+              backgroundColor: '#22c55e', padding: '8px 16px',
             }}
           >
             Go

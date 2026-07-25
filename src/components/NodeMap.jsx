@@ -10,10 +10,11 @@ import PowerUpgradeNode from './PowerUpgradeNode'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
+import { rivalTeamSpecs } from '../game/rivals.js'
 import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
@@ -388,6 +389,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region.name)
   const mapConfig = config.maps[mapIndex]
+  // Species ceiling for this region's generation — keeps catch offers and
+  // themed trainer teams from rolling into a later-gen regional form (e.g.
+  // Kanto Meowth → Perrserker). Same gate useEvolutionFlow applies post-battle.
+  const maxSpeciesId = GEN_MAX_ID[config?.generation] ?? Infinity
 
   // Use the restored layout when resuming a saved run (its generate() is random,
   // so re-generating would give a DIFFERENT map). Only reuse it if it's for this
@@ -535,8 +540,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (isBoss) {
       specs = config.bossTeams?.[node.trainer] ?? []
     } else if (isRival) {
-      // Rival: a fixed authored team selected by the node's rivalTeam variant.
-      specs = config.rivalTeams?.[node.rivalTeam] ?? []
+      // Rival: a fixed authored team selected by the node's rivalTeam variant,
+      // plus the rival's own starter (counters the player's pick) as the ace.
+      specs = rivalTeamSpecs(config, node, starter)
     } else if (isMasterBall) {
       // Master Ball: a single legendary from this map's pool, at its fixed level
       // (not position-scaled). Empty pool → no legendary (caller clears the node).
@@ -556,7 +562,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       specs = buildTrainerTeamSpec(pool, band, count, positionWeight)
       if (themed?.length) {
         specs = await Promise.all(
-          specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level) }))
+          specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level, maxSpeciesId) }))
         )
       }
     } else {
@@ -607,7 +613,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // eligible (early maps → base forms only; late maps → any stage). Odds
       // favor the most-evolved eligible stage. Rarity stays the pool's. Grass
       // and trainers don't call this, so they're unaffected.
-      const speciesId = await rollStageForLevel(id, level)
+      const speciesId = await rollStageForLevel(id, level, maxSpeciesId)
       const base = await fetchPokemonBase(speciesId)
       const instance = buildPokemonInstance(base, level)
       return { ...instance, level, rarity }
@@ -828,8 +834,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       return { title: node.trainer ?? 'Gym Leader', sub }
     }
     if (node.type === NODE_TYPES.RIVAL) {
-      // Same team-row format as a boss, plus the rival's reward line.
-      const team = config.rivalTeams?.[node.rivalTeam] ?? []
+      // Same team-row format as a boss, plus the rival's reward line. Uses the
+      // same resolver as the battle so the preview can't disagree with it.
+      const team = rivalTeamSpecs(config, node, starter)
       const sub = team.map(p => ({
         type: cachedType(p.id),
         name: cachedName(p.id) ?? '???',

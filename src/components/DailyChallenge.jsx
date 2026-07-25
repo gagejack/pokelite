@@ -95,7 +95,7 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: 0 }}>
             <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: text, textAlign: 'center' }}>
-              🗓️ Daily Challenge
+              Daily Challenge
             </span>
             <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
               {date} · {daily.region} · resets in {fmtCountdown(countdown)}
@@ -139,8 +139,10 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
               onClick={onPlay}
               className="hover:opacity-70 transition-opacity"
               style={{
-                fontFamily: 'Upheaval', fontSize: '14px', color: text, border, boxShadow: shadow,
-                backgroundColor: dark ? '#3a5a3a' : '#bfe0bf',
+                // Saturated green matching PLAY on the main menu — this is the
+                // primary action of the modal, so it shouldn't read as muted.
+                fontFamily: 'Upheaval', fontSize: '14px', color: '#fff', border, boxShadow: shadow,
+                backgroundColor: dark ? '#16a34a' : '#22c55e',
                 padding: '10px', cursor: 'pointer',
               }}
             >

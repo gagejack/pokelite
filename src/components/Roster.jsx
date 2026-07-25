@@ -156,10 +156,10 @@ function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor,
               </span>
             </div>
             <div style={{ display: 'flex', gap: s(10) }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: sf(9), color: mutedColor }}>
                 PWR: <span style={{ color: textColor }}>{move.power ?? '—'}</span>
               </span>
-              <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor, textTransform: 'capitalize' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: sf(9), color: mutedColor, textTransform: 'capitalize' }}>
                 {move.damageClass}
               </span>
             </div>

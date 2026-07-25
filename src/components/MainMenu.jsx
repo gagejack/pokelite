@@ -70,12 +70,14 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
             reachable from the region-select screen). */}
         <button
           onClick={onOpenDaily}
-          className="hover:scale-105 active:scale-95 transition-transform duration-150"
+          className="daily-glow hover:scale-105 active:scale-95 transition-transform duration-150"
           style={{
             width: '320px', maxWidth: '100%', height: '40px',
             backgroundColor: '#ef4444',
             border: borderStyle,
-            boxShadow: shadowStyle,
+            // The glow animation composes with this via --btn-shadow (index.css),
+            // so the offset shadow survives the animated box-shadow.
+            '--btn-shadow': shadowStyle,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >

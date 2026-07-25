@@ -45,3 +45,22 @@ html, body {
   overflow: hidden;
   height: 100dvh;
 }
+
+/* Soft red pulse on the main-menu Daily Challenge button. The button keeps its
+   hard offset shadow (passed inline via --btn-shadow); the glow is layered
+   after it so both render. */
+@keyframes daily-glow {
+  0%, 100% { box-shadow: var(--btn-shadow), 0 0 6px 1px rgba(239, 68, 68, 0.45); }
+  50%      { box-shadow: var(--btn-shadow), 0 0 14px 3px rgba(239, 68, 68, 0.75); }
+}
+
+.daily-glow {
+  animation: daily-glow 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-glow {
+    animation: none;
+    box-shadow: var(--btn-shadow), 0 0 10px 2px rgba(239, 68, 68, 0.6);
+  }
+}
