@@ -84,6 +84,11 @@ export const ITEMS = [
   { id: 'iron_ball',      name: 'Iron Ball',      description: '+35% damage dealt, but −40% Speed',        tier: 'rare', icon: 'iron-ball' },
   { id: 'shell_bell',     name: 'Shell Bell',     description: 'Restores HP = 20% of damage dealt',        tier: 'rare', icon: 'shell-bell' },
   { id: 'black_sludge',   name: 'Black Sludge',   description: 'Restores 12% max HP each turn',            tier: 'rare', icon: 'black-sludge' },
+  // Consumables, NOT held items — same mechanism as the Evolve Stone (see the
+  // note in Legendary below). Max Revive doubles as a full heal on a healthy
+  // target so a mis-drop is never wasted.
+  { id: 'max_heal',       name: 'Max Heal',       description: 'Restores one Pokémon to full HP',          tier: 'rare', icon: 'max-potion', consumable: 'heal' },
+  { id: 'max_revive',     name: 'Max Revive',     description: 'Revives a fainted Pokémon at full HP',     tier: 'rare', icon: 'max-revive', consumable: 'revive' },
 
   // --- Epic ---
   { id: 'life_orb',       name: 'Life Orb',       description: '+30% damage on all moves',                 tier: 'epic',     icon: 'life-orb' },
@@ -102,6 +107,8 @@ export const ITEMS = [
   // `consumable: 'evolve'` is what the UI keys off — see handleItemAssign in
   // App.jsx. It never reaches battle, so battle.js needs no case for it.
   { id: 'evolve_stone',   name: 'Moon Stone',     description: 'Instantly evolves the Pokémon it is given to', tier: 'legendary', icon: 'moon-stone', consumable: 'evolve' },
+  // Ignores its drop target — always applies to the whole roster.
+  { id: 'mega_revive',    name: 'Mega Revive',    description: 'Revives and fully heals the whole team', tier: 'legendary', icon: 'sacred-ash', consumable: 'revive_all' },
 
   // --- Type-boost items (Common) ---
   // +50% damage to moves of one type. Generated below from TYPE_BOOST_ITEMS so
