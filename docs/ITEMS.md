@@ -32,12 +32,12 @@ budget. See `itemWeight()` in `items.js:119`.
 | Tier | Budget | Items | Each | Border color |
 |---|---|---|---|---|
 | common | 60% | 24 | **2.50%** | `#9ca3af` grey |
-| rare | 25% | 9 | **2.78%** | `#3b82f6` blue |
+| rare | 25% | 11 | **2.27%** | `#3b82f6` blue |
 | epic | 10% | 6 | **1.67%** | `#a855f7` purple |
-| legendary | 5% | 4 | **1.25%** | `#facc15` yellow |
+| legendary | 5% | 5 | **1.00%** | `#facc15` yellow |
 
 > **Counterintuitive but correct:** a *common* item is individually rarer than a
-> *rare* one (2.50% vs 2.78%), because the 18 type plates dilute the common
+> *rare* one (2.50% vs 2.27%), because the 18 type plates dilute the common
 > tier. The tier names describe the tier's total share, not per-item odds.
 
 Adding an item to a tier makes every existing item in that tier proportionally
@@ -103,7 +103,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Rare (9 items, 2.78% each)
+## Rare (11 items, 2.27% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
@@ -116,6 +116,8 @@ offered per node** — once drawn, the rest are removed from that node's pool
 | `iron_ball` | Iron Ball | +35% damage dealt, but −40% Speed | `ironBallDmg` ×1.35, `ironBallSpeed` ×0.6 |
 | `shell_bell` | Shell Bell | Restores HP = 20% of damage dealt | `shellBellHeal` 0.2 |
 | `black_sludge` | Black Sludge | Restores 12% max HP each turn | `passiveHeal.blackSludge` 0.12 |
+| `max_heal` | Max Heal | Restores one Pokémon to full HP | **Consumable** — `consumable: 'heal'` |
+| `max_revive` | Max Revive | Revives a fainted Pokémon at full HP; full-heals a healthy one | **Consumable** — `consumable: 'revive'` |
 
 ---
 
@@ -132,7 +134,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Legendary (4 items, 1.25% each)
+## Legendary (5 items, 1.00% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
@@ -140,6 +142,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 | `weakness_policy` | Weakness Policy | +50% damage after a super-effective hit | `weaknessPolicy` ×1.5 |
 | `resist_charm` | Resist Charm | Super-effective hits deal 50% less damage | `resistCharm` ×0.5 (icon: `chople-berry`) |
 | `evolve_stone` | Moon Stone | Instantly evolves the Pokémon it is given to | **Consumable** — `consumable: 'evolve'` |
+| `mega_revive` | Mega Revive | Revives and fully heals the whole roster | **Consumable** — `consumable: 'revive_all'` |
 
 ---
 
@@ -149,18 +152,36 @@ Most items are **held**: equipped to one Pokémon, modifying battle math. A
 consumable is different — it is *used*, produces an immediate effect, and is
 destroyed.
 
-`evolve_stone` is currently the only one. Its mechanism:
+There are four: `evolve_stone`, `max_heal`, `max_revive`, and `mega_revive`.
+They share one mechanism:
 
-- Carries `consumable: 'evolve'`, which the UI keys off. It never reaches
-  `battle.js`, so the sim needs no case for it.
-- Handled at two sites with identical logic: `NodeMap.jsx:925` and
-  `EliteFour.jsx:193` (drag from bag onto a Pokémon), plus the offer popup at
-  `NodeMap.jsx:1281` (use directly from the offer).
+- Each carries a `consumable` field the UI keys off. None reaches `battle.js`,
+  so the sim needs no case for any of them.
+- Handled at three sites: drag-from-bag in `NodeMap.jsx` and `EliteFour.jsx`,
+  plus the item-offer popup in `NodeMap.jsx` (use directly from the offer).
 - On use, the caller fires `onMoveItem?.({ item, from, to: { kind: 'consumed' } })`.
-  `moveItem` (`App.jsx:412`) removes it from its source and re-adds it nowhere,
+  `moveItem` (`App.jsx`) removes it from its source and re-adds it nowhere,
   because no branch matches `'consumed'`.
-- **If it can't be used, it is kept** — a stone dropped on a Pokémon with no
-  evolution is not wasted.
+- **If it can't do anything, it is kept** — a stone dropped on a Pokémon with no
+  evolution, or a Max Heal on a full-HP Pokémon, is not wasted.
+
+The three healing items route through `applyConsumable` in `App.jsx`, which
+calls a pure helper in `src/game/roster.js` (`healOne` / `reviveOne` /
+`reviveAll`). Each helper returns `{ roster, used }`; `used: false` is what
+tells the caller to keep the item.
+
+| `consumable` | Helper | Target |
+|---|---|---|
+| `evolve` | `evolveWithStone` (useEvolutionFlow) | one Pokémon |
+| `heal` | `healOne` | one Pokémon |
+| `revive` | `reviveOne` | one Pokémon |
+| `revive_all` | `reviveAll` | whole roster — drop target ignored |
+
+One exception to keep-on-no-op: using a healing item **straight from an offer**
+clears the node even if it healed nothing. There the player is choosing one of
+three items, so banking an unchosen item would be more surprising. The
+keep-on-no-op rule is about the bag path, where the player spends something
+they already own.
 
 Any new consumable follows this same shape.
 
@@ -177,17 +198,5 @@ Any new consumable follows this same shape.
 - **Mystery-node rerolls** (`BALANCE.map.mysteryRerolls`) let an offer sourced
   from a Mystery node be redrawn; odds are unchanged by a reroll.
 
-## Planned
-
-Not yet implemented — see
-`docs/superpowers/specs/2026-07-26-healing-items-design.md`:
-
-| id | Name | Effect | Tier |
-|---|---|---|---|
-| `max_heal` | Max Heal | Restores one Pokémon to full HP | rare |
-| `max_revive` | Max Revive | Revives a fainted Pokémon at full HP; full-heals a healthy one | rare |
-| `mega_revive` | Mega Revive | Revives and fully heals the whole roster | legendary |
-
-All three are consumables following the `evolve_stone` pattern. Adding them
-changes existing odds: rare 2.78% → 2.27% each (9→11 items), legendary
-1.25% → 1.00% each (4→5 items).
+- **Healing items are map-screen only.** They work on the map and Elite Four
+  screens, not mid-battle — battles are a non-interactive simulation.
