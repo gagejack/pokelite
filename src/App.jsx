@@ -18,6 +18,7 @@ import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
+import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
 // Character select is skipped for now — every run uses this default protagonist.
@@ -438,6 +439,25 @@ export default function App() {
     })
   }
 
+  // Apply a healing consumable. Returns true if it did something (so the caller
+  // consumes it) and false if it was a no-op (so the caller KEEPS it) — the same
+  // contract the Evolve Stone uses when a Pokémon cannot evolve.
+  // `pokeIndex` is ignored by Mega Revive, which always applies to the whole team.
+  function applyConsumable(item, pokeIndex) {
+    const apply = {
+      heal:       r => healOne(r, pokeIndex),
+      revive:     r => reviveOne(r, pokeIndex),
+      revive_all: r => reviveAll(r),
+    }[item?.consumable]
+    if (!apply) return false
+
+    // Decide the return value from the current roster, then commit through the
+    // functional updater so a double-invoked updater (StrictMode) is harmless.
+    const { used } = apply(roster)
+    if (used) setRoster(prev => apply(prev).roster)
+    return used
+  }
+
   function restartRun() {
     if (!selectedStarter) return
     // The run is already saved at the moment of defeat (BattleCard onDefeat),
@@ -546,6 +566,7 @@ export default function App() {
           onItemAssign={handleItemAssign}
           onItemKeepInBag={handleItemKeepInBag}
           onMoveItem={moveItem}
+          onApplyConsumable={applyConsumable}
           mapIndex={mapIndex}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
@@ -587,6 +608,7 @@ export default function App() {
           roster={roster}
           setRoster={setRoster}
           onMoveItem={moveItem}
+          onApplyConsumable={applyConsumable}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
           onMapCleared={handleMapCleared}
