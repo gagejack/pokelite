@@ -10,7 +10,6 @@ const Pokedex = lazy(() => import('./Pokedex'))
 const Stats = lazy(() => import('./Stats'))
 const SettingsPanel = lazy(() => import('./SettingsPanel'))
 const TutorialOverlay = lazy(() => import('./TutorialOverlay'))
-import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
@@ -144,19 +143,6 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
             borderStyle={borderStyle}
             textColor={textColor}
             role={role}
-          />
-          {/* Centered brand. Replaces the username, which now only appears in
-              the settings panel. The logo art is wide, so it's height-constrained
-              and lets width follow naturally. */}
-          <img
-            src={speedmonLogo}
-            alt="Speedmon"
-            style={{
-              position: 'absolute', left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              height: '30px', width: 'auto', display: 'block',
-              pointerEvents: 'none',
-            }}
           />
         </div>
       ) : (
