@@ -366,21 +366,14 @@ Two-stage popup flow when an Item node is activated:
 ```js
 { id, name, icon, description, weight }
 ```
-- `weight` is out of 1000 (e.g. 200 = 20%, 10 = 1%)
-- 3 items drawn via weighted random with replacement (duplicates possible)
-- Items are never consumed — permanently held by a Pokémon or stored in the bag
-
-| id | Name | Effect | Weight |
-|----|------|--------|--------|
-| `leftovers` | Leftovers | Restore 10% max HP each turn | 200 |
-| `shell-bell` | Shell Bell | Restore HP = 20% of damage dealt | 180 |
-| `expert-belt` | Expert Belt | +20% damage on all moves | 160 |
-| `choice-band` | Choice Band | +50% Attack | 120 |
-| `choice-scarf` | Choice Scarf | +50% Speed | 120 |
-| `scope-lens` | Scope Lens | +30% crit rate | 100 |
-| `rocky-helmet` | Rocky Helmet | Attacker takes 1/3 max HP on every hit | 80 |
-| `life-orb` | Life Orb | +30% damage on all moves | 30 |
-| `focus-sash` | Focus Sash | Survive any KO hit at full HP | 10 |
+> **Superseded — see [ITEMS.md](ITEMS.md) for the complete, verified item list.**
+>
+> The table that lived here was stale in three ways: it used hyphenated ids
+> (`shell-bell`) where the code uses underscores (`shell_bell`); it described a
+> weight-out-of-1000 system that was replaced by tier budgets
+> (`BALANCE.items.tierBudget`, split equally among a tier's items); and it
+> claimed "items are never consumed", which stopped being true when the Evolve
+> Stone landed. It also listed 9 of the 43 items that actually exist.
 
 ### Stage 1 — Item Offer Popup
 - Same modal style as PokeballNode
