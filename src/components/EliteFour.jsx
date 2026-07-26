@@ -18,7 +18,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onApplyConsumable, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -188,6 +188,13 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (!movingItem) return
     const { item, from } = movingItem
     setMovingItem(null)
+    // Healing consumables: apply + consume, but KEEP the item on a no-op
+    // (target already at full HP). Mirrors NodeMap's handler.
+    if (['heal', 'revive', 'revive_all'].includes(item?.consumable) && to.kind === 'pokemon') {
+      const used = onApplyConsumable?.(item, to.pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
     // Evolve Stone on a Pokémon: evolve + consume rather than equip (kept if the
     // target can't evolve, so it isn't wasted).
     if (item?.consumable === 'evolve' && to.kind === 'pokemon') {

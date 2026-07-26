@@ -122,7 +122,7 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                         cursor: 'pointer', flexShrink: 0,
                       }}
                     >
-                      {selectedItem.consumable === 'evolve' ? 'Use' : hasItem ? 'Swap' : 'Equip'}
+                      {selectedItem.consumable ? 'Use' : hasItem ? 'Swap' : 'Equip'}
                     </button>
                   </div>
                 </div>

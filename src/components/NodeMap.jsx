@@ -379,7 +379,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -919,6 +919,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!movingItem) return
     const { item, from } = movingItem
     setMovingItem(null)
+    // Healing consumables: apply and consume. A no-op (target already at full
+    // HP) KEEPS the item rather than wasting it. Mega Revive ignores the drop
+    // target and heals the whole roster.
+    if (['heal', 'revive', 'revive_all'].includes(item?.consumable) && to.kind === 'pokemon') {
+      const used = onApplyConsumable?.(item, to.pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
     // Evolve Stone dropped on a Pokémon: evolve it and consume the stone
     // (remove it from wherever it came from) rather than equipping it. If the
     // target has no evolution at all the stone is kept, so it isn't wasted.
@@ -1280,6 +1288,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             // target on the spot and is used up, so it never gets equipped.
             if (item?.consumable === 'evolve') {
               await evo.evolveWithStone(pokemonIndex)
+            } else if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
+              // Used straight from the offer. A no-op (full-HP target) still
+              // clears the node — the player picked it from three; it simply
+              // had no effect. The keep-on-no-op rule applies to the bag path,
+              // where the player spends something they already own.
+              onApplyConsumable?.(item, pokemonIndex)
             } else {
               onItemAssign(item, pokemonIndex, swapBackItem)
             }
