@@ -177,11 +177,16 @@ tells the caller to keep the item.
 | `revive` | `reviveOne` | one Pokémon |
 | `revive_all` | `reviveAll` | whole roster — drop target ignored |
 
-One exception to keep-on-no-op: using a healing item **straight from an offer**
-clears the node even if it healed nothing. There the player is choosing one of
-three items, so banking an unchosen item would be more surprising. The
+One exception to keep-on-no-op: using **any** consumable straight from an offer
+clears the node even if it did nothing — this has always been true of the
+Evolve Stone and is true of the healing items. There the player is choosing one
+of three items, so banking an unchosen item would be more surprising. The
 keep-on-no-op rule is about the bag path, where the player spends something
 they already own.
+
+Both drop paths — mouse (`resolveItemMove`) and touch (`bagTouchEnd`) — route
+through one `applyConsumableTo` helper in `NodeMap.jsx`. The touch path used to
+call `onMoveItem` directly, which equipped consumables as dead held items.
 
 Any new consumable follows this same shape.
 

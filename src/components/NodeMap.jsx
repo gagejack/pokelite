@@ -914,25 +914,40 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   // --- Held-item movement (bag drag + stat-card picker) ---
   const isMovingItem = !!movingItem
+
+  // Drop an item onto roster slot `pokeIndex`. Consumables are USED (and spent
+  // only if they did something); everything else is equipped.
+  //
+  // Both drop paths route through here — the mouse/click path via
+  // resolveItemMove, and the touch path via bagTouchEnd, which bypasses
+  // resolveItemMove entirely. Keeping the decision in one function is what
+  // stops the two from drifting: the touch path used to equip consumables as
+  // dead held items because it only knew how to call onMoveItem.
+  async function applyConsumableTo(item, from, pokeIndex) {
+    // Healing consumables. A no-op (target already at full HP) KEEPS the item
+    // rather than wasting it. Mega Revive ignores the target and heals all.
+    if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
+      const used = onApplyConsumable?.(item, pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
+    // Evolve Stone: evolve and consume rather than equip. Kept if the target
+    // has no evolution at all, so it isn't wasted.
+    if (item?.consumable === 'evolve') {
+      const used = await evo.evolveWithStone(pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
+    onMoveItem?.({ item, from, to: { kind: 'pokemon', pokeIndex } })
+  }
+
   // Resolve a pending move onto a target (a roster Pokémon or the bag).
   async function resolveItemMove(to) {
     if (!movingItem) return
     const { item, from } = movingItem
     setMovingItem(null)
-    // Healing consumables: apply and consume. A no-op (target already at full
-    // HP) KEEPS the item rather than wasting it. Mega Revive ignores the drop
-    // target and heals the whole roster.
-    if (['heal', 'revive', 'revive_all'].includes(item?.consumable) && to.kind === 'pokemon') {
-      const used = onApplyConsumable?.(item, to.pokeIndex)
-      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
-      return
-    }
-    // Evolve Stone dropped on a Pokémon: evolve it and consume the stone
-    // (remove it from wherever it came from) rather than equipping it. If the
-    // target has no evolution at all the stone is kept, so it isn't wasted.
-    if (item?.consumable === 'evolve' && to.kind === 'pokemon') {
-      const used = await evo.evolveWithStone(to.pokeIndex)
-      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+    if (to.kind === 'pokemon') {
+      await applyConsumableTo(item, from, to.pokeIndex)
       return
     }
     onMoveItem?.({ item, from, to })
@@ -981,7 +996,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const t = e.changedTouches[0]
     const idx = slotIndexAt(t.clientX, t.clientY)
     if (idx != null) {
-      onMoveItem?.({ item: st.item, from: st.from, to: { kind: 'pokemon', pokeIndex: idx } })
+      // Consumables must be USED, not equipped — this path bypasses
+      // resolveItemMove, so it has to make the same decision itself. Without
+      // this, touch-dragging a Max Revive onto a Pokémon would silently equip
+      // it as a dead held item and displace whatever it was holding.
+      applyConsumableTo(st.item, st.from, idx)
     }
     setMovingItem(null) // clear placing mode whether or not it landed on a slot
   }
