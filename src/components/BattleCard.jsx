@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useSettings } from '../lib/settings'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
@@ -42,7 +43,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const shadowStyle = dark ? '-6px 8px 0 0 #121212' : '-6px 8px 0 0 #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
 
   // Prep-screen intro line. Legendaries are wild, so they announce the species

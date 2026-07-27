@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemOdds, itemIconUrl, TIER_COLORS, TIER_BUDGET, ITEMS } from '../game/items.js'
 import { catchOdds, CATCH_TIER_BUDGET } from '../game/catch.js'
@@ -89,7 +90,7 @@ export default function BalanceDashboard() {
   const isDesktop = useIsDesktop()
 
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const panelBorder = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const trackBg = dark ? '#333' : '#aaa'

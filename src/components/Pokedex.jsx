@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
 import { displayName } from '../game/pokemon.js'
@@ -242,7 +243,7 @@ export default function Pokedex({ onClose }) {
                           style={{ position: 'absolute', right: '4px', width: '14px', height: '14px', imageRendering: 'pixelated' }}
                         />
                       )}
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '13px' : '10px', color: dark ? '#888' : '#777' }}>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '13px' : '10px', color: muted(dark) }}>
                         #{String(p.id).padStart(3, '0')}
                       </span>
                     </div>

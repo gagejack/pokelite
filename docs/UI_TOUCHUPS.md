@@ -64,7 +64,13 @@ dark `#888` → `#9a9a9a` (4.83:1 on `#2e2e2e`), light `#777` → `#5f5f5f`
 locally in each file — consider a shared `theme.jsx` export while there).
 Re-verify both numbers with a contrast checker after picking final values.
 
-- [ ] Fixed
+- [x] Fixed — `muted(dark)` exported from `src/lib/colors.js` (own module:
+  a non-component export in theme.jsx breaks Fast Refresh per
+  react-refresh/only-export-components). All 13 re-declaration sites plus
+  PokemonCard's `cardStatLabel` and Pokedex's inline usage now read it.
+  Deliberately left: MainMenu's v1.0 tag (decorative fine print) and
+  CharacterSelect's `#aaa/#666` pair (4.2:1 on panels — marginal, different
+  values, separate call).
 
 ## 4. Catch-offer rarity never renders (dead prop)
 

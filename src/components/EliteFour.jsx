@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -34,7 +35,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
 
   // A member's full team. Blue (the champion) gets a 6th ace appended: the
   // fully-evolved starter that counters the player's pick, falling back to the

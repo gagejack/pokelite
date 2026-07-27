@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
@@ -192,7 +193,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
 
   function handleDragStart(i) { setDragFrom(i) }
   function handleDragEnter(i) { setDragOver(i) }

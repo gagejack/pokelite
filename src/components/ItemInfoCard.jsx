@@ -1,4 +1,5 @@
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { itemIconUrl, tierColor } from '../game/items'
 
 // Popup explaining a bag item (icon, name, rarity, description). Used on mobile
@@ -13,7 +14,7 @@ export default function ItemInfoCard({ item, onEquip, onClose }) {
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
   const rarity = tierColor(item)
 
   return (

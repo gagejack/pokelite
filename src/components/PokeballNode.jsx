@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import PokemonCard from './PokemonCard'
 import { TYPE_COLORS } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
@@ -29,7 +30,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
   const bg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
 
   function handleSelectPokemon(i) {
     if (!isFull) {

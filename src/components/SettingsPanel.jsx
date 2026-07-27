@@ -1,4 +1,5 @@
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useSettings } from '../lib/settings'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
@@ -22,7 +23,7 @@ export default function SettingsPanel({ onClose, username, onRestart }) {
   const cardBg = cards ? '#2e2e2e' : '#DBDBDB'
   const innerBg = cards ? '#1a1a1a' : '#c8c8c8'
   const textColor = cards ? '#DBDBDB' : '#333333'
-  const mutedColor = cards ? '#888' : '#777'
+  const mutedColor = muted(cards)
 
   return (
     <div

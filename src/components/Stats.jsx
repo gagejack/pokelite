@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
@@ -53,7 +54,7 @@ export default function Stats({ onClose, role = null }) {
   useEffect(() => { if (!isAdmin) setTab(t => (t === 'balance' ? 'stats' : t)) }, [isAdmin])
 
   const textColor = dark ? '#DBDBDB' : '#333333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
   const panelBorder = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { fetchPokemonBase } from '../game/pokemon.js'
 
 // "X is evolving — choose its evolution!" modal for multi-branch lines
@@ -25,7 +26,7 @@ export default function EvolutionChoice({ fromName, fromSprite, options, onChoos
   const border = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadow = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const textColor = dark ? '#DBDBDB' : '#333'
-  const mutedColor = dark ? '#888' : '#777'
+  const mutedColor = muted(dark)
 
   return (
     <div style={{

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
 
@@ -24,7 +25,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
   const cardBg = dark ? '#1a1a1a' : '#ffffff'
   const cardText = dark ? '#fff' : '#1a1a1a'
   const cardMuted = dark ? '#aaa' : '#666'
-  const cardStatLabel = dark ? '#888' : '#777'
+  const cardStatLabel = muted(dark)
   const cardBarTrack = dark ? '#2e2e2e' : '#ddd'
   const cardBarFill = dark ? '#888' : '#999'
 
