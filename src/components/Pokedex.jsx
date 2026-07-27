@@ -45,10 +45,21 @@ export default function Pokedex({ onClose }) {
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data, error } = await supabase
+      // pokemon_seen_shiny_ids is requested but NOT required: if that column
+      // is missing, Supabase fails the whole query, which would blank the
+      // entire Pokédex (every species renders as an unseen silhouette) over
+      // an optional shiny-mode field. Retry without it so caught/seen — the
+      // Dex's core data — always loads.
+      let { data, error } = await supabase
         .from('runs')
         .select('pokemon_caught_ids, pokemon_seen_ids, pokemon_seen_shiny_ids')
         .eq('user_id', user.id)
+      if (error) {
+        ;({ data, error } = await supabase
+          .from('runs')
+          .select('pokemon_caught_ids, pokemon_seen_ids')
+          .eq('user_id', user.id))
+      }
       if (cancelled || error || !data) return
       const caught = new Set()
       const seen = new Set()
