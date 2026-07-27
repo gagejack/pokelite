@@ -142,33 +142,37 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           })}
         </div>
       ) : (
-        // Mobile — the card is ~99px wide in its 3-across contexts, which is
-        // not enough for label + bar + value at a legible size: a 12px label
-        // and value leave a ~25px bar that shows nothing. So the four non-HP
-        // stats become a 2×2 label/value grid (the numbers carry the signal)
-        // and only HP keeps its two-tone bar — the card's signature element,
-        // which still reads at full card width.
+        // Mobile — the card is ~99px wide in its 3-across contexts, too
+        // narrow for the desktop's label|bar|value single row at legible
+        // sizes. Instead each stat stacks: label/value line at 12px, then a
+        // full-card-width bar beneath. The bars end up WIDER than desktop's
+        // squeezed ones, and the text never competes with them for width.
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-            {rows.filter(([label]) => label !== 'HP').map(([label, val]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', minWidth: 0 }}>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardStatLabel, lineHeight: 1.25 }}>{label}</span>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, lineHeight: 1.25 }}>{val}</span>
+          {rows.map(([label, val, max]) => {
+            const isHp = label === 'HP'
+            return (
+              <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '1px', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', minWidth: 0 }}>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardStatLabel, lineHeight: 1.2 }}>{label}</span>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, lineHeight: 1.2 }}>{val}</span>
+                </div>
+                <div style={{
+                  width: '100%', height: isHp ? '7px' : '4px',
+                  backgroundColor: isHp ? '#1a1a1a' : cardBarTrack,
+                  border: isHp ? '1px solid #000' : undefined,
+                  borderRadius: '1px', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    height: '100%', borderRadius: '1px',
+                    width: isHp ? '100%' : `${Math.min(100, (val / max) * 100)}%`,
+                    background: isHp
+                      ? 'linear-gradient(to bottom, #4ade80 50%, #16a34a 50%)'
+                      : cardBarFill,
+                  }} />
+                </div>
               </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{
-              flex: 1, height: '7px',
-              backgroundColor: '#1a1a1a', border: '1px solid #000',
-              borderRadius: '1px', overflow: 'hidden',
-            }}>
-              <div style={{ height: '100%', width: '100%', borderRadius: '1px', background: 'linear-gradient(to bottom, #4ade80 50%, #16a34a 50%)' }} />
-            </div>
-            <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, flexShrink: 0, lineHeight: 1 }}>
-              {pokemon.stats.maxHp}
-            </span>
-          </div>
+            )
+          })}
         </div>
       ))}
 
