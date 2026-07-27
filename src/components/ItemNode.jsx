@@ -180,20 +180,43 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%', position: 'relative' }}>
           <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Choose an Item</span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor }}>
+          {/* Was 9px Upheaval — a pixel face well below its legibility floor.
+              Orange Kid at 14px reads cleanly and matches the card body text. */}
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
             Pick one item to keep
           </span>
           <button
             onClick={onClose}
             className="hover:opacity-70 transition-opacity"
-            style={{ fontFamily: 'Upheaval', fontSize: '16px', color: mutedColor, background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', position: 'absolute', top: 0, right: 0 }}
+            aria-label="Close"
+            // Sized to a 44px touch target — it was 16px of glyph with 4px of
+            // padding, which is a hard tap to land on a phone. Offset so the
+            // larger hit area doesn't shift the glyph's visual position.
+            style={{
+              fontFamily: 'Upheaval', fontSize: '18px', color: mutedColor,
+              background: 'none', border: 'none', cursor: 'pointer',
+              minWidth: '44px', minHeight: '44px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'absolute', top: '-10px', right: '-10px',
+            }}
           >
             X
           </button>
         </div>
 
-        {/* 3 item cards */}
-        <div style={{ display: 'flex', gap: isDesktop ? '10px' : '8px', width: '100%' }}>
+        {/* 3 item cards — a row on desktop, a stack on mobile.
+            Mobile stacks because three columns on a 375px screen leaves each
+            card ~96px wide, which forced the type down to a clamped 8px
+            description and ~11px name. Both are pixel display faces that stop
+            being legible well before that. Stacked, the text block gets ~230px
+            and the type can be a flat, readable size at every phone width —
+            no clamp, no viewport scaling. */}
+        <div style={{
+          display: 'flex',
+          flexDirection: isDesktop ? 'row' : 'column',
+          gap: isDesktop ? '10px' : '10px',
+          width: '100%',
+        }}>
           {offered.map((item, i) => {
             const isHovered = hoveredOffer === i
             const rarity = tierColor(item)
@@ -213,24 +236,64 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     : 'none',
                   transform: isHovered ? 'translateY(-2px)' : 'none',
                   transition: 'transform 0.1s, box-shadow 0.1s',
-                  padding: isDesktop ? '17px 12px' : 'clamp(8px, 2vw, 14px) clamp(6px, 1.5vw, 10px)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isDesktop ? '8px' : '6px',
-                  flex: '1 1 0',
+                  padding: isDesktop ? '17px 12px' : '12px 14px',
+                  display: 'flex',
+                  // Desktop keeps the vertical card; mobile is icon-left, text-right.
+                  flexDirection: isDesktop ? 'column' : 'row',
+                  alignItems: 'center',
+                  gap: isDesktop ? '8px' : '14px',
+                  textAlign: isDesktop ? 'center' : 'left',
+                  flex: isDesktop ? '1 1 0' : '0 0 auto',
                   minWidth: 0,
+                  width: '100%',
                   cursor: 'pointer',
                 }}
               >
                 <img
                   src={itemIconUrl(item)}
                   alt={item.name}
-                  style={{ width: isDesktop ? '68px' : '56px', height: isDesktop ? '68px' : '56px', imageRendering: 'pixelated' }}
+                  style={{
+                    width: isDesktop ? '68px' : '56px',
+                    height: isDesktop ? '68px' : '56px',
+                    imageRendering: 'pixelated',
+                    flexShrink: 0,
+                  }}
                 />
-                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '18px' : 'clamp(9px, 3vw, 15px)', color: textColor, textAlign: 'center' }}>
-                  {item.name}
-                </span>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '17px' : 'clamp(8px, 2vw, 14px)', color: mutedColor, textAlign: 'center', lineHeight: 1.3 }}>
-                  {item.description}
-                </span>
+                <div style={{
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: isDesktop ? 'center' : 'flex-start',
+                  gap: isDesktop ? '8px' : '3px',
+                  minWidth: 0, flex: 1,
+                }}>
+                  {/* Name + tier share a line on mobile. The tier was previously
+                      carried by border hue alone — unreadable if you can't
+                      distinguish the colors. The stacked width pays for a label. */}
+                  <div style={{
+                    display: 'flex', alignItems: 'baseline', gap: '8px',
+                    width: '100%', justifyContent: isDesktop ? 'center' : 'space-between',
+                  }}>
+                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '18px' : '17px', color: textColor }}>
+                      {item.name}
+                    </span>
+                    {!isDesktop && (
+                      <span style={{
+                        fontFamily: 'Orange Kid', fontSize: '13px', color: rarity,
+                        textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0,
+                      }}>
+                        {item.tier}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{
+                    fontFamily: 'Orange Kid',
+                    fontSize: isDesktop ? '17px' : '15px',
+                    color: mutedColor,
+                    textAlign: isDesktop ? 'center' : 'left',
+                    lineHeight: 1.35,
+                  }}>
+                    {item.description}
+                  </span>
+                </div>
               </button>
             )
           })}
