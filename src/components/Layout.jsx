@@ -157,6 +157,7 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
             setSettingsOpen={setSettingsOpen}
             setPokedexOpen={setPokedexOpen}
             setStatsOpen={setStatsOpen}
+            onRestart={onRestart}
             onSkipMap={onSkipMap}
             role={role}
           />

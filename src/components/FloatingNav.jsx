@@ -2,6 +2,7 @@ import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
 import settingsIcon from '../assets/Icons/graySettingsIcon.png'
+import resetIcon from '../assets/Icons/reset.png'
 
 // Mobile-only floating nav — replaces the top nav bar so the map can use its
 // height. A translucent grey pill fixed to the top-right, above the map and
@@ -13,13 +14,26 @@ import settingsIcon from '../assets/Icons/graySettingsIcon.png'
 // tour still finds its targets; the "auto" step has no target on mobile and
 // is skipped by the overlay's missing-target handling.
 // onSkipMap is shown only for admins, matching the desktop nav bar's gate.
-export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, setStatsOpen, onSkipMap, role }) {
+// onRestart is only passed on run screens, so Restart self-hides on the menus —
+// the same gate the desktop nav bar uses.
+export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, setStatsOpen, onRestart, onSkipMap, role }) {
   const buttons = [
     { key: 'home',     icon: homeIcon,     alt: 'Home',     tutorial: 'home',     onClick: onHome },
     { key: 'dex',      icon: pokedexIcon,  alt: 'Pokedex',  tutorial: 'pokedex',  onClick: () => setPokedexOpen(true) },
     { key: 'stats',    icon: statsIcon,    alt: 'Stats',    tutorial: 'stats',    onClick: () => setStatsOpen(true) },
     { key: 'settings', icon: settingsIcon, alt: 'Settings', tutorial: 'settings', onClick: () => setSettingsOpen(true) },
   ]
+  // Sits below Settings so a mis-tap on the destructive action is less likely
+  // than on the four navigation buttons above it.
+  if (onRestart) {
+    buttons.push({
+      key: 'restart',
+      icon: resetIcon,
+      alt: 'Restart',
+      title: 'Restart run',
+      onClick: onRestart,
+    })
+  }
   if (role === 'admin' && onSkipMap) {
     buttons.push({
       key: 'skip',

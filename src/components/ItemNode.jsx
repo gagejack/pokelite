@@ -272,7 +272,10 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     display: 'flex', alignItems: 'baseline', gap: '8px',
                     width: '100%', justifyContent: isDesktop ? 'center' : 'space-between',
                   }}>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '18px' : '17px', color: textColor }}>
+                    {/* 22px is the ceiling before the longest name ("Weakness
+                        Policy") wraps in a 197px card and makes the three
+                        cards uneven — heights aren't equalized. */}
+                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '17px', color: textColor }}>
                       {item.name}
                     </span>
                     {!isDesktop && (
@@ -286,7 +289,7 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                   </div>
                   <span style={{
                     fontFamily: 'Orange Kid',
-                    fontSize: isDesktop ? '17px' : '15px',
+                    fontSize: isDesktop ? '21px' : '15px',
                     color: mutedColor,
                     textAlign: isDesktop ? 'center' : 'left',
                     lineHeight: 1.35,
