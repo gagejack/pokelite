@@ -27,7 +27,13 @@ afford it (roster thumbnails), drop the stat rows entirely rather than render
 them unreadably — the tap-through detail view already shows full stats.
 Verify at 320/375/430px.
 
-- [ ] Fixed
+- [x] Fixed — flat 14px name / 12px level+stats on mobile. The four non-HP
+  stat bars are dropped on mobile (at ~99px card width a legible label+value
+  leaves a ~25px bar showing nothing — the numbers carry the signal); HP
+  keeps its two-tone bar at full card width. Desktop bar rows unchanged.
+  Shiny badge 10→12px, move box 9-10→11-12px. Note: audit said Roster uses
+  this card — it doesn't (own `PokemonCardContent`); real consumers are
+  PokeballNode and StarterSelect.
 
 ## 2. FloatingNav touch targets are ~26px
 

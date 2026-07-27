@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
@@ -16,6 +17,7 @@ const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master
 //   caught     — show a Poké Ball icon top-left (species caught before)
 export default function PokemonCard({ pokemon, onClick, selected = false, spriteGlow = false, statMax = 100, caught = false }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(false)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -72,7 +74,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           title="Shiny!"
           style={{
             position: 'absolute', top: '5px', right: '6px', zIndex: 1,
-            fontFamily: 'Upheaval', fontSize: '10px', color: '#facc15',
+            fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15',
             letterSpacing: '0.5px', textShadow: '0 1px 2px rgba(0,0,0,0.6)',
           }}
         >
@@ -88,10 +90,13 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           filter: spriteGlow ? 'saturate(1.5) drop-shadow(0 0 6px rgba(250,204,21,0.35))' : undefined,
         }}
       />
-      <span style={{ fontFamily: 'Upheaval', fontSize: 'clamp(9px, 3vw, 16px)', color: cardText, textTransform: 'capitalize' }}>
+      {/* Flat sizes, not viewport clamps: the old clamp floors (9px/8px) put
+          both pixel faces below their ~12px legibility floor on every phone
+          up to ~430px. Desktop always resolved to the 16px cap anyway. */}
+      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '14px', color: cardText, textTransform: 'capitalize' }}>
         {pokemon.name}
       </span>
-      <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(8px, 2.5vw, 16px)', color: cardMuted, marginTop: '-10px' }}>
+      <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '16px' : '12px', color: cardMuted, marginTop: '-10px' }}>
         Lv. {pokemon.level}
       </span>
 
@@ -108,13 +113,15 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
         ))}
       </div>
 
-      {rows && (
+      {rows && (isDesktop ? (
+        // Desktop — label + relative bar + value rows. Flat 11/12px: the old
+        // clamps always resolved to these caps at desktop widths anyway.
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0px' }}>
           {rows.map(([label, val, max]) => {
             const isHp = label === 'HP'
             return (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 11px)', color: cardStatLabel, width: '22px', flexShrink: 0, textAlign: 'left', lineHeight: 1 }}>{label}</span>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: cardStatLabel, width: '22px', flexShrink: 0, textAlign: 'left', lineHeight: 1 }}>{label}</span>
                 <div style={{
                   flex: 1, height: isHp ? '7px' : '4px',
                   backgroundColor: isHp ? '#1a1a1a' : cardBarTrack,
@@ -129,12 +136,41 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
                       : cardBarFill,
                   }} />
                 </div>
-                <span style={{ fontFamily: 'Orange Kid', fontSize: 'clamp(7px, 2vw, 12px)', color: cardStatLabel, width: '18px', textAlign: 'right', flexShrink: 0, lineHeight: 1 }}>{val}</span>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardStatLabel, width: '18px', textAlign: 'right', flexShrink: 0, lineHeight: 1 }}>{val}</span>
               </div>
             )
           })}
         </div>
-      )}
+      ) : (
+        // Mobile — the card is ~99px wide in its 3-across contexts, which is
+        // not enough for label + bar + value at a legible size: a 12px label
+        // and value leave a ~25px bar that shows nothing. So the four non-HP
+        // stats become a 2×2 label/value grid (the numbers carry the signal)
+        // and only HP keeps its two-tone bar — the card's signature element,
+        // which still reads at full card width.
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+            {rows.filter(([label]) => label !== 'HP').map(([label, val]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', minWidth: 0 }}>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardStatLabel, lineHeight: 1.25 }}>{label}</span>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, lineHeight: 1.25 }}>{val}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              flex: 1, height: '7px',
+              backgroundColor: '#1a1a1a', border: '1px solid #000',
+              borderRadius: '1px', overflow: 'hidden',
+            }}>
+              <div style={{ height: '100%', width: '100%', borderRadius: '1px', background: 'linear-gradient(to bottom, #4ade80 50%, #16a34a 50%)' }} />
+            </div>
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, flexShrink: 0, lineHeight: 1 }}>
+              {pokemon.stats.maxHp}
+            </span>
+          </div>
+        </div>
+      ))}
 
       {pokemon.move && (
         <div style={{
@@ -144,18 +180,18 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           padding: '5px 6px',
           display: 'flex', flexDirection: 'column', gap: '4px',
         }}>
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: cardText, textTransform: 'capitalize', textAlign: 'center', width: '100%', display: 'block' }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText, textTransform: 'capitalize', textAlign: 'center', width: '100%', display: 'block' }}>
             {pokemon.move.name.replace(/-/g, ' ')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <span style={{
-              fontFamily: 'Orange Kid', fontSize: '9px', color: '#ffffff',
+              fontFamily: 'Orange Kid', fontSize: '11px', color: '#ffffff',
               backgroundColor: TYPE_COLORS[pokemon.move.type] || '#888',
               padding: '1px 5px', textTransform: 'capitalize', flexShrink: 0,
             }}>
               {pokemon.move.type}
             </span>
-            <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: cardText }}>
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: cardText }}>
               PWR: <span style={{ color: cardText }}>{pokemon.move.power ?? '—'}</span>
             </span>
           </div>
