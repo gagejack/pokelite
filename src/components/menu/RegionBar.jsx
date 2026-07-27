@@ -25,7 +25,7 @@ export default function RegionBar({ region, dark, onSelect }) {
       onClick={available ? () => onSelect(region) : undefined}
       className={available ? 'relative overflow-hidden hover:scale-105 active:scale-95 transition-transform duration-150' : 'relative overflow-hidden'}
       style={{
-        width: '320px', height: '68px',
+        width: '320px', maxWidth: '100%', height: '68px',
         border: borderStyle,
         boxShadow: shadowStyle,
         backgroundColor: '#1a1a1a',

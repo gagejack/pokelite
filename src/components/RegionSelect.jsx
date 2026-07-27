@@ -5,6 +5,8 @@ import { getRegionConfig } from '../game/regionRegistry'
 import Layout from './Layout'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 import { REGIONS, SPRITE } from '../game/regions/regionList'
+import MenuButton from './menu/MenuButton'
+import RegionBar from './menu/RegionBar'
 
 // Defined at module scope (not nested inside RegionSelect) so its component
 // identity is stable across parent re-renders. Nesting it caused every card to
@@ -133,6 +135,7 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         overflowY: isDesktop ? 'hidden' : 'auto',
         minHeight: 0,
       }}>
+        {isDesktop ? (<>
         <div className="flex flex-col items-center gap-2">
           <span style={{ fontFamily: 'Upheaval', fontSize: '28px', color: headingColor, textShadow: headingShadow }}>
             Select a Region
@@ -142,8 +145,8 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           </span>
         </div>
 
-        {/* 3×2 grid of square boxes (5 regions + a Coming Soon cell), same on
-            desktop and mobile — desktop just uses a larger max width. */}
+        {/* 3×2 grid of square boxes (5 regions + a Coming Soon cell) —
+            desktop only; mobile uses the stacked RegionBar column below. */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -231,6 +234,69 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
         >
           Back
         </button>
+        </>) : (
+          // Mobile — the desktop region column transplanted: Daily bar, five
+          // RegionBars, then the BACK + seed half-row, all one centered group.
+          // `margin: auto` centers it vertically when it fits and releases on
+          // overflow so the top is never clipped (MainMenu's column pattern).
+          <div style={{
+            margin: 'auto',
+            width: '320px', maxWidth: '100%',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+          }}>
+            <div className="flex flex-col items-center gap-2" style={{ marginBottom: '4px' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: headingColor, textShadow: headingShadow }}>
+                Select a Region
+              </span>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: subheadingColor, textAlign: 'center', maxWidth: '260px', lineHeight: 1.5, textShadow: headingShadow }}>
+                Choose one region to start, once the region is complete, unlock a region token to continue your journey
+              </span>
+            </div>
+            <MenuButton
+              def={{ id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)', color: '#fff', fontSize: '22px', onClick: onOpenDaily, className: 'daily-glow' }}
+              dark={dark}
+            />
+            {REGIONS.map(region => (
+              <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion} />
+            ))}
+            <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
+              <MenuButton
+                def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: onBack }}
+                dark={dark}
+                style={{ flex: 1, width: 'auto' }}
+              />
+              <input
+                value={seedInput}
+                onChange={e => { setSeedInput(e.target.value); setSeedError(null) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const res = onCustomSeed?.(seedInput)
+                    if (res?.error) setSeedError(res.error)
+                  }
+                }}
+                placeholder="KANTO-7Q2"
+                // The virtual keyboard's action key becomes "go" — it stands in
+                // for the old screen's Go button, which this row drops to match
+                // the desktop column's BACK + input pattern.
+                enterKeyHint="go"
+                style={{
+                  flex: 1, height: '40px', minWidth: 0,
+                  fontFamily: 'Orange Kid', fontSize: '14px', padding: '6px 8px',
+                  textTransform: 'uppercase', textAlign: 'center',
+                  border: dark ? '2px solid #121212' : '2px solid #2e2e2e',
+                  backgroundColor: dark ? '#1a1a1a' : '#fff',
+                  color: dark ? '#DBDBDB' : '#333333',
+                }}
+              />
+            </div>
+            {/* Error below the row so an invalid seed never resizes the column. */}
+            {seedError && (
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#ef4444' }}>
+                {seedError}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Layout>
   )
