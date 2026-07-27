@@ -17,7 +17,10 @@ const HP_DARK = { '#22c55e': '#15803d', '#facc15': '#a16207', '#ef4444': '#991b1
 const STAT_BAR_LIGHT = '#6890F0'
 const STAT_BAR_DARK = '#3b5aa8'
 
-function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor, onHeldItemClick }) {
+// Exported so the item-assign screen (ItemNode) can show the SAME stat card
+// the map roster shows on hover — one visual language for "here are this
+// Pokémon's stats", learned once.
+export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mutedColor, onHeldItemClick }) {
   const isDesktop = useIsDesktop()
   const { stats, move } = pokemon
   const k = isDesktop ? 1.7 : 1

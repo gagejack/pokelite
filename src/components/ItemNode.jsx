@@ -5,6 +5,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
+import { PokemonCardContent } from './Roster'
 
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
 export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose, onReroll = null }) {
@@ -14,6 +15,13 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [hoveredOffer, setHoveredOffer] = useState(null)
   const [rerollsLeft, setRerollsLeft] = useState(MYSTERY_REROLLS)
+  // Roster index whose stat card is open on the assign screen, or null.
+  // Click-to-toggle on BOTH platforms rather than hover-on-desktop: the brief
+  // asks for click-anywhere-to-dismiss, and a hover popup that also closes on
+  // mouse-out would give one surface two competing dismissal rules. Desktop
+  // still gets a hover highlight on the row so the affordance is discoverable.
+  const [statsFor, setStatsFor] = useState(null)
+  const [hoveredRow, setHoveredRow] = useState(null)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
@@ -26,12 +34,19 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
 
   if (stage === 'assign' && selectedItem) {
     return (
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-      }}>
+      <div
+        // Any click that reaches the backdrop or the panel background closes
+        // an open stat card. Row triggers stopPropagation so they toggle
+        // instead of immediately re-closing.
+        onClick={() => setStatsFor(null)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+        }}
+      >
         <div style={{
+          position: 'relative',
           backgroundColor: bg,
           border: borderStyle,
           boxShadow: shadowStyle,
@@ -74,34 +89,58 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     opacity: pokemon.fainted ? 0.5 : 1,
                   }}
                 >
-                  {/* Sprite */}
-                  <img
-                    src={pokemon.sprite}
-                    alt={pokemon.name}
-                    style={{ width: '40px', height: '40px', imageRendering: 'pixelated', flexShrink: 0 }}
-                  />
-                  {/* Name + type chips + level */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#ffffff', textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                        {pokemon.name}
-                      </span>
-                      <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-                        {pokemon.types?.map(t => (
-                          <span key={t} style={{
-                            fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
-                            backgroundColor: TYPE_COLORS[t] || '#888',
-                            padding: '2px 5px', textTransform: 'capitalize',
-                          }}>
-                            {t}
-                          </span>
-                        ))}
+                  {/* Sprite + name are one button that toggles the stat card.
+                      The Use/Swap/Equip control stays outside it, so tapping to
+                      compare stats can never be mistaken for committing the
+                      item. stopPropagation beats the backdrop's close handler. */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setStatsFor(statsFor === i ? null : i) }}
+                    // The trigger keeps focus while the card is open, so
+                    // Escape is handled here rather than on the card.
+                    onKeyDown={e => { if (e.key === 'Escape' && statsFor === i) { e.stopPropagation(); setStatsFor(null) } }}
+                    onMouseEnter={() => setHoveredRow(i)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                    aria-expanded={statsFor === i}
+                    aria-label={`${pokemon.name} stats`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      flex: 1, minWidth: 0, cursor: 'pointer',
+                      background: 'none', border: 'none', padding: 0,
+                      textAlign: 'left',
+                      // Desktop discoverability: the row lifts slightly on
+                      // hover so the sprite/name reads as pressable.
+                      opacity: hoveredRow === i || statsFor === i ? 1 : 0.92,
+                      transition: 'opacity 0.1s',
+                    }}
+                  >
+                    <img
+                      src={pokemon.sprite}
+                      alt=""
+                      style={{ width: '40px', height: '40px', imageRendering: 'pixelated', flexShrink: 0 }}
+                    />
+                    {/* Name + type chips + level */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#ffffff', textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                          {pokemon.name}
+                        </span>
+                        <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                          {pokemon.types?.map(t => (
+                            <span key={t} style={{
+                              fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                              backgroundColor: TYPE_COLORS[t] || '#888',
+                              padding: '2px 5px', textTransform: 'capitalize',
+                            }}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: '#facc15' }}>
+                        LVL {pokemon.level}
+                      </span>
                     </div>
-                    <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: '#facc15' }}>
-                      LVL {pokemon.level}
-                    </span>
-                  </div>
+                  </button>
                   {/* Held item slot */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {hasItem ? (
@@ -158,6 +197,38 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
             </button>
           </div>
         </div>
+
+        {/* Stat card — fixed and centered rather than anchored beside its row.
+            The assign panel is only 420px wide and scrolls, so a row-anchored
+            popup would clip or drift out of view mid-scroll. Centered, the
+            same position works on a phone and a desktop. */}
+        {statsFor !== null && roster[statsFor] && (
+          <div
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-label={`${roster[statsFor].name} stats`}
+            style={{
+              position: 'fixed', top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 110,
+              border: borderStyle,
+              boxShadow: shadowStyle,
+              backgroundColor: bg,
+              display: 'flex', flexDirection: 'column', gap: '8px',
+              padding: '0 12px 12px',
+              width: isDesktop ? '300px' : '260px',
+              maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto',
+            }}
+          >
+            <PokemonCardContent
+              pokemon={roster[statsFor]}
+              dark={dark}
+              borderStyle={borderStyle}
+              textColor={textColor}
+              mutedColor={mutedColor}
+            />
+          </div>
+        )}
       </div>
     )
   }
