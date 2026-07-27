@@ -120,7 +120,11 @@ notch at the threshold points.
 player frustration). **Fix:** floor all battle text at 12px; the defeat line
 deserves 16px+.
 
-- [ ] Fixed
+- [x] Fixed — every sub-12px string in BattleCard raised: prep labels and
+  both Fight! buttons 9-13→14px, fainted banner 10→16px, item/level/flash
+  popups 10-11→12px, trainer label 8→12px, roster HP numbers 9→12px. The
+  HP raise adds ~3px per roster slot against the six-slot fit noted at the
+  one-row comment — watch for clipping with a full team on a short phone.
 
 ### 8. Sub-12px sweep — the long tail
 
@@ -130,7 +134,9 @@ opportunistic — when touching a file, raise any pixel-font size below 12px
 or justify it in a comment. Do not do a big-bang pass; the hot-path items
 above matter, the tail mostly doesn't.
 
-- [ ] Ongoing
+- [x] Ongoing — policy in effect. Applied to BattleCard (item #7 pass left
+  zero sub-12px strings in the file). Remaining tail stays opportunistic
+  per this rule; no big-bang pass.
 
 ---
 

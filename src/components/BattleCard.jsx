@@ -432,13 +432,13 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
               backgroundColor: cardBg,
             }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>
                 {prepLabel}
               </span>
               <button
                 onClick={startBattle}
                 style={{
-                  fontFamily: 'Upheaval', fontSize: '11px', color: '#fff',
+                  fontFamily: 'Upheaval', fontSize: '14px', color: '#fff',
                   border: borderStyle, backgroundColor: '#dc2626',
                   padding: '6px 24px', cursor: 'pointer',
                 }}
@@ -525,7 +525,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                   <motion.span
                     key={flashText.text + 'e'}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    style={{ position: 'absolute', top: '-4px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', filter: 'drop-shadow(0 0 4px #facc15)', zIndex: 10, pointerEvents: 'none' }}
+                    style={{ position: 'absolute', top: '-4px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15', filter: 'drop-shadow(0 0 4px #facc15)', zIndex: 10, pointerEvents: 'none' }}
                   >
                     {flashText.text}
                   </motion.span>
@@ -598,7 +598,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                   <motion.span
                     key={flashText.text + 'p'}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    style={{ position: 'absolute', top: '-4px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '11px', color: '#facc15', filter: 'drop-shadow(0 0 4px #facc15)', zIndex: 10, pointerEvents: 'none' }}
+                    style={{ position: 'absolute', top: '-4px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15', filter: 'drop-shadow(0 0 4px #facc15)', zIndex: 10, pointerEvents: 'none' }}
                   >
                     {flashText.text}
                   </motion.span>
@@ -684,13 +684,13 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
               position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
             }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff', textShadow: '1px 1px 0 #000' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: '#fff', textShadow: '1px 1px 0 #000' }}>
                 {prepLabel}
               </span>
               <button
                 onClick={startBattle}
                 style={{
-                  fontFamily: 'Upheaval', fontSize: '13px', color: '#fff',
+                  fontFamily: 'Upheaval', fontSize: '14px', color: '#fff',
                   border: '2px solid #fff', backgroundColor: '#dc2626',
                   padding: '6px 24px', cursor: 'pointer',
                 }}
@@ -706,7 +706,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
               position: 'absolute', bottom: '5%', left: '50%', transform: 'translateX(-50%)',
               backgroundColor: 'rgba(0,0,0,0.55)', padding: '6px 16px',
             }}>
-              <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: '#ef4444' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: '#ef4444' }}>
                 {currentEntry.defenderName} fainted!
               </span>
             </div>
@@ -1016,7 +1016,7 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
               transition={{ duration: 0.5, ease: 'easeOut' }}
               style={{
                 position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-                whiteSpace: 'nowrap', fontFamily: 'Upheaval', fontSize: '11px',
+                whiteSpace: 'nowrap', fontFamily: 'Upheaval', fontSize: '12px',
                 color: '#facc15', filter: 'drop-shadow(0 0 4px #facc15)',
                 textShadow: '1px 1px 0 #000', pointerEvents: 'none', zIndex: 10,
               }}
@@ -1173,7 +1173,7 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
           ? <img src={characterSprite} alt={characterName} style={{ width: `${spriteSize}px`, height: `${spriteH}px`, objectFit: 'contain', objectPosition: 'bottom', imageRendering: 'pixelated' }} />
           : <div style={{ width: `${spriteSize}px`, height: `${spriteH}px` }} />
         }
-        <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: mutedColor }}>{label}</span>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor }}>{label}</span>
       </div>
       {/* Slots flow top-down: slot 0 pins to the top regardless of roster
           size (was space-evenly, which centered small rosters vertically). */}
@@ -1236,7 +1236,7 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
         <AnimatePresence>
           {flashText && (
             <motion.span key={flashText} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '10px', color: '#facc15', filter: 'drop-shadow(0 0 3px #facc15)', zIndex: 10, pointerEvents: 'none' }}>
+              style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15', filter: 'drop-shadow(0 0 3px #facc15)', zIndex: 10, pointerEvents: 'none' }}>
               {flashText}
             </motion.span>
           )}
@@ -1256,7 +1256,7 @@ function RosterSlot({ pokemon, hp, fainted, active, attacking, dark, textColor, 
       {/* HP number LEFT of the bar (one row instead of two) — saves a line per
           slot so all six roster slots fit the mobile card without scrolling. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, flexShrink: 0 }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, flexShrink: 0 }}>
           {fainted ? 'FNT' : `${hp}/${pokemon.stats.maxHp}`}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
