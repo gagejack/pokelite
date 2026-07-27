@@ -389,22 +389,29 @@ const CATCH_POOLS = [
 ]
 
 // --- Legendary pools per map (Master Ball nodes) ---
-// Fixed levels per species, tiered weakest→strongest so a Lv70 Mewtwo can't
-// appear while the player's team is still low level.
-const LEG_BIRDS = [
-  { id: 144, level: 45 }, // Articuno
-  { id: 145, level: 45 }, // Zapdos
-  { id: 146, level: 45 }, // Moltres
+// Tiered weakest→strongest so a Lv70 Mewtwo can't appear while the player's
+// team is still low level.
+// The birds scale with the map they appear on: each is set to that map's gym
+// leader's ace level, rounded down to a multiple of 5 (Erika 37 → 35,
+// Koga 46 → 45, Sabrina 55 → 55). So a bird is always a match for the boss
+// guarding the same map rather than a flat Lv45 that is overlevelled on map 4
+// and underlevelled on map 6.
+const legBirds = level => [
+  { id: 144, level }, // Articuno
+  { id: 145, level }, // Zapdos
+  { id: 146, level }, // Moltres
 ]
 const LEG_MYTHIC = [
   { id: 151, level: 60 }, // Mew
   { id: 150, level: 70 }, // Mewtwo
 ]
 const LEGENDARY_POOLS = [
-  [], [], [],                      // Maps 1–3 — none
-  LEG_BIRDS, LEG_BIRDS, LEG_BIRDS, // Maps 4–6
-  [...LEG_BIRDS, ...LEG_MYTHIC],   // Map 7
-  [...LEG_BIRDS, ...LEG_MYTHIC],   // Map 8
+  [], [], [],        // Maps 1–3 — none
+  legBirds(35),      // Map 4 — Erika's ace is 37
+  legBirds(45),      // Map 5 — Koga's ace is 46
+  legBirds(55),      // Map 6 — Sabrina's ace is 55
+  LEG_MYTHIC,        // Map 7 — mythicals only; the birds are map 4–6 chases
+  LEG_MYTHIC,        // Map 8
 ]
 
 // --- Trainer node pools per map (which route-trainer icons can appear) ---
