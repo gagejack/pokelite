@@ -11,14 +11,23 @@ import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   // Desktop only: 'region' swaps the button column in place instead of
   // changing screens, so the background art and logo never unmount.
-  const [mode, setMode] = useState('menu')
+  // `initialMode` lets Back from starter select reopen the region column
+  // rather than dumping the player on the plain menu.
+  const [mode, setMode] = useState(initialMode)
+
+  // Keep App's copy in step so the mode survives the next screen change, and
+  // so leaving region mode here doesn't leave a stale 'region' flag behind.
+  function changeMode(next) {
+    setMode(next)
+    onModeChange?.(next)
+  }
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
 
@@ -35,7 +44,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   // adding a mode or changing a size happens in exactly one place.
   const buttonDefs = [
     { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
-      color: '#fff', fontSize: '26px', onClick: () => (isDesktop ? setMode('region') : onPlay()), visible: true },
+      color: '#fff', fontSize: '26px', onClick: () => (isDesktop ? changeMode('region') : onPlay()), visible: true },
     { id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)',
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
@@ -118,7 +127,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       ))}
       <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
         <MenuButton
-          def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => setMode('menu') }}
+          def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => changeMode('menu') }}
           dark={dark}
           style={{ flex: 1, width: 'auto' }}
         />
@@ -214,7 +223,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   )
 
   return (
-    <Layout onHome={() => { setPokedexOpen(false); setMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+    <Layout onHome={() => { setPokedexOpen(false); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
       {isDesktop ? desktopLayout : mobileLayout}
     </Layout>
   )

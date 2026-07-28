@@ -19,6 +19,7 @@ import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
+import { useIsDesktop } from './lib/useIsDesktop'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
 // Character select is skipped for now — every run uses this default protagonist.
@@ -26,6 +27,11 @@ const DEFAULT_CHARACTER = { id: 'Hilbert', name: 'Hilbert', sprite: defaultChara
 
 export default function App() {
   const [screen, setScreen] = useState('menu')
+  const isDesktop = useIsDesktop()
+  // Which mode MainMenu opens in. Desktop picks its region from inside the
+  // menu, so Back from starter select has to return there rather than to the
+  // standalone RegionSelect screen (which is mobile's region UI).
+  const [menuMode, setMenuMode] = useState('menu')
   const [resetting, setResetting] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
@@ -208,6 +214,8 @@ export default function App() {
       clearRun(user)
     }
     clearRunState()
+    // Leaving a run lands on the plain menu, never the region column.
+    setMenuMode('menu')
     setScreen('menu')
   }
 
@@ -530,6 +538,8 @@ export default function App() {
           onOpenDaily={() => setDailyOpen(true)}
           onSelectRegion={handleSelectRegion}
           onCustomSeed={handleCustomSeed}
+          initialMode={menuMode}
+          onModeChange={setMenuMode}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
         />
@@ -547,7 +557,12 @@ export default function App() {
       {screen === 'starter' && (
         <StarterSelect
           region={selectedRegion}
-          onBack={() => setScreen('region')}
+          onBack={() => {
+            // Desktop's region picker lives inside the menu; mobile's is the
+            // standalone screen. Send Back to whichever one the player used.
+            if (isDesktop) { setMenuMode('region'); setScreen('menu') }
+            else setScreen('region')
+          }}
           onSelectStarter={startRun}
           caughtSet={caughtSet}
           pokedexOpen={pokedexOpen}
