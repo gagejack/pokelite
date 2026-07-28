@@ -27,7 +27,7 @@ afford it (roster thumbnails), drop the stat rows entirely rather than render
 them unreadably — the tap-through detail view already shows full stats.
 Verify at 320/375/430px.
 
-- [x] Fixed — flat 14px name / 12px level+stats on mobile. Stat rows stack
+- [x] Fixed (`2f007e9`, `9e14fea`) — flat 14px name / 12px level+stats on mobile. Stat rows stack
   on mobile: label/value line, full-card-width bar beneath (bars end up
   wider than desktop's inline ones; text never competes with them for
   width). First pass dropped the non-HP bars entirely — user flagged the
@@ -64,7 +64,7 @@ dark `#888` → `#9a9a9a` (4.83:1 on `#2e2e2e`), light `#777` → `#5f5f5f`
 locally in each file — consider a shared `theme.jsx` export while there).
 Re-verify both numbers with a contrast checker after picking final values.
 
-- [x] Fixed — `muted(dark)` exported from `src/lib/colors.js` (own module:
+- [x] Fixed (`46733c1`) — `muted(dark)` exported from `src/lib/colors.js` (own module:
   a non-component export in theme.jsx breaks Fast Refresh per
   react-refresh/only-export-components). All 13 re-declaration sites plus
   PokemonCard's `cardStatLabel` and Pokedex's inline usage now read it.
@@ -120,7 +120,7 @@ notch at the threshold points.
 player frustration). **Fix:** floor all battle text at 12px; the defeat line
 deserves 16px+.
 
-- [x] Fixed — every sub-12px string in BattleCard raised: prep labels and
+- [x] Fixed (`2272aea`) — every sub-12px string in BattleCard raised: prep labels and
   both Fight! buttons 9-13→14px, fainted banner 10→16px, item/level/flash
   popups 10-11→12px, trainer label 8→12px, roster HP numbers 9→12px. The
   HP raise adds ~3px per roster slot against the six-slot fit noted at the
@@ -134,14 +134,45 @@ opportunistic — when touching a file, raise any pixel-font size below 12px
 or justify it in a comment. Do not do a big-bang pass; the hot-path items
 above matter, the tail mostly doesn't.
 
-- [x] Ongoing — policy in effect. Applied to BattleCard (item #7 pass left
-  zero sub-12px strings in the file). Remaining tail stays opportunistic
-  per this rule; no big-bang pass.
+- [x] Ongoing — policy in effect. Applied to BattleCard (`2272aea`, zero
+  sub-12px strings left in the file) and to ItemNode's pick-stage roster
+  tiles (`8968171`: name 8→12px, level 7→12px, type chips 6→10px — the
+  smallest text in the app). Remaining tail stays opportunistic per this
+  rule; no big-bang pass.
 
 ---
 
 ## Done
 
+Numbered items above are checked off in place. Related accessibility work
+that fell outside the audit's list:
+
 - **ItemNode offer cards** (`6d11054`) — 8px clamped descriptions → stacked
   full-width rows, flat 17/15px type, tier as a text label, 44px close
   target. The template for items 1, 4, and 5.
+- **Roster stat card on the item screens** (`a23be57`, `8968171`) — tapping
+  a Pokémon opens its stat card, tapping elsewhere closes it. Reuses
+  Roster's `PokemonCardContent`, so it's the same card the map roster shows
+  — one visual language. Click-to-toggle on both platforms rather than
+  hover-on-desktop: hover-out plus click-anywhere-to-dismiss would give one
+  surface two competing dismissal rules. Escape closes it; `role="dialog"`
+  and `aria-expanded` on the trigger.
+- **Desktop item offer type** (`e95ba97`) — name 18→22px, description
+  17→21px. 22px is the ceiling before "Weakness Policy" wraps and leaves
+  the three cards uneven.
+
+### Status
+
+| # | Item | State |
+|---|---|---|
+| 1 | PokemonCard 7px floors | ✅ `2f007e9`, `9e14fea` |
+| 2 | FloatingNav 26px targets | ⬜ open — has a destructive action (Restart) in the mis-tap zone |
+| 3 | Muted text contrast | ✅ `46733c1` |
+| 4 | Dead rarity prop | ⬜ open |
+| 5 | Modal close buttons | ⬜ open — ItemNode done, Stats/Pokedex/SettingsPanel remain |
+| 6 | HP color-only | ⬜ open |
+| 7 | BattleCard sub-12px | ✅ `2272aea` |
+| 8 | Sub-12px tail | ✅ policy in effect, applied opportunistically |
+
+**#2 is the one to take next** — it's the only open item where a mis-tap
+triggers an irreversible action.
