@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import homeIcon from '../assets/Icons/homeIcon.png'
 import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
@@ -17,6 +18,17 @@ import resetIcon from '../assets/Icons/reset.png'
 // onRestart is only passed on run screens, so Restart self-hides on the menus —
 // the same gate the desktop nav bar uses.
 export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, setStatsOpen, onRestart, onSkipMap, role }) {
+  // Restart wipes the run with no undo, so it takes two taps: the first arms
+  // it (the icon turns red and the label says so), the second fires. A single
+  // mis-tap from a neighbouring button can now only arm it, never restart.
+  const [armed, setArmed] = useState(false)
+  // Disarm after 3s so a forgotten arm can't be triggered by a later stray tap.
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(t)
+  }, [armed])
+
   const buttons = [
     { key: 'home',     icon: homeIcon,     alt: 'Home',     tutorial: 'home',     onClick: onHome },
     { key: 'dex',      icon: pokedexIcon,  alt: 'Pokedex',  tutorial: 'pokedex',  onClick: () => setPokedexOpen(true) },
@@ -29,9 +41,10 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
     buttons.push({
       key: 'restart',
       icon: resetIcon,
-      alt: 'Restart',
-      title: 'Restart run',
-      onClick: onRestart,
+      alt: armed ? 'Tap again to restart the run' : 'Restart run',
+      title: armed ? 'Tap again to restart' : 'Restart run',
+      armed,
+      onClick: () => { if (armed) { setArmed(false); onRestart() } else setArmed(true) },
     })
   }
   if (role === 'admin' && onSkipMap) {
@@ -46,23 +59,53 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
   return (
     <div style={{
       position: 'fixed', top: '8px', right: '5px',
-      display: 'flex', flexDirection: 'column', gap: '10px',
+      // Gap drops 10 → 2px because the 44px hit areas now touch: the old gap
+      // existed to separate 26px targets, and keeping it would push the pill
+      // to ~44% of an iPhone SE's height for a nav overlay.
+      display: 'flex', flexDirection: 'column', gap: '2px',
       backgroundColor: 'rgba(46, 46, 46, 0.55)',
-      padding: '6px 4px',
+      padding: '4px 2px',
       zIndex: 150,
     }}>
       {buttons.map(b => (
+        <div key={b.key} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+        {b.armed && (
+          // Tells the player what the second tap does. Sits to the LEFT of
+          // the pill, which is flush to the right screen edge.
+          <span style={{
+            position: 'absolute', right: '100%', top: '50%',
+            transform: 'translateY(-50%)', marginRight: '6px',
+            whiteSpace: 'nowrap', pointerEvents: 'none',
+            fontFamily: 'Orange Kid', fontSize: '13px', color: '#fff',
+            backgroundColor: 'rgba(220,38,38,0.92)', padding: '3px 8px',
+          }}>
+            Tap again to restart
+          </span>
+        )}
         <button
-          key={b.key}
           data-tutorial={b.tutorial}
           title={b.title}
-          onClick={b.onClick}
+          aria-label={b.alt}
+          // Any other button disarms Restart, so the armed state can't
+          // survive behind an opened modal.
+          onClick={() => { if (b.key !== 'restart' && armed) setArmed(false); b.onClick() }}
           className="hover:opacity-60 transition-opacity"
-          style={{ padding: '2px', cursor: 'pointer' }}
+          // 44px hit area with a 22px icon centered inside it: the target
+          // meets the touch minimum while the pill looks unchanged. It was
+          // 22px + 2px padding — six adjacent ~26px targets, where a mis-tap
+          // lands on the neighbour.
+          style={{
+            minWidth: '44px', minHeight: '44px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 0, cursor: 'pointer',
+            // Armed restart reads as dangerous rather than silently waiting
+            // for a second tap.
+            backgroundColor: b.armed ? 'rgba(220,38,38,0.85)' : 'transparent',
+          }}
         >
           <img
             src={b.icon}
-            alt={b.alt}
+            alt=""
             style={{
               width: '22px', height: '22px', display: 'block',
               imageRendering: 'pixelated',
@@ -70,6 +113,7 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
             }}
           />
         </button>
+        </div>
       ))}
     </div>
   )

@@ -48,7 +48,15 @@ action.
 pill's footprint allows. Additionally gate Restart behind a confirm (it is
 one tap from wiping a run) or move it into the settings panel only.
 
-- [ ] Fixed
+- [x] Fixed (`a7858bb`) — 44px hit areas with the icon still 22px, so the
+  pill looks unchanged. Gap 10→2px: at 44px the targets already touch, and
+  keeping the old gap would have pushed the pill to 44% of an iPhone SE's
+  height. Net +54px despite every target growing 26→44px.
+  Restart is now a two-tap confirm rather than moved: the first tap arms it
+  (button turns red, "Tap again to restart" label appears), the second
+  fires. Auto-disarms after 3s, and any other nav button disarms it. Chose
+  confirm over settings-only because `restartRun` had NO confirmation on
+  any path — including the desktop nav — so this protects all of them.
 
 ## 3. Muted text fails WCAG contrast in both themes
 
@@ -166,7 +174,7 @@ that fell outside the audit's list:
 | # | Item | State |
 |---|---|---|
 | 1 | PokemonCard 7px floors | ✅ `2f007e9`, `9e14fea` |
-| 2 | FloatingNav 26px targets | ⬜ open — has a destructive action (Restart) in the mis-tap zone |
+| 2 | FloatingNav 26px targets | ✅ `a7858bb` — 44px targets + two-tap Restart |
 | 3 | Muted text contrast | ✅ `46733c1` |
 | 4 | Dead rarity prop | ⬜ open |
 | 5 | Modal close buttons | ⬜ open — ItemNode done, Stats/Pokedex/SettingsPanel remain |
@@ -174,5 +182,6 @@ that fell outside the audit's list:
 | 7 | BattleCard sub-12px | ✅ `2272aea` |
 | 8 | Sub-12px tail | ✅ policy in effect, applied opportunistically |
 
-**#2 is the one to take next** — it's the only open item where a mis-tap
-triggers an irreversible action.
+**#4 or #5 next.** #5 has three remaining call sites (Stats, Pokedex,
+SettingsPanel) and a clear template in ItemNode; #4 is a half-wired prop
+that should either render or be deleted.
