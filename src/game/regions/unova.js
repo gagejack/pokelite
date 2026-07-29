@@ -653,6 +653,9 @@ export const unovaConfig = {
   legendaryPools: LEGENDARY_POOLS,
   // Flat set of every legendary species id (for the stats "Legendaries" box).
   legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
+  // Pokémart shelves — see game/shop.js and the note in kanto.js.
+  shopGeneric: ['max_heal'],
+  shopPools: [],
   badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,

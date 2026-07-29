@@ -136,4 +136,7 @@ export const sinnohConfig = {
   trainerFullSprites: {},
   characters: CHARACTERS,
   maps: [],
+  // Pokémart shelves — see game/shop.js and the note in kanto.js.
+  shopGeneric: ['max_heal'],
+  shopPools: [],
 }

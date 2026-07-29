@@ -473,6 +473,15 @@ export const kantoConfig = {
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
   legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
+  // Pokémart shelves (see game/shop.js). Both are arrays of item ids from
+  // game/items.js; price and stock come from BALANCE.economy, not from here.
+  // `shopGeneric` is offered at EVERY map's shop; `shopPools[i]` is map i's
+  // curated extra. The curated lists are authored by hand and are intentionally
+  // empty for now — a separate design decision.
+  shopGeneric: ['max_heal'],
+  shopPools: [
+    [], [], [], [], [], [], [], [],   // maps 1–8
+  ],
   badges: BADGES,
   // Battle data (see kanto.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
