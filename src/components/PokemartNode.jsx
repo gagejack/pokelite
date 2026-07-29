@@ -4,14 +4,26 @@ import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 
-// The Pokémart shop overlay. Deliberately built on ItemNode's pick-stage
-// language (same backdrop, panel, close button, stacked-on-mobile cards) so the
-// two "choose a thing" screens read as one family — the difference is that this
-// one costs money and can run out.
+// The Pokémart shop overlay — a price list on both platforms, sized up for
+// desktop rather than restructured.
+//
+// It began as a row of product cards, which broke when the shelf grew from one
+// item to five: five cards in a 740px panel is 100px of content each, where the
+// name alone needs ~133px and the description ~326px. But the real problem was
+// that name / effect / price / stock is TABULAR data, and five columns denies
+// that. Five rows admits it, and a list has no width pressure at all.
+//
+// One layout, two scales, so the platforms cannot drift apart the way two
+// branches of the same screen always eventually do.
 //
 // Stock is LOCAL state: a mart node is cleared when the shop closes, so a shop
 // is visited exactly once and there is nothing to carry. The parent owns money
 // and the bag; this component owns only what's left on the shelf.
+
+// One source for the two blocked states, so the copy can't drift.
+const SOLD_OUT = 'Sold out'
+const TOO_POOR = 'Costs more than you have'
+
 export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -25,6 +37,13 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
+  // Row divider. #757575 measures 2.95:1 on the dark panel and #7a7a7a 3.10:1
+  // on the light one — at/above the 3:1 floor for a meaningful UI boundary.
+  // The first pass used #3a3a3a/#b4b4b4 at 1.19:1 and 1.50:1, which was
+  // decoration pretending to be structure. These rules genuinely separate the
+  // rows, which matters here: the list is a table, and the boundary between
+  // one item's price and the next item's name is load-bearing.
+  const ruleColor = dark ? '#757575' : '#7a7a7a'
 
   function buy(entry, i) {
     if (stock[i] <= 0) return
@@ -46,30 +65,31 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
         backgroundColor: bg,
         border: borderStyle,
         boxShadow: shadowStyle,
-        // Mobile trims padding and gap: with the shelf now ~330px, this chrome
-        // is the difference between fitting an iPhone SE and not. dvh over vh
-        // so mobile browser chrome doesn't push the Leave button off-screen.
-        padding: isDesktop ? '29px' : '16px 14px',
+        // 560px on both: a five-row list at 740 leaves dead space between the
+        // effect and the price, which reads as a broken table rather than a
+        // roomy one. dvh so mobile browser chrome can't push Leave off-screen.
+        padding: isDesktop ? '22px 20px' : '16px 14px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: isDesktop ? '24px' : '12px',
-        maxWidth: isDesktop ? '740px' : '560px', width: '94vw',
+        gap: isDesktop ? '16px' : '12px',
+        maxWidth: '560px', width: '94vw',
         maxHeight: '90dvh', overflowY: 'auto',
       }}>
-        {/* Header — title, balance, close. Mobile puts the title and balance
-            on ONE line: two short strings stacked cost a row the shelf needs,
-            and "Pokémart ... $420" reads as a single statement anyway. */}
+        {/* Header — title and balance on one line, close pinned right. The
+            balance belongs beside the title: "Pokémart … $420" is a single
+            statement, and it's the number every price below is measured
+            against. */}
         <div style={{
-          display: 'flex',
-          flexDirection: isDesktop ? 'column' : 'row',
-          alignItems: 'center',
-          justifyContent: isDesktop ? 'flex-start' : 'space-between',
+          display: 'flex', flexDirection: 'row',
+          alignItems: 'center', justifyContent: 'space-between',
           gap: '4px', width: '100%', position: 'relative',
-          paddingRight: isDesktop ? 0 : '34px',   // clear of the close button
+          paddingRight: '34px',   // clear of the close button
         }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '20px', color: textColor }}>Pokémart</span>
+          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: textColor }}>
+            Pokémart
+          </span>
           {/* cash(dark), not a flat #facc15: this sits on the themed panel,
               where the yellow measures 1.11:1 in light mode. */}
-          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '14px' : '17px', color: cash(dark) }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '20px' : '17px', color: cash(dark) }}>
             ${speedCash}
           </span>
           <button
@@ -84,9 +104,7 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
               minWidth: '44px', minHeight: '44px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               position: 'absolute', right: '-10px',
-              // Desktop offsets up past the stacked title; mobile centers on
-              // the single header row.
-              ...(isDesktop ? { top: '-10px' } : { top: '50%', transform: 'translateY(-50%)' }),
+              top: '50%', transform: 'translateY(-50%)',
             }}
           >
             X
@@ -97,80 +115,89 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
           <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
             Nothing in stock.
           </span>
-        ) : !isDesktop ? (
-          /* MOBILE — a price list, not five product cards.
-             Five stacked cards ran 955px inside a 600px panel on an iPhone SE:
-             you saw two and a half items and scrolled for the rest, including
-             Mega Revive, the most expensive thing in the game. The height went
-             to a 56px icon, a wrapped description line, a stock line, and a
-             44px Buy button — four rows per item to say name, price, effect,
-             count.
-             Here the PRICE is the button. That removes a whole 44px row per
-             item and turns the prices into one right-aligned column you can
-             read top to bottom to see what this stop can do for you. Shelf
-             drops ~783px to ~330px, so all five fit without scrolling. */
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
             {inventory.map((entry, i) => {
               const left = stock[i]
               const soldOut = left <= 0
               const tooPoor = speedCash < entry.price
-              const blocked = soldOut ? 'Sold out' : tooPoor ? 'Costs more than you have' : null
+              // Sold out first: it's the more useful of the two reasons, and a
+              // sold-out entry stays visible so the player sees what they missed.
+              const blocked = soldOut ? SOLD_OUT : tooPoor ? TOO_POOR : null
               const rarity = tierColor(entry.item)
+              const isHovered = hovered === i
               return (
                 <div
                   key={entry.item.id}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '9px 0',
+                    display: 'flex', alignItems: 'center',
+                    gap: isDesktop ? '14px' : '10px',
+                    padding: isDesktop ? '11px 8px' : '9px 0',
                     opacity: soldOut ? 0.45 : 1,
-                    // Hairline between rows, not a box around each — the list
-                    // is one object, and five bordered cards read as five.
-                    borderTop: i === 0 ? 'none' : `1px solid ${dark ? '#3a3a3a' : '#b4b4b4'}`,
+                    // Hover tints the row instead of lifting it. A translate on
+                    // a full-width row reads as jitter, and moving layout on
+                    // hover is the kind of motion that serves nothing.
+                    backgroundColor: !blocked && isHovered ? innerBg : 'transparent',
+                    transition: 'background-color 0.1s',
+                    borderTop: i === 0 ? 'none' : `1px solid ${ruleColor}`,
                   }}
                 >
-                  {/* 28px, down from 56: still aids recognition, no longer
-                      sets the row height. The tier color moves to a left rule,
-                      which reads at a glance without a full border. */}
+                  {/* Tier as a left rule rather than a border around the whole
+                      row: it reads at a glance, costs no width, and five
+                      glowing borders was noise where one column of color is
+                      information. */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <div style={{ width: '3px', height: '32px', backgroundColor: rarity }} />
+                    <div style={{ width: '3px', height: isDesktop ? '38px' : '32px', backgroundColor: rarity }} />
                     <img
                       src={itemIconUrl(entry.item)}
                       alt=""
-                      style={{ width: '28px', height: '28px', imageRendering: 'pixelated', display: 'block' }}
+                      style={{
+                        width: isDesktop ? '34px' : '28px',
+                        height: isDesktop ? '34px' : '28px',
+                        imageRendering: 'pixelated', display: 'block',
+                      }}
                     />
                   </div>
 
-                  {/* Name over effect. Two lines, both flat sizes — no clamp,
-                      no viewport scaling, nothing under 12px. */}
+                  {/* Name over effect. Desktop has the width to show the whole
+                      description; mobile ellipsises it, so the title carries
+                      the rest for anyone on a narrow desktop window. */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
                     <span style={{
-                      fontFamily: 'Upheaval', fontSize: '15px', color: textColor,
+                      fontFamily: 'Upheaval', fontSize: isDesktop ? '19px' : '15px', color: textColor,
                       overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                     }}>
                       {entry.item.name}
                     </span>
-                    <span style={{
-                      fontFamily: 'Orange Kid', fontSize: '13px', color: blocked ? '#ef4444' : mutedColor,
-                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                    }}>
+                    <span
+                      title={blocked ? undefined : entry.item.description}
+                      style={{
+                        fontFamily: 'Orange Kid', fontSize: isDesktop ? '17px' : '13px',
+                        color: blocked ? '#ef4444' : mutedColor,
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      }}
+                    >
                       {blocked ?? entry.item.description}
                     </span>
                   </div>
 
-                  {/* The price IS the buy button. Boxed so it reads as
-                      pressable, 44px tall for the touch minimum, and filled
-                      with cash green when affordable so the column scans as
-                      "what I can afford" at a glance. */}
+                  {/* The price IS the buy button — boxed so it reads as
+                      pressable, filled with cash green when affordable. Five
+                      of them stack into one column, so the whole shelf's
+                      affordability reads in a single downward glance. That
+                      column is what this screen is for. */}
                   <button
                     onClick={() => buy(entry, i)}
                     disabled={!!blocked}
                     aria-label={blocked ? `${entry.item.name}, ${blocked}` : `Buy ${entry.item.name} for $${entry.price}`}
                     style={{
-                      fontFamily: 'Upheaval', fontSize: '14px',
+                      fontFamily: 'Upheaval', fontSize: isDesktop ? '17px' : '14px',
                       color: blocked ? mutedColor : (dark ? '#1a1a1a' : '#ffffff'),
                       backgroundColor: blocked ? 'transparent' : cash(dark),
                       border: blocked ? `2px solid ${mutedColor}` : borderStyle,
-                      minHeight: '44px', minWidth: '78px',
+                      minHeight: '44px', minWidth: isDesktop ? '96px' : '78px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       textDecoration: soldOut ? 'line-through' : 'none',
                       cursor: blocked ? 'not-allowed' : 'pointer',
@@ -181,121 +208,15 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                     ${entry.price}
                   </button>
 
-                  {/* Stock as a bare multiplier — "×2" carries it; "2 in
-                      stock" cost a whole row to say the same thing. Hidden at
+                  {/* Stock as a bare multiplier — "×2" carries it. Hidden at
                       one unit, which is the default and therefore not news. */}
                   <span style={{
-                    fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor,
-                    width: '18px', textAlign: 'right', flexShrink: 0,
+                    fontFamily: 'Orange Kid', fontSize: isDesktop ? '15px' : '13px',
+                    color: mutedColor,
+                    width: isDesktop ? '22px' : '18px', textAlign: 'right', flexShrink: 0,
                   }}>
                     {left > 1 ? `×${left}` : ''}
                   </span>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          // DESKTOP — the card row. Space is not scarce here, so the icon and
-          // full description stay.
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            gap: '10px',
-            width: '100%',
-          }}>
-            {inventory.map((entry, i) => {
-              const left = stock[i]
-              const soldOut = left <= 0
-              const tooPoor = speedCash < entry.price
-              // Sold out is checked first: a sold-out entry stays visible and
-              // greyed so the player can see what they missed, and "Sold Out"
-              // is the more useful of the two reasons.
-              const blocked = soldOut ? 'Sold Out' : tooPoor ? 'Not enough Speed Cash' : null
-              const rarity = tierColor(entry.item)
-              const isHovered = hovered === i
-              return (
-                <div
-                  key={entry.item.id}
-                  style={{
-                    backgroundColor: innerBg,
-                    border: `2px solid ${rarity}`,
-                    opacity: soldOut ? 0.45 : 1,
-                    padding: '17px 12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                    textAlign: 'center',
-                    flex: '1 1 0',
-                    minWidth: 0, width: '100%',
-                  }}
-                >
-                  <img
-                    src={itemIconUrl(entry.item)}
-                    alt={entry.item.name}
-                    style={{
-                      width: '68px',
-                      height: '68px',
-                      imageRendering: 'pixelated',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                    minWidth: 0, flex: 1,
-                  }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'baseline', gap: '8px',
-                      width: '100%', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>
-                        {entry.item.name}
-                      </span>
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: cash(dark), flexShrink: 0 }}>
-                        ${entry.price}
-                      </span>
-                    </div>
-                    <span style={{
-                      fontFamily: 'Orange Kid',
-                      fontSize: '21px',
-                      color: mutedColor,
-                      textAlign: 'center',
-                      lineHeight: 1.35,
-                    }}>
-                      {entry.item.description}
-                    </span>
-                    <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor }}>
-                      {left} in stock
-                    </span>
-                    {/* The reason has to be ON SCREEN, not in a title tooltip:
-                        `title` never appears on touch. */}
-                    {blocked && (
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#ef4444' }}>
-                        {blocked}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => buy(entry, i)}
-                      disabled={!!blocked}
-                      onMouseEnter={() => setHovered(i)}
-                      onMouseLeave={() => setHovered(null)}
-                      style={{
-                        fontFamily: 'Upheaval', fontSize: '13px',
-                        color: textColor, border: borderStyle,
-                        backgroundColor: bg, padding: '8px 20px',
-                        minHeight: '44px',
-                        cursor: blocked ? 'not-allowed' : 'pointer',
-                        opacity: blocked ? 0.4 : 1,
-                        transform: !blocked && isHovered ? 'translateY(-2px)' : 'none',
-                        transition: 'transform 0.1s',
-                        marginTop: '4px',
-                      }}
-                    >
-                      Buy
-                    </button>
-                  </div>
                 </div>
               )
             })}
@@ -306,7 +227,7 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
           onClick={onClose}
           className="hover:opacity-70 transition-opacity"
           style={{
-            fontFamily: 'Upheaval', fontSize: '13px',
+            fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px',
             color: mutedColor, border: borderStyle,
             backgroundColor: innerBg, padding: '8px', cursor: 'pointer',
             width: '100%', minHeight: '44px',
