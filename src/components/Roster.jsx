@@ -28,7 +28,15 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
   // Fonts scale a touch smaller than the card's layout on desktop so the hover
   // stat card reads tighter without shrinking the sprite/bars/spacing.
   const fontK = isDesktop ? 0.82 : 1
-  const sf = px => `${Math.round(px * k * fontK)}px`
+  // FLOOR AT 12px. These sizes were authored against desktop's 1.7x, so at
+  // mobile's k=1 they ARE the raw px — which put nine of the card's ten
+  // strings between 7px and 10px. Upheaval and Orange Kid are pixel display
+  // faces that stop resolving below ~12px (see docs/UI_TOUCHUPS.md), so the
+  // stat labels, HP numbers, and move text were shapes rather than words.
+  // Desktop is nudged too, though far less: its type chips, stat labels, and
+  // MOVE heading computed to 10-11px and now sit at 12. Its label column is
+  // 68px against ~46px of "SP.DEF", so the extra 2px costs no layout.
+  const sf = px => `${Math.max(12, Math.round(px * k * fontK))}px`
   const innerBg = dark ? '#1a1a1a' : '#c8c8c8'
   const isSpecial = move?.damageClass === 'special'
   const statRows = [
@@ -109,7 +117,10 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
             {stats.hp}/{stats.maxHp}
           </span>
         </div>
-        <div style={{ width: '100%', height: s(6), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
+        {/* Bar heights grow on mobile only. At the 12px type floor a 6px bar
+            reads as a hairline beside its own label; desktop's s(6) already
+            computes to 10px. The two-tone fill is unchanged. */}
+        <div style={{ width: '100%', height: isDesktop ? s(6) : '10px', backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
           <div style={{
             height: '100%', borderRadius: '1px',
             width: `${Math.max(0, (stats.hp / stats.maxHp) * 100)}%`,
@@ -125,17 +136,24 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
       <div style={{ display: 'flex', flexDirection: 'column', gap: s(4) }}>
         {statRows.filter(row => row.label !== 'HP').map(({ label, value }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: s(6) }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor, width: s(40), flexShrink: 0 }}>
+            {/* Label column widened: it was sized for 7px text, and "SP.DEF"
+                at the 12px floor needs ~46px or it wraps mid-word. Desktop's
+                s(40) already computed to 68px, so only mobile changes. */}
+            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: mutedColor, width: isDesktop ? s(40) : '48px', flexShrink: 0 }}>
               {label}
             </span>
-            <div style={{ flex: 1, height: s(4), backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
+            {/* 4px was a hairline on mobile — and this bar IS the card's
+                comparison device, the thing you read to see which stat is
+                strong. Desktop's s(4) computes to 7px and is unchanged. */}
+            <div style={{ flex: 1, height: isDesktop ? s(4) : '8px', backgroundColor: dark ? '#333' : '#aaa', borderRadius: '1px' }}>
               <div style={{
                 height: '100%', borderRadius: '1px',
                 width: `${(value / maxStat) * 100}%`,
                 background: twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK),
               }} />
             </div>
-            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: textColor, width: s(24), textAlign: 'right', flexShrink: 0 }}>
+            {/* Same reason as the label: three digits at 12px need ~28px. */}
+            <span style={{ fontFamily: 'Upheaval', fontSize: sf(7), color: textColor, width: isDesktop ? s(24) : '30px', textAlign: 'right', flexShrink: 0 }}>
               {value}
             </span>
           </div>
