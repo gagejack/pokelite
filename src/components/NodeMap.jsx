@@ -1339,6 +1339,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             onMainMenu={onBack}
             seedCode={seedCode}
             cashEarned={cashEarned}
+            speedCash={speedCash}
+            badges={config.badges ?? []}
+            badgesEarned={mapIndex}
           />
         </div>
       )}

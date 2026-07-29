@@ -262,6 +262,11 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             onMainMenu={onBack}
             seedCode={seedCode}
             cashEarned={cashEarned}
+            speedCash={speedCash}
+            // Reaching the gauntlet means every gym is cleared, so all badges
+            // show earned — there is no mapIndex here to count from.
+            badges={config?.badges ?? []}
+            badgesEarned={config?.badges?.length ?? 0}
           />
         </div>
       )}

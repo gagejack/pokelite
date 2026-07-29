@@ -31,7 +31,7 @@ const MOBILE_CARD_H = 640
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode, cashEarned = 0 }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, badges = [], badgesEarned = 0 }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
@@ -322,7 +322,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
   const defeatOverlay = battleResult === 'loss' ? (
-    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} />
+    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} speedCash={speedCash} badges={badges} badgesEarned={badgesEarned} />
   ) : null
 
   // Victory overlay — centered "Victory!" + Continue popup. Skipped entirely
@@ -741,7 +741,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 // Shown when the player is defeated: the final team as a 2×3 card grid, with a
 // Play Again button below. Replaces the in-card "Play Again" button so the
 // battle card itself keeps all its space for the roster.
-function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarned = 0 }) {
+function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, badges = [], badgesEarned = 0 }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   // Light theme keeps DARK grey strokes/shadows — the lighter #666 wash out
@@ -749,6 +749,16 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarne
   const borderStyle = dark ? '2px solid #121212' : '2px solid #444444'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #444444'
   const textColor = dark ? '#DBDBDB' : '#333333'
+  const mutedColor = muted(dark)
+
+  // A one-word read on the leftover balance — the only thing on this screen
+  // the player can act on next run. Deliberately silent in the normal case:
+  // it speaks only when the number is actually telling you something.
+  // Thresholds are absolute, not a fraction of earnings: $400 unspent is a
+  // wasted Max Heal whether you earned $500 or $2000.
+  const verdict = speedCash >= 300 ? 'hoarded'
+    : speedCash < 50 ? 'spent well'
+    : null
 
   return (
     <div
@@ -770,13 +780,66 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarne
         </span>
         <SeedCodeChip code={seedCode} dark={dark} />
 
-        {/* Total Speed Cash earned this run — the lifetime counter, so it is
-            unaffected by anything spent at the Pokémart. This is the only
-            place the Elite Four's payouts ever become visible: there is no
-            mart in the gauntlet, so that money is otherwise unspendable. */}
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: cash(dark) }}>
-          Speed Cash earned: ${cashEarned}
-        </span>
+        {/* Run ledger — how far you got, and what the money did.
+            One band rather than three stacked lines: badges answer "how far",
+            and the earned/unspent pair answers "how well" as a single reading.
+            The divider between the two figures is doing the work — you read
+            them as one sentence (earned this, still holding this), which is
+            the only way the leftover number means anything. */}
+        <div style={{
+          width: '100%', border: borderStyle, backgroundColor: cellBg,
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ backgroundColor: '#3f9d4f', padding: '3px 10px', display: 'flex', justifyContent: 'center' }}>
+            <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#fff' }}>Run Ledger</span>
+          </div>
+
+          {/* Badge row. Same colorize/black-out rule as the map's BadgeList, so
+              this reads as the same object the player watched fill up. */}
+          {badges.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '6px', padding: '10px 10px 8px',
+            }}>
+              {badges.map((badge, i) => (
+                <img
+                  key={badge.name} src={badge.icon} alt={badge.name} title={badge.name}
+                  style={{
+                    flex: '1 1 0', minWidth: 0, maxWidth: '30px', height: 'auto', aspectRatio: '1',
+                    objectFit: 'contain', imageRendering: 'pixelated',
+                    filter: i < badgesEarned ? 'none' : 'brightness(0) opacity(0.45)',
+                  }}
+                />
+              ))}
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor, flexShrink: 0, marginLeft: '4px' }}>
+                {badgesEarned}/{badges.length}
+              </span>
+            </div>
+          )}
+
+          {/* Earned vs. unspent, split by a rule. Unspent is deliberately the
+              quieter of the two — it is the consequence, not the achievement. */}
+          <div style={{ display: 'flex', alignItems: 'stretch', borderTop: borderStyle }}>
+            <div style={{ flex: 1, padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '22px', color: cash(dark), lineHeight: 1 }}>
+                ${cashEarned.toLocaleString()}
+              </span>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>earned</span>
+            </div>
+            <div style={{ width: '2px', backgroundColor: dark ? '#121212' : '#444444', flexShrink: 0 }} />
+            <div style={{ flex: 1, padding: '10px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '22px', color: textColor, lineHeight: 1 }}>
+                ${speedCash.toLocaleString()}
+              </span>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>unspent</span>
+              {verdict && (
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor, fontStyle: 'italic' }}>
+                  {verdict}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* 2 columns × 3 rows of the final team. */}
         <div style={{
