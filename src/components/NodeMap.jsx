@@ -6,6 +6,7 @@ import Roster from './Roster'
 import BattleCard from './BattleCard'
 import PokeballNode from './PokeballNode'
 import ItemNode from './ItemNode'
+import PokemartNode from './PokemartNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
@@ -14,6 +15,7 @@ import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl } from '../game/items.js'
+import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
@@ -37,6 +39,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
   [NODE_TYPES.POKECENTER]:    pokecenterIcon,
+  [NODE_TYPES.POKEMART]:      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-potion.png',
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.MYSTERY]:       mysteryIcon,
 }
@@ -426,6 +429,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingLegendary, setPendingLegendary] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
+  const [pendingMart, setPendingMart] = useState(null)
   const [rerolling, setRerolling] = useState(false)
 
   // Keep the parent's snapshot of this map's progress current, so hitting Home
@@ -702,6 +706,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
       setCurrentNode(node.id)
+    } else if (node.type === NODE_TYPES.POKEMART) {
+      // The node is NOT cleared here — the shop's onClose clears it, matching
+      // how pendingItem / pendingPower work. Clearing on open would let the
+      // player walk on with the shop still up.
+      setPendingMart({ node, inventory: getShopInventory(config, mapIndex) })
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
       onEarnCash?.(BALANCE.economy.payouts.node)
       setPendingPower({ node })
@@ -892,6 +901,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: `Select an item · $${nodePay}` }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: `Upgrade a move · $${nodePay}` }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
+      case NODE_TYPES.POKEMART:      return { title: 'Pokémart', sub: 'Spend Speed Cash' }
       case NODE_TYPES.MYSTERY:       return { title: 'Mystery', sub: '???' }
       default:                       return { title: node.type, sub: '' }
     }
@@ -1419,6 +1429,26 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
             setCurrentNode(pendingPower.node.id)
             setPendingPower(null)
+          }}
+        />
+      )}
+
+      {pendingMart && (
+        <PokemartNode
+          inventory={pendingMart.inventory}
+          speedCash={speedCash}
+          onBuy={entry => {
+            // The App owns the balance, so IT decides whether the purchase is
+            // affordable; the shop only reflects the answer. Bought items go
+            // straight to the bag, exactly like an item node's "Keep in Bag".
+            const paid = onSpendCash?.(entry.price)
+            if (paid) onItemKeepInBag?.(entry.item)
+            return !!paid
+          }}
+          onClose={() => {
+            setClearedNodes(prev => new Set([...prev, pendingMart.node.id]))
+            setCurrentNode(pendingMart.node.id)
+            setPendingMart(null)
           }}
         />
       )}
