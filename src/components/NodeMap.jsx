@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -1072,19 +1073,23 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} showTutorial>
-      {/* Speed Cash balance. Fixed top-left so it clears the FloatingNav pill
-          (top-right, zIndex 150) on mobile and the nav bar on desktop. zIndex
-          sits below the battle overlay (100) so a battle covers it. */}
-      <div style={{
-        position: 'fixed', top: '8px', left: '8px', zIndex: 50,
-        display: 'flex', alignItems: 'center', gap: '4px',
-        backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
-        pointerEvents: 'none',
-      }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
-          ${speedCash}
-        </span>
-      </div>
+      {/* Speed Cash balance — DESKTOP ONLY. Fixed top-left, clearing the nav
+          bar; zIndex sits below the battle overlay (100) so a battle covers it.
+          Mobile shows the balance at the right end of the bag bar instead: a
+          floating pill there would either overlay the map art or push the map
+          in, and the bag bar is already full-width so it costs nothing. */}
+      {isDesktop && (
+        <div style={{
+          position: 'fixed', top: '8px', left: '8px', zIndex: 50,
+          display: 'flex', alignItems: 'center', gap: '4px',
+          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
+            ${speedCash}
+          </span>
+        </div>
+      )}
       {isDesktop ? (
         <div className="flex flex-col items-center gap-2 w-full" style={{ flex: 1, minHeight: 0, visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px', flex: 1, minHeight: 0, padding: `${MAP_PAD_Y}px 0` }}>
@@ -1248,6 +1253,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               }) : (
                 <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: dark ? '#555' : '#aaa' }}>— empty —</span>
               )}
+              {/* Speed Cash, pinned to the right end of the bag bar. It lives
+                  here rather than in a floating overlay so it costs the map no
+                  horizontal space — this bar is already full-width.
+                  `position: sticky` keeps it visible when a full bag scrolls
+                  this row; without it the balance would scroll out of reach.
+                  marginLeft:auto pushes it right when the bag is short. */}
+              <span style={{
+                marginLeft: 'auto', flexShrink: 0,
+                position: 'sticky', right: 0,
+                paddingLeft: '8px',
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                fontFamily: 'Upheaval', fontSize: '12px', color: cash(dark),
+              }}>
+                ${speedCash}
+              </span>
             </div>
             {/* Gym badges earned this run — horizontal bar. */}
             <BadgeList badges={config.badges ?? []} earned={mapIndex} layout="horizontal" />
