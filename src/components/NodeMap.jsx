@@ -929,6 +929,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
       const used = onApplyConsumable?.(item, pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      // Kept, not consumed — say why, or the tap looks broken.
+      else {
+        const target = roster[pokeIndex]
+        setNotice(
+          item.consumable === 'heal' && target?.fainted
+            ? `${target.name} has fainted — use a revive`
+            : `${item.name} would do nothing here`
+        )
+      }
       return
     }
     // Evolve Stone: evolve and consume rather than equip. Kept if the target
@@ -961,6 +970,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // finger-following icon so the drag reads visually.
   const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
   const [dragGhost, setDragGhost] = useState(null) // { x, y, item } | null
+  // Short message when an action does nothing (e.g. Max Heal on a fainted
+  // Pokémon). Without it a kept item reads as a broken tap.
+  const [notice, setNotice] = useState(null)
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 2200)
+    return () => clearTimeout(t)
+  }, [notice])
   const DRAG_THRESHOLD = 8
 
   function slotIndexAt(x, y) {
@@ -1203,6 +1220,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
           }}
         />
+      )}
+
+      {/* No-op notice — an item that couldn't be used is KEPT, and this says
+          why. Same placement as the targeting banner below. */}
+      {notice && (
+        <div style={{
+          position: 'fixed', top: '48px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 95, backgroundColor: 'rgba(0,0,0,0.85)', border: '2px solid #ef4444',
+          padding: '8px 14px', pointerEvents: 'none', maxWidth: '90vw',
+        }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: '#fff' }}>
+            {notice}
+          </span>
+        </div>
       )}
 
       {/* Item-move targeting banner — shown while placing an item. */}

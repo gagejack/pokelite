@@ -109,6 +109,23 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {roster.map((pokemon, i) => {
               const hasItem = !!pokemon.heldItem
+              // Why this target can't take this item, or null if it can.
+              // Mirrors the guards in roster.js (healOne / reviveOne /
+              // reviveAll) so the UI never offers a tap that does nothing.
+              const blocked = (() => {
+                const c = selectedItem.consumable
+                if (c === 'heal') {
+                  if (pokemon.fainted) return 'Fainted — needs a revive'
+                  if (pokemon.stats.hp >= pokemon.stats.maxHp) return 'Already at full HP'
+                }
+                if (c === 'revive' && !pokemon.fainted && pokemon.stats.hp >= pokemon.stats.maxHp) {
+                  return 'Already at full HP'
+                }
+                if (c === 'revive_all' && !roster.some(p => p.fainted || p.stats.hp < p.stats.maxHp)) {
+                  return 'Whole team already healthy'
+                }
+                return null
+              })()
               return (
                 <div
                   key={i}
@@ -167,9 +184,16 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                           ))}
                         </div>
                       </div>
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: '#facc15' }}>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15' }}>
                         LVL {pokemon.level}
                       </span>
+                      {/* Reason line — `title` is desktop-only, so the block
+                          reason has to be on-screen for touch users. */}
+                      {blocked && (
+                        <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: '#ef4444' }}>
+                          {blocked}
+                        </span>
+                      )}
                     </div>
                   </button>
                   {/* Held item slot */}
@@ -186,11 +210,15 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                     )}
                     <button
                       onClick={() => onAssign(selectedItem, i, hasItem ? pokemon.heldItem : null)}
+                      disabled={!!blocked}
+                      title={blocked ?? undefined}
                       style={{
                         fontFamily: 'Upheaval', fontSize: '10px',
                         color: textColor, border: borderStyle,
                         backgroundColor: bg, padding: '4px 10px',
-                        cursor: 'pointer', flexShrink: 0,
+                        cursor: blocked ? 'not-allowed' : 'pointer',
+                        opacity: blocked ? 0.4 : 1,
+                        flexShrink: 0,
                       }}
                     >
                       {selectedItem.consumable ? 'Use' : hasItem ? 'Swap' : 'Equip'}
