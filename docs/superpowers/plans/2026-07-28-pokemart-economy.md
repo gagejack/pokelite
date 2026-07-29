@@ -21,7 +21,7 @@ Copy these verbatim; every task inherits them.
 - **Persistence:** per-run, carried across maps, resets on new run / restart. Lives in the run-save `stats` object. **No Supabase schema change, no migration.**
 - **Row 7 is always `[pokecenter, pokemart]` in random order.** The coin-flip that places the Pokécenter is kept; only the sibling changes.
 - **No test framework exists in this repo.** Verification per task = `npm run lint` + `npm run build` + the stated manual check. Never add a test runner.
-- **Pre-existing lint baselines** (do not "fix", do not let them grow): `App.jsx` 1 error, `NodeMap.jsx` 3, `Pokedex.jsx` 1, `BattleCard.jsx` 18.
+- **Pre-existing lint baselines** (do not "fix", do not let them grow): `App.jsx` 1 error, `NodeMap.jsx` 3, `Pokedex.jsx` 1, `BattleCard.jsx` 18. Whole-repo baseline: **43 errors, 5 warnings (48 problems)**. Count **errors only** — eslint's "N problems" total bundles warnings, so `NodeMap.jsx` reports "4 problems" for its 3 errors + 1 warning. That is the baseline, not a regression.
 - **Balance numbers live in `src/game/balance.js`.** No gameplay number may be hardcoded in a component. `balance.js` is a leaf module: it imports nothing, and node-type strings inside it are plain string literals asserted against `NODE_TYPES` by `nodeMap.js`.
 - **Fonts:** `Upheaval` for headings/buttons, `Orange Kid` for body. **Never render either below 12px** — they are pixel display faces that stop resolving. (See `docs/UI_TOUCHUPS.md`.)
 - **Muted text color** comes from `muted(dark)` in `src/lib/colors.js`. Never re-declare `dark ? '#888' : '#777'`.
