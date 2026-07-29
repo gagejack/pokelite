@@ -9,6 +9,9 @@ export const NODE_TYPES = {
   ITEM: 'item',
   POWER_UPGRADE: 'power_upgrade',
   POKECENTER: 'pokecenter',
+  // Shop node. Always row 7's sibling to the Pokécenter, so the row is a fork:
+  // heal OR shop, never both. See buildRows below.
+  POKEMART: 'pokemart',
   BOSS: 'boss',
   MYSTERY: 'mystery',
   // Rival — a special trainer that heals + gives +4 levels to the whole roster
@@ -125,12 +128,17 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
   }
   rows[1][1] = right
 
-  // Row 7 (2 nodes) — guaranteed pokecenter among 2
+  // Row 7 (2 nodes) — a guaranteed Pokécenter at a random index, with the
+  // Pokémart as its sibling. Because the player walks exactly one node per
+  // row, this row is a fork: arrive at the boss HEALED, or arrive STOCKED.
+  // The coin flip only decides which side each lands on. Note this row can no
+  // longer roll grass/trainer/item — an accepted loss of ~1 random node per
+  // map in exchange for a guaranteed shop.
   const pcIndex = rng() < 0.5 ? 0 : 1
   rows.push(Array.from({ length: 2 }, (_, i) =>
     i === pcIndex
       ? { id: id++, type: NODE_TYPES.POKECENTER }
-      : randomNode(id++, trainerPool, mapIndex)
+      : { id: id++, type: NODE_TYPES.POKEMART }
   ))
 
   // Boss node always last
