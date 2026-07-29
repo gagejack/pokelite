@@ -1147,6 +1147,88 @@ git commit -m "docs: document the Pokemart and Speed Cash economy"
 
 ---
 
+## Task 9: Persist total earned to Supabase
+
+The `runs.speed_cash_earned` column **already exists in the live project** — it was applied and verified on 2026-07-28 (integer, not null, default 0). This task only writes to it.
+
+**Files:**
+- Modify: `supabase/runs_tracking.sql` (record the column so the file stays the schema's source of truth)
+- Modify: `src/App.jsx` (`recordRunEnd`, ~line 275-301)
+- Modify: `src/components/Stats.jsx` (display)
+
+**Interfaces:**
+- Consumes: `cashEarned` from Task 4.
+- Produces: nothing downstream.
+
+- [ ] **Step 1: Record the column in the SQL file**
+
+The column is already live; this keeps `supabase/runs_tracking.sql` accurate for anyone rebuilding the schema. In the `alter table public.runs` block (line ~13-22), add before the `winning_roster` line:
+
+```sql
+  add column if not exists speed_cash_earned   integer not null default 0,
+```
+
+Do **not** re-run the file expecting a change — `add column if not exists` is a no-op for both this and `pokemon_seen_shiny_ids`.
+
+- [ ] **Step 2: Write the field on run end**
+
+In `src/App.jsx`, in `recordRunEnd`'s `payload` object (line ~280-288), add after `pokemon_seen_shiny_ids`:
+
+```js
+      speed_cash_earned: cashEarned,
+```
+
+Store the **lifetime earned** total, not the ending balance: the balance is an artifact of when the player last shopped and says nothing about how the run went.
+
+- [ ] **Step 3: Surface insert failures**
+
+This is the bug-prevention half of the task. `recordRunEnd` currently ignores its insert error (line ~301), while `recordCatch` (line ~345) and `recordBadgeEarned` (line ~393) both `console.warn`. That silence hid a real outage: `pokemon_seen_shiny_ids` was added to this payload before the column existed in the live project, so **every run-end insert failed silently** until the column was applied on 2026-07-28.
+
+Replace line ~301:
+```js
+    await supabase.from('runs').insert(payload)
+```
+with:
+```js
+    // A missing column rejects the WHOLE insert, so a schema drift silently
+    // stops all run tracking. This warn is what makes that visible — it was
+    // absent when `pokemon_seen_shiny_ids` shipped ahead of its column, and
+    // every run-end write failed unnoticed until the column was added.
+    const { error: runErr } = await supabase.from('runs').insert(payload)
+    if (runErr) console.warn('recordRunEnd insert failed:', runErr.message)
+```
+
+Matches the existing pattern in `recordCatch` / `recordBadgeEarned`. Never blocks the run.
+
+- [ ] **Step 4: Show lifetime earnings on the Stats page**
+
+Read `src/components/Stats.jsx` first and match its existing stat-row markup and aggregation style exactly — it already sums columns across the user's `runs` rows (see the query at line ~73). Add `speed_cash_earned` to that select, sum it, and render one row labelled `Speed Cash earned` with the value formatted as `$1,240` (leading symbol, thousands separators via `toLocaleString()`).
+
+If the existing query selects specific columns, add this one to the list. **Do not** add a retry-without-column fallback here — the column is verified present, and the fallback in `Pokedex.jsx` exists only because that bug predates the fix.
+
+- [ ] **Step 5: Lint and build**
+
+Run: `npm run lint && npm run build`
+Expected: `App.jsx` at its 1-error baseline, no growth. Build succeeds.
+
+- [ ] **Step 6: Manual verification**
+
+Run `npm run dev`, logged in:
+
+1. Play a run, earn cash, lose. Open Stats — `Speed Cash earned` reflects the run.
+2. Check the browser console during run-end: **no** `recordRunEnd insert failed` warning.
+3. Play a second run. The Stats total is the sum of both, not just the latest.
+4. Buying at the mart does not reduce the recorded total.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add supabase/runs_tracking.sql src/App.jsx src/components/Stats.jsx
+git commit -m "feat(economy): persist Speed Cash earned to runs, surface insert errors"
+```
+
+---
+
 ## Known gaps (deliberate, not defects)
 
 State these plainly if asked; do not "fix" them without a new decision.
