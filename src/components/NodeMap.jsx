@@ -29,6 +29,7 @@ import { swapInRoster } from '../game/roster.js'
 // a filename can't be imported, since "?" is the query separator in a specifier.)
 import mysteryIcon from '../assets/Icons/mysteryIcon2.png'
 import pokecenterIcon from '../assets/pokecenter.png'
+import pokemartIcon from '../assets/pokemart.png'
 
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
@@ -39,7 +40,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
   [NODE_TYPES.POKECENTER]:    pokecenterIcon,
-  [NODE_TYPES.POKEMART]:      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-potion.png',
+  [NODE_TYPES.POKEMART]:      pokemartIcon,
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.MYSTERY]:       mysteryIcon,
 }
