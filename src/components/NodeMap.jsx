@@ -263,9 +263,19 @@ function MapSvg({
                   />
                 </g>
               ) : (() => {
-                const isGrass = node.type === NODE_TYPES.GRASS
-                const size = isGrass ? NODE_SIZE * 0.7 : NODE_SIZE
-                const offset = isGrass ? (NODE_SIZE - size) / 2 : 0
+                // Per-type icon scale. Grass has always run small; the mart is
+                // trimmed to 0.9 because its source art fills more of its
+                // canvas than pokecenter.png does (453x441 of drawn building
+                // vs 256x256 with margin), so at an equal box it rendered
+                // visibly larger than the Pokécenter sharing its row. Row 7 is
+                // a fork between those two, and one looking bigger reads as
+                // one being more important.
+                const ICON_SCALE = { [NODE_TYPES.GRASS]: 0.7, [NODE_TYPES.POKEMART]: 0.9 }
+                const scale = ICON_SCALE[node.type] ?? 1
+                const size = NODE_SIZE * scale
+                // Shrunk icons stay centered on the node point rather than
+                // hanging off its top-left corner.
+                const offset = (NODE_SIZE - size) / 2
                 return (
                   <image href={icon} x={offset} y={offset}
                     width={size} height={size}
