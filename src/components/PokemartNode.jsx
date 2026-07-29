@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 
@@ -55,7 +55,9 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
         {/* Header — title, balance, close */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%', position: 'relative' }}>
           <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Pokémart</span>
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: '#facc15' }}>
+          {/* cash(dark), not a flat #facc15: this sits on the themed panel,
+              where the yellow measures 1.11:1 in light mode. */}
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cash(dark) }}>
             ${speedCash}
           </span>
           <button
@@ -139,7 +141,7 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                       <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '17px', color: textColor }}>
                         {entry.item.name}
                       </span>
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', flexShrink: 0 }}>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: cash(dark), flexShrink: 0 }}>
                         ${entry.price}
                       </span>
                     </div>

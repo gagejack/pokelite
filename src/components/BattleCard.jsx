@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useSettings } from '../lib/settings'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
@@ -774,7 +774,7 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarne
             unaffected by anything spent at the Pokémart. This is the only
             place the Elite Four's payouts ever become visible: there is no
             mart in the gauntlet, so that money is otherwise unspendable. */}
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: '#facc15' }}>
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: cash(dark) }}>
           Speed Cash earned: ${cashEarned}
         </span>
 
