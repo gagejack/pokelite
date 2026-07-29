@@ -55,6 +55,19 @@ export default function App() {
   const pokemonSeenIds = useRef([])
   const pokemonSeenShinyIds = useRef([])
 
+  // Speed Cash — the run's currency. Per-run: earned in battle, spent at the
+  // Pokémart, carried across maps, reset on a new run. Lives in the run-save
+  // `stats` object below, so there is no schema change.
+  // State (not a ref) because the HUD and the shop's affordability re-render
+  // on every change; the other stats above are only read at save time.
+  const [speedCash, setSpeedCash] = useState(0)
+  // Total ever earned this run — only goes up; purchases never touch it. Shown
+  // on the run-end screen. Without it the Elite Four's payouts would be pure
+  // waste: there is no mart there, so $200 × 4 + the last gym's $120 would
+  // accrue into a void. This makes the whole economy visible at the end even
+  // for a player who never shopped. Local only — no `runs` column.
+  const [cashEarned, setCashEarned] = useState(0)
+
   // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
   // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
   // can persist exactly where the player is. `savedRunData` caches the loaded
@@ -174,6 +187,8 @@ export default function App() {
         pokemonCaughtIds: pokemonCaughtIds.current,
         pokemonSeenIds: pokemonSeenIds.current,
         pokemonSeenShinyIds: pokemonSeenShinyIds.current,
+        speedCash,
+        cashEarned,
       },
       map: mapProgress.current, // { mapData, clearedNodes, currentNode }
       savedAt: Date.now(),
@@ -241,6 +256,8 @@ export default function App() {
     pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = run.stats?.pokemonSeenIds ?? []
     pokemonSeenShinyIds.current = run.stats?.pokemonSeenShinyIds ?? []
+    setSpeedCash(run.stats?.speedCash ?? 0)
+    setCashEarned(run.stats?.cashEarned ?? 0)
     // Feed the current map's layout + node progress to NodeMap on mount.
     mapProgress.current = run.map ?? null
     runEnded.current = false
@@ -399,6 +416,8 @@ export default function App() {
     pokemonCaughtIds.current = []
     pokemonSeenIds.current = []
     pokemonSeenShinyIds.current = []
+    setSpeedCash(0)
+    setCashEarned(0)
   }
 
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
@@ -464,6 +483,39 @@ export default function App() {
     const { used } = apply(roster)
     if (used) setRoster(prev => apply(prev).roster)
     return used
+  }
+
+  // Credit a payout. Amounts come from BALANCE.economy.payouts — the callers
+  // pick which one; this just adds. Both counters move together here, and ONLY
+  // here: spendCash below touches the balance alone, which is what makes
+  // cashEarned a true lifetime total.
+  function earnCash(amount) {
+    if (!amount) return
+    setSpeedCash(prev => prev + amount)
+    setCashEarned(prev => prev + amount)
+  }
+
+  // Debit a purchase. Returns true if it went through, false if the player
+  // couldn't afford it (and nothing changed) — the caller uses the boolean to
+  // decide whether to hand over the item, so the two can never disagree.
+  //
+  // The decision is made INSIDE the updater against `prev`, not against the
+  // `speedCash` closure value: two Buy taps in the same tick both close over
+  // the same stale balance, and checking outside would let a player at $150
+  // buy twice and go negative. `paid` is assigned during the updater and read
+  // after — safe because React runs the updater synchronously here.
+  //
+  // StrictMode double-invokes updaters, so the updater must be idempotent for
+  // a given `prev`: it is, since it only ever returns `prev - amount` or
+  // `prev`, and `paid` is overwritten with the same value both times.
+  function spendCash(amount) {
+    let paid = false
+    setSpeedCash(prev => {
+      if (prev < amount) { paid = false; return prev }
+      paid = true
+      return prev - amount
+    })
+    return paid
   }
 
   function restartRun() {
@@ -582,6 +634,9 @@ export default function App() {
           onItemKeepInBag={handleItemKeepInBag}
           onMoveItem={moveItem}
           onApplyConsumable={applyConsumable}
+          speedCash={speedCash}
+          onEarnCash={earnCash}
+          onSpendCash={spendCash}
           mapIndex={mapIndex}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
@@ -624,6 +679,8 @@ export default function App() {
           setRoster={setRoster}
           onMoveItem={moveItem}
           onApplyConsumable={applyConsumable}
+          speedCash={speedCash}
+          onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
           onMapCleared={handleMapCleared}

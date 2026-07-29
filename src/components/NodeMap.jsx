@@ -379,7 +379,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -686,6 +686,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       setLoadingNode(node.id)
       const offered = await fetchOfferedPokemon(node)
       setLoadingNode(null)
+      // The floor payout — paid for taking the node, whether or not the player
+      // keeps anything. See BALANCE.economy.payouts.node.
+      onEarnCash?.(BALANCE.economy.payouts.node)
       if (offered.length > 0) {
         setPendingPokeball({ node, offered })
       } else {
@@ -693,12 +696,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setCurrentNode(node.id)
       }
     } else if (node.type === NODE_TYPES.ITEM) {
+      onEarnCash?.(BALANCE.economy.payouts.node)
       setPendingItem({ node, offered: pickThreeItems() })
     } else if (node.type === NODE_TYPES.POKECENTER) {
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
       setCurrentNode(node.id)
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
+      onEarnCash?.(BALANCE.economy.payouts.node)
       setPendingPower({ node })
     } else {
       setClearedNodes(prev => new Set([...prev, node.id]))
@@ -719,6 +724,24 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     if (won) {
       const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival })
+
+      // Speed Cash payout. Mirrors the levelsGained ladder above but inverted:
+      // the fights that pay the fewest levels pay the most cash. See
+      // BALANCE.economy.payouts for why.
+      //
+      // CRITICAL — the legendary payout lives HERE, in the `won` branch, and
+      // never in handleLegendaryCatch: a Master Ball win leads to a catch offer
+      // the player may DECLINE, and declining must not torch $250. The money is
+      // for beating it, not for keeping it.
+      const pay = BALANCE.economy.payouts
+      onEarnCash?.(
+        isRival ? pay.rival
+        : isMasterBall ? pay.legendary
+        : isBoss ? pay.boss
+        : node.type === NODE_TYPES.GRASS ? pay.grass
+        : pay.trainer
+      )
+
       setPendingBattle(null)
 
       if (isMasterBall) {
@@ -826,7 +849,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const types = [...new Set(pool.map(id => cachedType(id)).filter(Boolean))]
       const typeLine = types.length === 1 ? `${types[0]} type` : types.length > 1 ? 'various types' : null
       // Types line (if known), then the level-reward line.
-      const sub = [...(typeLine ? [typeLine] : []), '+2 levels to all mon']
+      const sub = [...(typeLine ? [typeLine] : []), '+2 levels to all mon', `$${BALANCE.economy.payouts.trainer}`]
       return { title: node.trainer ?? 'Trainer', sub }
     }
     if (node.type === NODE_TYPES.BOSS) {
@@ -838,7 +861,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         name: cachedName(p.id) ?? '???',
         level: p.level,
       }))
-      return { title: node.trainer ?? 'Gym Leader', sub }
+      return { title: node.trainer ?? 'Gym Leader', sub: [...sub, `$${BALANCE.economy.payouts.boss}`] }
     }
     if (node.type === NODE_TYPES.RIVAL) {
       // Same team-row format as a boss, plus the rival's reward line. Uses the
@@ -849,7 +872,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         name: cachedName(p.id) ?? '???',
         level: p.level,
       }))
-      return { title: node.trainer ?? 'Rival', sub: [...sub, '+4 levels + full heal'] }
+      return { title: node.trainer ?? 'Rival', sub: [...sub, `+4 levels + full heal · $${BALANCE.economy.payouts.rival}`] }
     }
     if (node.type === NODE_TYPES.MASTER_BALL) {
       // The exact legendary is rolled at battle time, so hide its identity (???)
@@ -860,13 +883,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const hi = levels.length ? Math.max(...levels) : null
       const lvl = lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
       // Object line reuses the boss tooltip's { type, name, level } row format.
-      return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }] }
+      return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
     }
+    const nodePay = BALANCE.economy.payouts.node
     switch (node.type) {
-      case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: '+1 LVL' }
-      case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: 'Catch a Pokémon' }
-      case NODE_TYPES.ITEM:          return { title: 'Item', sub: 'Select an item' }
-      case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: 'Upgrade a move' }
+      case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: `+1 LVL · $${BALANCE.economy.payouts.grass}` }
+      case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: `Catch a Pokémon · $${nodePay}` }
+      case NODE_TYPES.ITEM:          return { title: 'Item', sub: `Select an item · $${nodePay}` }
+      case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: `Upgrade a move · $${nodePay}` }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
       case NODE_TYPES.MYSTERY:       return { title: 'Mystery', sub: '???' }
       default:                       return { title: node.type, sub: '' }
@@ -1037,6 +1061,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} showTutorial>
+      {/* Speed Cash balance. Fixed top-left so it clears the FloatingNav pill
+          (top-right, zIndex 150) on mobile and the nav bar on desktop. zIndex
+          sits below the battle overlay (100) so a battle covers it. */}
+      <div style={{
+        position: 'fixed', top: '8px', left: '8px', zIndex: 50,
+        display: 'flex', alignItems: 'center', gap: '4px',
+        backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+        pointerEvents: 'none',
+      }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
+          ${speedCash}
+        </span>
+      </div>
       {isDesktop ? (
         <div className="flex flex-col items-center gap-2 w-full" style={{ flex: 1, minHeight: 0, visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px', flex: 1, minHeight: 0, padding: `${MAP_PAD_Y}px 0` }}>

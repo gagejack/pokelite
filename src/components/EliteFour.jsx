@@ -19,7 +19,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onApplyConsumable, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onApplyConsumable, speedCash = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -82,6 +82,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (battleWon) {
       // Levels gained per battle; reorder happens on the next member's prep screen.
       const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: BALANCE.progression.levelsGained.eliteFour, fullHeal: false })
+      onEarnCash?.(BALANCE.economy.payouts.eliteFour)
       setPendingBattle(null)
         onMapCleared?.()
         setDefeated(index + 1)
@@ -213,6 +214,19 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+      {/* Speed Cash balance. Fixed top-left so it clears the FloatingNav pill
+          (top-right, zIndex 150) on mobile and the nav bar on desktop. zIndex
+          sits below the battle overlay (100) so a battle covers it. */}
+      <div style={{
+        position: 'fixed', top: '8px', left: '8px', zIndex: 50,
+        display: 'flex', alignItems: 'center', gap: '4px',
+        backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+        pointerEvents: 'none',
+      }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
+          ${speedCash}
+        </span>
+      </div>
       {isDesktop ? (
         <div className="flex w-full py-4" style={{ alignItems: 'flex-start', justifyContent: 'center', gap: '16px', visibility: pendingBattle ? 'hidden' : 'visible', overflowY: 'auto', minHeight: 0 }}>
           <Roster roster={roster} onSwap={swapRoster} {...rosterItemProps} />
