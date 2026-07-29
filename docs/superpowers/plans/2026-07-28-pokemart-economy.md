@@ -4,7 +4,7 @@
 
 **Goal:** Add a per-run currency (Speed Cash) earned from battles and a Pokémart node that spends it on a stocked Max Heal.
 
-**Architecture:** Currency is a `useRef` counter in `App.jsx` beside the existing run stats, passed down to `NodeMap` as a number plus an `onEarnCash` / `onSpendCash` callback pair. Battles credit cash in the two existing victory handlers (`NodeMap.handleBattleEnd`, `EliteFour.handleBattleEnd`). Map generation swaps row 7's random sibling for a new `NODE_TYPES.POKEMART`, which opens a new `PokemartNode.jsx` overlay modelled directly on `ItemNode.jsx`'s pick stage. Shop inventory is authored per region config (`shopGeneric` + `shopPools`) and read through a new pure module `src/game/shop.js`.
+**Architecture:** Two counters live as `useState` in `App.jsx` beside the existing run stats — `speedCash` (spendable) and `cashEarned` (lifetime total) — passed down with an `onEarnCash` / `onSpendCash` callback pair. Battles credit cash in the two existing victory handlers (`NodeMap.handleBattleEnd`, `EliteFour.handleBattleEnd`); non-fight nodes credit a $10 floor where they clear in `handleNodeClick`. Node tooltips gain their payout so the tradeoff is visible. Map generation swaps row 7's random sibling for a new `NODE_TYPES.POKEMART`, which opens a new `PokemartNode.jsx` overlay modelled directly on `ItemNode.jsx`'s pick stage. Shop inventory is authored per region config (`shopGeneric` + `shopPools`, ids only) and read through a new pure module `src/game/shop.js`; price and stock come from `BALANCE.economy`.
 
 **Tech Stack:** React 19 (function components, hooks), Vite, inline styles (this codebase uses inline `style={{}}` for layout; Tailwind utility classes only for `hover:`/`transition` — follow that convention exactly), no test framework.
 
@@ -13,8 +13,11 @@
 Copy these verbatim; every task inherits them.
 
 - **Currency name:** Speed Cash. **Symbol:** `$`, always **leading** the amount (`$150`, never `150$`).
-- **Payouts (Speed Cash):** grass `50`, trainer `30`, rival `60`, boss (gym leader) `120`, legendary (Master Ball) `250`, Elite Four member `200`.
+- **Payouts (Speed Cash):** grass `50`, trainer `30`, rival `60`, boss (gym leader) `120`, legendary (Master Ball) `250`, Elite Four member `200`, non-fight node (Pokéball/Item/TM) `10`.
 - **Prices:** Max Heal `150`, stock `2` per shop.
+- **Legendary money is paid for WINNING, never for catching.** The payout fires in `handleBattleEnd`'s `if (won)` branch — never in `handleLegendaryCatch`. Declining the catch must not cost the player $250.
+- **Mystery nodes pay their RESOLVED type's rate.** No special case: resolution happens before dispatch, so the normal payout logic already sees the resolved type.
+- **Two counters:** `speedCash` (spendable balance, goes down on purchase) and `cashEarned` (total ever earned this run, only goes up, never touched by purchases). Both in the run-save `stats`.
 - **Persistence:** per-run, carried across maps, resets on new run / restart. Lives in the run-save `stats` object. **No Supabase schema change, no migration.**
 - **Row 7 is always `[pokecenter, pokemart]` in random order.** The coin-flip that places the Pokécenter is kept; only the sibling changes.
 - **No test framework exists in this repo.** Verification per task = `npm run lint` + `npm run build` + the stated manual check. Never add a test runner.
@@ -23,6 +26,7 @@ Copy these verbatim; every task inherits them.
 - **Fonts:** `Upheaval` for headings/buttons, `Orange Kid` for body. **Never render either below 12px** — they are pixel display faces that stop resolving. (See `docs/UI_TOUCHUPS.md`.)
 - **Muted text color** comes from `muted(dark)` in `src/lib/colors.js`. Never re-declare `dark ? '#888' : '#777'`.
 - **Commit after every task** using the message given in that task's final step.
+- **AGENTS.md:49 says "Never reorder rng() calls." Task 2 breaks this on purpose, with sign-off.** Removing `randomNode` from row 7 shifts the seeded stream. Do NOT add throwaway `rng()` calls to compensate — the old call count was variable (1–2), so no fixed burn restores alignment. Accepted cost; deploy at UTC midnight so the daily challenge rolls over cleanly.
 
 ---
 
@@ -43,10 +47,11 @@ Copy these verbatim; every task inherits them.
 | `src/game/nodeMap.js` | `NODE_TYPES.POKEMART`; row 7 sibling becomes the mart. |
 | `src/game/regions/kanto.js` | `shopGeneric` + `shopPools` on the config. |
 | `src/game/regions/hoenn.js`, `sinnoh.js`, `unova.js` | Same two fields (empty pools). |
-| `src/App.jsx` | `speedCash` state, earn/spend handlers, save/restore/reset, props. |
-| `src/components/NodeMap.jsx` | Cash prop + earn on victory, mart node icon/label/click/overlay, HUD. |
+| `src/App.jsx` | `speedCash` + `cashEarned` state, earn/spend handlers, save/restore/reset, props. |
+| `src/components/NodeMap.jsx` | Cash props, earn on victory + non-fight nodes, payout tooltips, mart node icon/label/click/overlay, HUD. |
 | `src/components/EliteFour.jsx` | Earn on victory + HUD. |
-| `docs/ITEMS.md` | Document shop prices. |
+| `src/components/BattleCard.jsx` | Show total earned on the run-end screen. |
+| `docs/ITEMS.md` | Document payouts and shop prices. |
 
 ---
 
@@ -62,7 +67,7 @@ The single source of truth for every number in this feature. Nothing else in thi
 - Produces: `BALANCE.economy` with this exact shape —
   ```js
   BALANCE.economy = {
-    payouts: { grass: 50, trainer: 30, rival: 60, boss: 120, legendary: 250, eliteFour: 200 },
+    payouts: { grass: 50, trainer: 30, rival: 60, boss: 120, legendary: 250, eliteFour: 200, node: 10 },
     prices:  { max_heal: 150 },
     shopStock: { max_heal: 2 },
   }
@@ -85,15 +90,28 @@ In `src/game/balance.js`, insert this block immediately **after** the closing `}
   // only levelsGained.default (2) — the same as a route trainer — for a Lv70
   // Mewtwo. It cannot be farmed, so it doesn't move the average.
   //
-  // Expected income ≈ 1.7 grass + 1.7 trainers + 1 boss per map ≈ $256.
+  // `node` is the FLOOR: a token payout for non-fight nodes (pokéball / item /
+  // TM). Without it a map whose six random rows all roll non-fight pays only
+  // the boss's 120 — less than one Max Heal, so the guaranteed shop is
+  // guaranteed useless. At a fifth of a grass node it can't rival fighting.
+  //
+  // Expected income per map: rowWidths gives 7 rows, but row 0 is the
+  // pre-cleared START node (NodeMap seeds clearedNodes with Set([0])), so
+  // there are 6 random rows plus the boss:
+  //   grass    6 × 0.28 × 50  =  84
+  //   trainer  6 × 0.28 × 30  =  50
+  //   floor    6 × 0.38 × 10  =  23
+  //   mystery  6 × 0.06 × ~45 =  16
+  //   boss                    = 120   →  ≈ $293/map (floor $180, ceiling ~$420)
   economy: {
     payouts: {
       grass: 50,
       trainer: 30,
       rival: 60,
       boss: 120,        // gym leader
-      legendary: 250,   // Master Ball node
+      legendary: 250,   // Master Ball node — paid on WIN, never on catch
       eliteFour: 200,
+      node: 10,         // pokéball / item / TM — the income floor
     },
     // Keyed by item id (see game/items.js). An item with no entry is not sold.
     prices: { max_heal: 150 },
@@ -109,7 +127,7 @@ Run:
 ```bash
 node --input-type=module -e "import('./src/game/balance.js').then(m => { const e = m.BALANCE.economy; console.log(JSON.stringify(e)); console.log('frozen:', Object.isFrozen(e), Object.isFrozen(e.payouts)) })"
 ```
-Expected output: the full economy JSON, then `frozen: true true`. (`deepFreeze` at the top of the file recurses, so the nested objects must both report frozen — if `payouts` is not frozen, the block was inserted outside the `deepFreeze(...)` call.)
+Expected output: the full economy JSON — confirm `"node":10` is present — then `frozen: true true`. (`deepFreeze` at the top of the file recurses, so the nested objects must both report frozen — if `payouts` is not frozen, the block was inserted outside the `deepFreeze(...)` call.)
 
 - [ ] **Step 3: Lint**
 
@@ -365,16 +383,25 @@ In `src/App.jsx`, add the ref beside the other run-stat refs (after `const pokem
   // State (not a ref) because the HUD and the shop's affordability re-render
   // on every change; the other stats above are only read at save time.
   const [speedCash, setSpeedCash] = useState(0)
+  // Total ever earned this run — only goes up; purchases never touch it. Shown
+  // on the run-end screen. Without it the Elite Four's payouts would be pure
+  // waste: there is no mart there, so $200 × 4 + the last gym's $120 would
+  // accrue into a void. This makes the whole economy visible at the end even
+  // for a player who never shopped. Local only — no `runs` column.
+  const [cashEarned, setCashEarned] = useState(0)
 ```
 
 Add the two handlers next to `applyConsumable` (after line 467):
 
 ```js
-  // Credit a battle payout. Amounts come from BALANCE.economy.payouts — the
-  // callers pick which one; this just adds.
+  // Credit a payout. Amounts come from BALANCE.economy.payouts — the callers
+  // pick which one; this just adds. Both counters move together here, and ONLY
+  // here: spendCash below touches the balance alone, which is what makes
+  // cashEarned a true lifetime total.
   function earnCash(amount) {
     if (!amount) return
     setSpeedCash(prev => prev + amount)
+    setCashEarned(prev => prev + amount)
   }
 
   // Debit a purchase. Returns true if it went through, false if the player
@@ -405,20 +432,23 @@ Add the two handlers next to `applyConsumable` (after line 467):
 
 Three edits in `src/App.jsx`:
 
-In `buildRunSnapshot()`'s `stats` object (line ~171), add a final entry after `pokemonSeenShinyIds`:
+In `buildRunSnapshot()`'s `stats` object (line ~171), add two entries after `pokemonSeenShinyIds`:
 ```js
         speedCash,
+        cashEarned,
 ```
 
 In `resumeRun()` (line ~243), after the `pokemonSeenShinyIds.current = ...` line:
 ```js
     setSpeedCash(run.stats?.speedCash ?? 0)
+    setCashEarned(run.stats?.cashEarned ?? 0)
 ```
-The `?? 0` matters — runs saved before this feature have no `speedCash` key.
+The `?? 0` matters — runs saved before this feature have neither key.
 
-In `resetRunStats()` (line ~396), add as the last line of the function:
+In `resetRunStats()` (line ~396), add as the last lines of the function:
 ```js
     setSpeedCash(0)
+    setCashEarned(0)
 ```
 `resetRunStats` is called by both `startRun` and `restartRun`, so this covers "new run" and "Play Again" in one place — do not add separate resets in either.
 
@@ -451,6 +481,11 @@ In `handleBattleEnd` (line ~709), inside the `if (won) {` branch, immediately **
       // Speed Cash payout. Mirrors the levelsGained ladder above but inverted:
       // the fights that pay the fewest levels pay the most cash. See
       // BALANCE.economy.payouts for why.
+      //
+      // CRITICAL — the legendary payout lives HERE, in the `won` branch, and
+      // never in handleLegendaryCatch: a Master Ball win leads to a catch offer
+      // the player may DECLINE, and declining must not torch $250. The money is
+      // for beating it, not for keeping it.
       const pay = BALANCE.economy.payouts
       onEarnCash?.(
         isRival ? pay.rival
@@ -462,6 +497,77 @@ In `handleBattleEnd` (line ~709), inside the `if (won) {` branch, immediately **
 ```
 
 Order matters in that chain: a rival node is checked first (it is a trainer variant), then Master Ball, then boss, then grass, with plain trainers as the fallback. `BALANCE` is already imported at line 24 — do not add a second import.
+
+- [ ] **Step 4b: Credit the non-fight nodes ($10 floor)**
+
+Still in `src/components/NodeMap.jsx`, in `handleNodeClick` (line ~658). Three node types pay the floor: Pokéball, Item, and TM. Each is credited **when the node is taken**, not when the player keeps something — declining a catch or closing an item offer still pays.
+
+In the `POKEBALL` branch (line ~685), add immediately after `setLoadingNode(null)`:
+```js
+      // The floor payout — paid for taking the node, whether or not the player
+      // keeps anything. See BALANCE.economy.payouts.node.
+      onEarnCash?.(BALANCE.economy.payouts.node)
+```
+
+In the `ITEM` branch (line ~695), change the single line to:
+```js
+    } else if (node.type === NODE_TYPES.ITEM) {
+      onEarnCash?.(BALANCE.economy.payouts.node)
+      setPendingItem({ node, offered: pickThreeItems() })
+```
+
+In the `POWER_UPGRADE` branch (line ~701), change to:
+```js
+    } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
+      onEarnCash?.(BALANCE.economy.payouts.node)
+      setPendingPower({ node })
+```
+
+A mystery node needs no case: `resolveMysteryNode` rewrites `node.type` to the resolved type **before** this dispatch runs, so a "?" that becomes an item hits the ITEM branch and pays $10, and one that becomes grass hits the battle path and pays $50. Do not add a mystery-specific payout.
+
+The Pokécenter and Pokémart branches pay nothing.
+
+- [ ] **Step 4c: Show payouts in the node tooltips**
+
+Without this the entire mechanism is invisible — the player can't weigh grass against trainer if only one side of the trade is on screen. In `getNodeLabel`:
+
+Trainer (line ~829) — replace the `sub` construction:
+```js
+      const sub = [...(typeLine ? [typeLine] : []), '+2 levels to all mon', `$${BALANCE.economy.payouts.trainer}`]
+```
+
+Rival (line ~852) — replace the return:
+```js
+      return { title: node.trainer ?? 'Rival', sub: [...sub, `+4 levels + full heal · $${BALANCE.economy.payouts.rival}`] }
+```
+
+Master Ball (line ~863) — replace the return:
+```js
+      return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
+```
+
+Boss (line ~841) — replace the return:
+```js
+      return { title: node.trainer ?? 'Gym Leader', sub: [...sub, `$${BALANCE.economy.payouts.boss}`] }
+```
+
+The plain `switch` cases (line ~865) become:
+```js
+    const nodePay = BALANCE.economy.payouts.node
+    switch (node.type) {
+      case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: `+1 LVL · $${BALANCE.economy.payouts.grass}` }
+      case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: `Catch a Pokémon · $${nodePay}` }
+      case NODE_TYPES.ITEM:          return { title: 'Item', sub: `Select an item · $${nodePay}` }
+      case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: `Upgrade a move · $${nodePay}` }
+      case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
+      case NODE_TYPES.MYSTERY:       return { title: 'Mystery', sub: '???' }
+      default:                       return { title: node.type, sub: '' }
+    }
+```
+
+Mystery deliberately shows no payout — revealing it would leak the outcome. The Pokémart case is added in Task 6.
+
+The tooltip renderer (line ~350) already handles both a string `sub` and an array of strings/objects, so no rendering change is needed.
 
 - [ ] **Step 5: Credit EliteFour victories**
 
@@ -512,11 +618,16 @@ Run `npm run dev` and check all of these:
 1. A fresh run starts at `$0`.
 2. Clearing a **grass** node adds exactly `50`.
 3. Clearing a **trainer** node adds exactly `30`.
-4. Clearing the **gym leader** adds `120` and the balance survives into the next map (it must NOT reset at the map boundary).
-5. Hitting **Home** mid-run, then **Resume Run** from the menu, restores the same balance.
-6. Starting a **new** run resets it to `$0`.
-7. **Play Again** after a loss resets it to `$0`.
-8. Losing a battle adds nothing.
+4. Clearing a **Pokéball**, **Item**, or **TM** node adds exactly `10` each — including when the player **declines** the catch or closes the item offer without taking anything.
+5. Clearing the **gym leader** adds `120` and the balance survives into the next map (it must NOT reset at the map boundary).
+6. **Beat a Master Ball node and DECLINE the catch — the $250 is still credited.** This is the regression this plan most wants to prevent.
+7. A **mystery** node pays its resolved type: "?" → grass pays `50`, "?" → item pays `10`.
+8. Every node tooltip shows its payout — grass reads `+1 LVL · $50`, trainer shows `$30`. Mystery shows none.
+9. Hitting **Home** mid-run, then **Resume Run** from the menu, restores the same balance.
+10. Starting a **new** run resets it to `$0`.
+11. **Play Again** after a loss resets it to `$0`.
+12. Losing a battle adds nothing.
+13. **Play a full map taking only Pokéball/Item/TM nodes.** Total must be at least `$180` — the floor exists so this map isn't dead.
 
 - [ ] **Step 9: Commit**
 
@@ -874,6 +985,7 @@ Run `npm run dev` and confirm every item:
 7. A Max Heal bought at the mart works from the bag exactly like a dropped one (drag onto a damaged Pokémon → heals and is consumed; onto a fainted one → kept, with the "has fainted — use a revive" notice).
 8. Taking the mart means the Pokécenter is **not** reachable, and vice versa.
 9. Check the shop at **375px** width: cards stack, no text below 12px, Buy is a 44px-tall target.
+10. **Refresh the page mid-shop** (shop open, one Max Heal already bought). On reload the shop is closed and its node is un-cleared, so re-entering shows **full stock** — the bought Max Heal is gone from the bag too, because `persistProgress` only fires on map-progress change. Money, bag, and stock all roll back together, so this is consistent, not a duplicate. **Confirm the player did not keep the item while the money returned** — that would be the exploit.
 
 - [ ] **Step 8: Commit**
 
@@ -884,7 +996,81 @@ git commit -m "feat(shop): wire Pokemart node into the map"
 
 ---
 
-## Task 7: Document the economy
+## Task 7: Show total earned on the run-end screen
+
+Without this, `cashEarned` is tracked and never displayed, and the Elite Four's ~$920 of payouts stays invisible. This is the payoff for Task 4's second counter.
+
+**Files:**
+- Modify: `src/components/BattleCard.jsx` (component signature ~line 34, `DefeatScreen` call ~325, `DefeatScreen` signature ~744, its body)
+- Modify: `src/components/NodeMap.jsx` (`<BattleCard>` ~1281)
+- Modify: `src/components/EliteFour.jsx` (`<BattleCard>` ~238)
+
+**Interfaces:**
+- Consumes: `cashEarned` from Task 4.
+- Produces: nothing downstream.
+
+- [ ] **Step 1: Thread the prop through BattleCard**
+
+In `src/components/BattleCard.jsx`, add `cashEarned = 0` to the component's props (line ~34), after `seedCode`.
+
+Pass it on at the `DefeatScreen` render (line ~325):
+```jsx
+    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} />
+```
+
+Add it to `DefeatScreen`'s signature (line ~744):
+```js
+function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarned = 0 }) {
+```
+
+- [ ] **Step 2: Render the total**
+
+In `DefeatScreen`'s JSX, immediately after the `<SeedCodeChip .../>` line (~771):
+
+```jsx
+        {/* Total Speed Cash earned this run — the lifetime counter, so it is
+            unaffected by anything spent at the Pokémart. This is the only
+            place the Elite Four's payouts ever become visible: there is no
+            mart in the gauntlet, so that money is otherwise unspendable. */}
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: '#facc15' }}>
+          Speed Cash earned: ${cashEarned}
+        </span>
+```
+
+- [ ] **Step 3: Pass it from both run screens**
+
+In `src/components/NodeMap.jsx`, add `cashEarned` to the component signature next to `speedCash` (from Task 4), and add to the `<BattleCard ...>` element (~1281):
+```jsx
+            cashEarned={cashEarned}
+```
+
+Do the same in `src/components/EliteFour.jsx` (signature + `<BattleCard>` at ~238).
+
+In `src/App.jsx`, pass `cashEarned={cashEarned}` to both `<NodeMap>` and `<EliteFour>`, beside the existing `speedCash={speedCash}`.
+
+- [ ] **Step 4: Lint and build**
+
+Run: `npm run lint && npm run build`
+Expected: `BattleCard.jsx` still at its 18-error baseline, no growth. Build succeeds.
+
+- [ ] **Step 5: Manual verification**
+
+Run `npm run dev`:
+
+1. Earn some cash, then lose a battle. The defeat screen shows `Speed Cash earned: $X` matching the total earned.
+2. Buy a Max Heal, then lose. The displayed total is **unchanged by the purchase** — it is lifetime earned, not the balance.
+3. The number is legible in both light and dark themes.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/components/BattleCard.jsx src/components/NodeMap.jsx src/components/EliteFour.jsx src/App.jsx
+git commit -m "feat(economy): show total Speed Cash earned on the run-end screen"
+```
+
+---
+
+## Task 8: Document the economy
 
 **Files:**
 - Modify: `docs/ITEMS.md`
@@ -919,10 +1105,23 @@ object — there is no Supabase column for it.
 | Gym leader | $120 | 2 + full heal |
 | Legendary (Master Ball) | $250 | 2 |
 | Elite Four member | $200 | 2 |
+| Pokéball / Item / TM | $10 | — |
 
 Money compensates for forgone levels: weaker XP pays better cash. Grass out-earns
 trainers because trainers already pay double the levels, and levels compound.
-Expected income is roughly **$256 per map** (range 180–320).
+Expected income is roughly **$293 per map** (floor $180, ceiling ~$420).
+
+The $10 on non-fight nodes is the income floor — without it a map of all
+Pokéball/Item/TM rows would pay only the boss's $120, less than one Max Heal.
+
+**Legendary money is paid for winning, not catching** — declining the catch
+still pays $250. A mystery node pays whatever type it resolves into.
+
+Node tooltips show the payout beside the level reward, so the grass-versus-
+trainer tradeoff is visible rather than learned by accident.
+
+Two counters are tracked: the spendable balance, and total ever earned this run
+(shown on the run-end screen, unaffected by purchases).
 
 ### Shop
 
@@ -952,8 +1151,10 @@ git commit -m "docs: document the Pokemart and Speed Cash economy"
 
 State these plainly if asked; do not "fix" them without a new decision.
 
-1. **Seeded runs change.** Task 2 removes a `randomNode` call from row 7, shifting the rng stream. Maps generated from a seed before this change will differ after it. Accepted — there is no versioning on seeds.
+1. **Seeded runs change, breaking AGENTS.md:49.** Task 2 removes a `randomNode` call from row 7, shifting the rng stream. The same seed yields a different run before and after deploy. The daily challenge is the real cost: a mid-day deploy puts morning and afternoon players on different maps for one date and one leaderboard. **Signed off by the user.** Do not attempt to preserve the stream with throwaway `rng()` calls — the old call count was variable (1–2), so no fixed burn realigns it. **Mitigation: deploy at UTC midnight**, when the daily seed rolls over.
 2. **Curated shop pools are empty.** `shopPools` arrays exist and resolve correctly but contain nothing. Filling them is a separate authoring pass.
-3. **No selling.** Items cannot be sold back for cash (spec §6).
-4. **No mart in the Elite Four.** The stage is a linear gauntlet; the HUD shows the balance there but nothing spends it.
-5. **Stock does not persist.** A shop's remaining stock is local component state. Since the node is cleared on close, a shop cannot be revisited — but a mid-shop page refresh would restore the shop unentered with full stock. Accepted as vanishingly rare.
+3. **No selling.** Items cannot be sold back for cash.
+4. **No mart in the Elite Four.** The stage is a linear gauntlet. The HUD shows the balance and members still pay $200, but nothing there spends it — the payout surfaces only through `cashEarned` on the run-end screen.
+5. **Stock does not persist across a page refresh.** A shop's remaining stock is local component state, and the node is only cleared on close. A mid-shop refresh restores the shop unentered at full stock — but the purchase's money and item roll back with it, so nothing is duplicated. Verified in Task 6 Step 7.10.
+6. **Map 8's fork is degenerate.** A gym win already full-heals, so on the final map the Pokécenter is nearly worthless while the mart's two Max Heals carry into the Elite Four. The mart strictly dominates row 7 there. Knowingly shipped; revisit after play-testing.
+7. **No money on the win screen.** `cashEarned` is shown on the defeat screen (`DefeatScreen`). `VictoryScreen` is a lean "Victory! / Continue" popup and was left alone. A winning player sees the total only if they lose a later run.
