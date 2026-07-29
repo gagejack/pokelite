@@ -16,9 +16,11 @@ import { itemIconUrl, tierColor } from '../game/items'
 // One layout, two scales, so the platforms cannot drift apart the way two
 // branches of the same screen always eventually do.
 //
-// Stock is LOCAL state: a mart node is cleared when the shop closes, so a shop
-// is visited exactly once and there is nothing to carry. The parent owns money
-// and the bag; this component owns only what's left on the shelf.
+// Stock is local state MIRRORED UP to the parent. Leaving a mart doesn't clear
+// its node — the player can walk back in — so this component unmounting must
+// not restore a sold-out shelf. It renders from `initialStock` when returning
+// and reports every purchase through `onStockChange`. The parent owns money,
+// the bag, and the persistent shelf; this component owns the open session.
 
 // Sold out is the only state that replaces an item's description — the shelf
 // is empty, so there is nothing left to describe. Not affording something is
@@ -27,11 +29,14 @@ import { itemIconUrl, tierColor } from '../game/items'
 // can't drift between platforms.
 const SOLD_OUT = 'Sold out'
 
-export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
+export default function PokemartNode({ inventory, speedCash, onBuy, onClose, initialStock = null, onStockChange }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
-  // Remaining units per shelf index, seeded once from the inventory.
-  const [stock, setStock] = useState(() => inventory.map(e => e.stock))
+  // Remaining units per shelf index. Seeded from `initialStock` when the
+  // player is RETURNING to a shop they already bought from — Leave doesn't
+  // clear a mart node, so the parent remembers the shelf and hands it back.
+  // Falls back to the inventory's own counts on a first visit.
+  const [stock, setStock] = useState(() => initialStock ?? inventory.map(e => e.stock))
   const [hovered, setHovered] = useState(null)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -53,7 +58,11 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
     // The parent is the authority on affordability — it owns the balance. Only
     // decrement the shelf if it actually took the money, so a rejected purchase
     // can never eat stock.
-    if (onBuy(entry)) setStock(prev => prev.map((n, j) => (j === i ? n - 1 : n)))
+    if (!onBuy(entry)) return
+    const next = stock.map((n, j) => (j === i ? n - 1 : n))
+    setStock(next)
+    // Report up so the shelf survives this component unmounting on Leave.
+    onStockChange?.(next)
   }
 
   return (

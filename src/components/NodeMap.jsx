@@ -235,11 +235,16 @@ function MapSvg({
         {Object.values(nodePositions).map(({ x, y, node }) => {
           const isCurrentNode = node.id === currentNode
           const cleared = clearedNodes.has(node.id)
-          const reachable = !cleared && isReachable(node.id)
+          // A visited Pokémart is still open for business (see handleNodeClick),
+          // so it keeps the reachable styling — a node you can click must not
+          // render as a spent one.
+          const reachable = (!cleared || node.type === NODE_TYPES.POKEMART) && isReachable(node.id)
           const locked = isLocked(node.id)
           const isHovered = hoveredNode?.id === node.id
           const icon = getIcon(node, isCurrentNode)
-          const opacity = isCurrentNode ? 1 : cleared ? 0.8 : reachable ? 1 : locked ? 0.2 : .85
+          // `reachable` is checked before `cleared` so a visited-but-reopenable
+          // mart renders at full strength rather than dimmed to 0.8.
+          const opacity = isCurrentNode ? 1 : reachable ? 1 : cleared ? 0.8 : locked ? 0.2 : .85
           const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL
           // Gym leaders + rivals render larger than everything else.
           const nodeScale = NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
@@ -291,7 +296,8 @@ function MapSvg({
 
       {mapScale > 0 && Object.values(nodePositions).map(({ x, y, node }) => {
         const cleared = clearedNodes.has(node.id)
-        const reachable = !cleared && isReachable(node.id)
+        // Matches the SVG layer above: a visited mart stays interactive.
+        const reachable = (!cleared || node.type === NODE_TYPES.POKEMART) && isReachable(node.id)
         // Tag the first reachable node so the first-run tutorial can spotlight it
         // ("click here to begin"). Only one node carries the marker.
         const isTutorialTarget = reachable && node.id === firstReachableNodeId
@@ -442,6 +448,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
   const [pendingMart, setPendingMart] = useState(null)
+  // Remaining shop stock per mart node id, so a shelf survives Leave and
+  // re-entry. Lives here rather than in PokemartNode because that component
+  // unmounts on close, and a shop the player can return to has to remember
+  // what they already bought. { [nodeId]: number[] }
+  const [martStock, setMartStock] = useState({})
   const [rerolling, setRerolling] = useState(false)
 
   // Keep the parent's snapshot of this map's progress current, so hitting Home
@@ -672,7 +683,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   const handleNodeClick = async (rawNode) => {
-    if (clearedNodes.has(rawNode.id) || !isReachable(rawNode.id)) return
+    // A cleared node is spent — except the Pokémart, which stays open for
+    // business until the player walks past it. Leaving the shop shouldn't
+    // lock you out of a shelf you didn't finish with.
+    const reopenable = rawNode.type === NODE_TYPES.POKEMART
+    if ((clearedNodes.has(rawNode.id) && !reopenable) || !isReachable(rawNode.id)) return
 
     // Reveal a Mystery node before dispatching (keeps the same id, so
     // reachability/clearing still work).
@@ -722,7 +737,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // The node is NOT cleared here — the shop's onClose clears it, matching
       // how pendingItem / pendingPower work. Clearing on open would let the
       // player walk on with the shop still up.
-      setPendingMart({ node, inventory: getShopInventory(config, mapIndex) })
+      // Stock is remembered per node id, because Leave no longer clears the
+      // mart: without this, buying both Max Heals, leaving, and re-entering
+      // would restore a full shelf and make stock limits meaningless.
+      // Seeded from the inventory on first visit, then carried.
+      setPendingMart({
+        node,
+        inventory: getShopInventory(config, mapIndex),
+        stock: martStock[node.id] ?? null,
+      })
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
       onEarnCash?.(BALANCE.economy.payouts.node)
       setPendingPower({ node })
@@ -1474,6 +1497,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       {pendingMart && (
         <PokemartNode
           inventory={pendingMart.inventory}
+          initialStock={pendingMart.stock}
+          onStockChange={next => setMartStock(prev => ({ ...prev, [pendingMart.node.id]: next }))}
           speedCash={speedCash}
           onBuy={entry => {
             // The App owns the balance, so IT decides whether the purchase is
@@ -1483,9 +1508,20 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             if (paid) onItemKeepInBag?.(entry.item)
             return !!paid
           }}
+          // Leaving the shop marks the node visited but does NOT move the
+          // player onto it. Every other node is spent the moment you open it;
+          // a shop is the one with nothing irreversible behind it. You might
+          // leave to check a held item or re-read what you can afford, and
+          // being locked out for that is a trap.
+          //
+          // Clearing without advancing is what makes it re-enterable:
+          // `isReachable` is computed from `currentNode`, which this doesn't
+          // touch, so the mart stays reachable. The click gate at
+          // handleNodeClick lets a POKEMART through even when cleared.
+          // Clearing still matters for the map's traveled-path trail, which
+          // greens an edge only when BOTH endpoints are cleared.
           onClose={() => {
             setClearedNodes(prev => new Set([...prev, pendingMart.node.id]))
-            setCurrentNode(pendingMart.node.id)
             setPendingMart(null)
           }}
         />
