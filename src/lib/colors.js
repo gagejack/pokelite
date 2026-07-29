@@ -17,3 +17,13 @@ export const muted = dark => (dark ? '#9a9a9a' : '#5f5f5f')
 // (7.79:1) and light mode #166534 (5.15:1, and 4.26:1 on the inner card fill
 // #c8c8c8, which is the tightest surface either value has to sit on).
 export const cash = dark => (dark ? '#4ade80' : '#166534')
+
+// A price the player cannot afford. Same two-value shape and the same reason
+// as cash() above: #f87171 reads on the dark panel (4.91:1) but drops to
+// 2.00:1 on the light one, and #b91c1c does the reverse (2.10 / 4.67).
+//
+// Used for the AMOUNT only — the button's outline stays neutral grey. Red on
+// the number says "this specific price is out of reach"; red on the whole
+// control would say "something is wrong here", which is not what an item you
+// simply haven't saved for yet means.
+export const cashShort = dark => (dark ? '#f87171' : '#b91c1c')

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted, cash } from '../lib/colors'
+import { muted, cash, cashShort } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 
@@ -20,9 +20,12 @@ import { itemIconUrl, tierColor } from '../game/items'
 // is visited exactly once and there is nothing to carry. The parent owns money
 // and the bag; this component owns only what's left on the shelf.
 
-// One source for the two blocked states, so the copy can't drift.
+// Sold out is the only state that replaces an item's description — the shelf
+// is empty, so there is nothing left to describe. Not affording something is
+// different: the item is still there, you still want to know what it does, and
+// the red price already says you can't have it yet. One const so the copy
+// can't drift between platforms.
 const SOLD_OUT = 'Sold out'
-const TOO_POOR = 'Costs more than you have'
 
 export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
   const { dark } = useTheme()
@@ -120,10 +123,11 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
             {inventory.map((entry, i) => {
               const left = stock[i]
               const soldOut = left <= 0
-              const tooPoor = speedCash < entry.price
-              // Sold out first: it's the more useful of the two reasons, and a
-              // sold-out entry stays visible so the player sees what they missed.
-              const blocked = soldOut ? SOLD_OUT : tooPoor ? TOO_POOR : null
+              // Not affording something is checked AFTER sold out: an empty
+              // shelf is empty regardless of your balance, so there is no
+              // point telling you the price too.
+              const tooPoor = !soldOut && speedCash < entry.price
+              const blocked = soldOut || tooPoor
               const rarity = tierColor(entry.item)
               const isHovered = hovered === i
               return (
@@ -171,37 +175,54 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                     }}>
                       {entry.item.name}
                     </span>
+                    {/* The description keeps describing even when you can't
+                        afford the item — that's exactly when you most want to
+                        know what you'd be saving toward. Only SOLD_OUT
+                        replaces it, because an empty shelf has nothing to
+                        describe. */}
                     <span
-                      title={blocked ? undefined : entry.item.description}
+                      title={soldOut ? undefined : entry.item.description}
                       style={{
                         fontFamily: 'Orange Kid', fontSize: isDesktop ? '17px' : '13px',
-                        color: blocked ? '#ef4444' : mutedColor,
+                        color: mutedColor,
                         overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                       }}
                     >
-                      {blocked ?? entry.item.description}
+                      {soldOut ? SOLD_OUT : entry.item.description}
                     </span>
                   </div>
 
-                  {/* The price IS the buy button — boxed so it reads as
-                      pressable, filled with cash green when affordable. Five
-                      of them stack into one column, so the whole shelf's
-                      affordability reads in a single downward glance. That
-                      column is what this screen is for. */}
+                  {/* The price IS the buy button, and it carries the whole
+                      affordability story on its own: filled green when you can
+                      buy it, red on a grey outline when you can't. Five of
+                      them stack into one column, so the shelf reads in a
+                      single downward glance — green is what you can take now,
+                      red is what you're saving for.
+                      The outline stays neutral grey deliberately. Red on the
+                      amount says "this price is out of reach"; red on the
+                      whole control would say "something is wrong here", and an
+                      item you simply haven't saved for yet is not an error. */}
                   <button
                     onClick={() => buy(entry, i)}
-                    disabled={!!blocked}
-                    aria-label={blocked ? `${entry.item.name}, ${blocked}` : `Buy ${entry.item.name} for $${entry.price}`}
+                    disabled={blocked}
+                    aria-label={
+                      soldOut ? `${entry.item.name}, sold out`
+                        : tooPoor ? `${entry.item.name}, $${entry.price}, costs more than you have`
+                        : `Buy ${entry.item.name} for $${entry.price}`
+                    }
                     style={{
                       fontFamily: 'Upheaval', fontSize: isDesktop ? '17px' : '14px',
-                      color: blocked ? mutedColor : (dark ? '#1a1a1a' : '#ffffff'),
+                      color: tooPoor ? cashShort(dark) : soldOut ? mutedColor : (dark ? '#1a1a1a' : '#ffffff'),
                       backgroundColor: blocked ? 'transparent' : cash(dark),
                       border: blocked ? `2px solid ${mutedColor}` : borderStyle,
                       minHeight: '44px', minWidth: isDesktop ? '96px' : '78px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       textDecoration: soldOut ? 'line-through' : 'none',
                       cursor: blocked ? 'not-allowed' : 'pointer',
-                      opacity: blocked ? 0.5 : 1,
+                      // No opacity here: the ROW already fades to 0.45 when
+                      // sold out, and opacity compounds through the tree —
+                      // 0.45 × 0.5 left the struck-through price at 0.225,
+                      // effectively invisible. The strikethrough carries it.
                       flexShrink: 0,
                     }}
                   >
