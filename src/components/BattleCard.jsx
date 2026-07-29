@@ -31,7 +31,7 @@ const MOBILE_CARD_H = 640
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode, cashEarned = 0 }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
@@ -322,7 +322,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
   const defeatOverlay = battleResult === 'loss' ? (
-    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} />
+    <DefeatScreen roster={battleRoster} dark={dark} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} />
   ) : null
 
   // Victory overlay — centered "Victory!" + Continue popup. Skipped entirely
@@ -741,7 +741,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 // Shown when the player is defeated: the final team as a 2×3 card grid, with a
 // Play Again button below. Replaces the in-card "Play Again" button so the
 // battle card itself keeps all its space for the roster.
-function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode }) {
+function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarned = 0 }) {
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   // Light theme keeps DARK grey strokes/shadows — the lighter #666 wash out
@@ -769,6 +769,14 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode }) {
           Defeated...
         </span>
         <SeedCodeChip code={seedCode} dark={dark} />
+
+        {/* Total Speed Cash earned this run — the lifetime counter, so it is
+            unaffected by anything spent at the Pokémart. This is the only
+            place the Elite Four's payouts ever become visible: there is no
+            mart in the gauntlet, so that money is otherwise unspendable. */}
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: '#facc15' }}>
+          Speed Cash earned: ${cashEarned}
+        </span>
 
         {/* 2 columns × 3 rows of the final team. */}
         <div style={{

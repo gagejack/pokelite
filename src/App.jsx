@@ -635,6 +635,7 @@ export default function App() {
           onMoveItem={moveItem}
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
+          cashEarned={cashEarned}
           onEarnCash={earnCash}
           onSpendCash={spendCash}
           mapIndex={mapIndex}
@@ -680,6 +681,7 @@ export default function App() {
           onMoveItem={moveItem}
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
+          cashEarned={cashEarned}
           onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}

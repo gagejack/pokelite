@@ -382,7 +382,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -1337,6 +1337,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             onRestart={onRestart}
             onMainMenu={onBack}
             seedCode={seedCode}
+            cashEarned={cashEarned}
           />
         </div>
       )}
