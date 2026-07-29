@@ -302,6 +302,9 @@ export default function App() {
       pokemon_caught_ids: pokemonCaughtIds.current,
       pokemon_seen_ids: pokemonSeenIds.current,
       pokemon_seen_shiny_ids: pokemonSeenShinyIds.current,
+      // The LIFETIME earned total, not the ending balance: the balance is an
+      // artifact of when the player last shopped and says nothing about the run.
+      speed_cash_earned: cashEarned,
     }
     if (result === 'win' && winRoster?.length) {
       payload.winning_roster = winRoster.map(p => ({
@@ -315,7 +318,12 @@ export default function App() {
         shiny: !!p.shiny,
       }))
     }
-    await supabase.from('runs').insert(payload)
+    // A missing column rejects the WHOLE insert, so a schema drift silently
+    // stops all run tracking. This warn is what makes that visible — it was
+    // absent when `pokemon_seen_shiny_ids` shipped ahead of its column, and
+    // every run-end write failed unnoticed until the column was added.
+    const { error: runErr } = await supabase.from('runs').insert(payload)
+    if (runErr) console.warn('recordRunEnd insert failed:', runErr.message)
     // Daily challenge: record this finished run as an attempt (trust-client).
     // Guarded so only daily-mode runs submit; guests already returned above.
     // NOTE: "Play Again" (restartRun) keeps runMode/dailyDate, so a replay

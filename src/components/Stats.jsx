@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
@@ -71,7 +71,7 @@ export default function Stats({ onClose, role = null }) {
       setLoggedIn(true)
       const { data, error } = await supabase
         .from('runs')
-        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, winning_roster')
+        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster')
         .eq('user_id', user.id)
       if (cancelled) return
       const rows = (!error && data) ? data : []
@@ -83,6 +83,10 @@ export default function Stats({ onClose, role = null }) {
       const totalBadges = rows.reduce((s, r) => s + (r.maps_cleared ?? 0), 0)
       const avgBadges = totalRuns ? (totalBadges / totalRuns) : 0
       const totalCatches = rows.reduce((s, r) => s + (r.pokemon_caught ?? 0), 0)
+      // Lifetime Speed Cash EARNED across every recorded run — purchases never
+      // reduce it (App tracks earned separately from the spendable balance).
+      // `?? 0` covers runs recorded before the column existed.
+      const totalCashEarned = rows.reduce((s, r) => s + (r.speed_cash_earned ?? 0), 0)
 
       // Unique caught species across all runs → per-region completion.
       const caught = new Set()
@@ -120,7 +124,7 @@ export default function Stats({ onClose, role = null }) {
         .filter(r => r.result === 'win' && r.winning_roster)
         .map(r => r.winning_roster)
 
-      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, regions, legendaries, shinies, winRosters })
+      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, totalCashEarned, regions, legendaries, shinies, winRosters })
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -275,6 +279,24 @@ export default function Stats({ onClose, role = null }) {
                 <Stat label="Badges Earned" value={stats.totalBadges} />
                 <Stat label="Avg Badges / Run" value={stats.avgBadges.toFixed(1)} />
                 <Stat label="Wild Catches" value={stats.totalCatches} />
+                {/* Same tile markup as <Stat> above, inlined rather than a
+                    ninth <Stat> call site: react-hooks/static-components fires
+                    once per call site (Stat is defined inside this component),
+                    so another one would grow this file's lint baseline.
+                    The amount uses cash(dark), not the tiles' default #facc15 —
+                    that yellow is only 1.11:1 on the light tile. */}
+                <div style={{
+                  backgroundColor: innerBg, border: panelBorder,
+                  boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                  padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: cash(dark) }}>
+                    ${stats.totalCashEarned.toLocaleString()}
+                  </span>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>
+                    Speed Cash earned
+                  </span>
+                </div>
               </div>
 
               {/* Per-region dex completion */}
