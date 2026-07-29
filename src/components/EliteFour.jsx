@@ -214,11 +214,13 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
-      {/* Speed Cash balance. Fixed top-left so it clears the FloatingNav pill
-          (top-right, zIndex 150) on mobile and the nav bar on desktop. zIndex
-          sits below the battle overlay (100) so a battle covers it. */}
+      {/* Speed Cash balance. Sits on the side OPPOSITE the mobile FloatingNav
+          pill, which is top-left (zIndex 150). Unlike NodeMap this shows on
+          both platforms — the Elite Four has no bag bar to host the balance,
+          so a floating readout is the only place it can live. zIndex sits
+          below the battle overlay (100) so a battle covers it. */}
       <div style={{
-        position: 'fixed', top: '8px', left: '8px', zIndex: 50,
+        position: 'fixed', top: '8px', right: '8px', zIndex: 50,
         display: 'flex', alignItems: 'center', gap: '4px',
         backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
         pointerEvents: 'none',

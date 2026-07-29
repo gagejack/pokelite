@@ -703,8 +703,12 @@ export default function App() {
         />
       )}
       {screen === 'elitefour' && runSeed && (
+        // Offset below EliteFour's Speed Cash readout, which also sits
+        // top-right there (it moved off the left when the mobile nav did).
+        // The nodemap chip above needs no offset: that screen's balance is
+        // desktop-only and top-left.
         <div style={{
-          position: 'fixed', top: '8px', right: '8px', zIndex: 50,
+          position: 'fixed', top: '42px', right: '8px', zIndex: 50,
           fontFamily: 'Orange Kid', fontSize: '13px', color: '#DBDBDB',
           backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
           borderRadius: '4px', pointerEvents: 'none',

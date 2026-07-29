@@ -58,7 +58,7 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
   }
   return (
     <div style={{
-      position: 'fixed', top: '8px', right: '5px',
+      position: 'fixed', top: '8px', left: '5px',
       // Gap drops 10 → 2px because the 44px hit areas now touch: the old gap
       // existed to separate 26px targets, and keeping it would push the pill
       // to ~44% of an iPhone SE's height for a nav overlay.
@@ -70,11 +70,12 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
       {buttons.map(b => (
         <div key={b.key} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
         {b.armed && (
-          // Tells the player what the second tap does. Sits to the LEFT of
-          // the pill, which is flush to the right screen edge.
+          // Tells the player what the second tap does. Sits to the RIGHT of
+          // the pill, which is flush to the left screen edge — anchored the
+          // other way it would render off-screen.
           <span style={{
-            position: 'absolute', right: '100%', top: '50%',
-            transform: 'translateY(-50%)', marginRight: '6px',
+            position: 'absolute', left: '100%', top: '50%',
+            transform: 'translateY(-50%)', marginLeft: '6px',
             whiteSpace: 'nowrap', pointerEvents: 'none',
             fontFamily: 'Orange Kid', fontSize: '13px', color: '#fff',
             backgroundColor: 'rgba(220,38,38,0.92)', padding: '3px 8px',
