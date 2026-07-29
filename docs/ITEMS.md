@@ -205,3 +205,56 @@ Any new consumable follows this same shape.
 
 - **Healing items are map-screen only.** They work on the map and Elite Four
   screens, not mid-battle — battles are a non-interactive simulation.
+
+---
+
+## Pokémart & Speed Cash
+
+Speed Cash (`$`) is a per-run currency. It is earned in battle, spent at the
+Pokémart node (row 7, always paired with the Pokécenter), carried across maps,
+and reset when a run starts or restarts. It is stored in the run-save `stats`
+object — there is no Supabase column for the live balance.
+
+### Payouts
+
+| Source | Speed Cash | Levels |
+|---|---|---|
+| Grass | $50 | 1 |
+| Trainer | $30 | 2 |
+| Rival | $60 | 4 |
+| Gym leader | $120 | 2 + full heal |
+| Legendary (Master Ball) | $250 | 2 |
+| Elite Four member | $200 | 2 |
+| Pokéball / Item / TM | $10 | — |
+
+Money compensates for forgone levels: weaker XP pays better cash. Grass out-earns
+trainers because trainers already pay double the levels, and levels compound.
+Expected income is roughly **$293 per map** (floor $180, ceiling ~$420).
+
+The $10 on non-fight nodes is the income floor — without it a map of all
+Pokéball/Item/TM rows would pay only the boss's $120, less than one Max Heal.
+
+**Legendary money is paid for winning, not catching** — declining the catch
+still pays $250. A mystery node pays whatever type it resolves into.
+
+Node tooltips show the payout beside the level reward, so the grass-versus-
+trainer tradeoff is visible rather than learned by accident.
+
+Two counters are tracked: the spendable balance, and total ever earned this run
+(shown on the run-end screen, unaffected by purchases). The total earned is also
+written to the `runs.speed_cash_earned` column when a run ends, and the Stats
+page sums that column across every run to show lifetime Speed Cash earned.
+
+### Shop
+
+| Item | Price | Stock per shop |
+|---|---|---|
+| Max Heal | $150 | 2 |
+
+Purchases go straight to the bag. A sold-out entry stays visible and greyed.
+
+Inventory is authored per region: `shopGeneric` (offered at every map) plus
+`shopPools[mapIndex]` (curated per map, currently empty). Both are arrays of
+item ids; price and stock come from `BALANCE.economy`. See `src/game/shop.js`.
+
+All numbers live in `src/game/balance.js` under `economy`.
