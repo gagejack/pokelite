@@ -1085,7 +1085,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
           pointerEvents: 'none',
         }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
+          {/* cash(true) unconditionally: this pill's backdrop is a fixed
+              rgba(0,0,0,0.55) in BOTH themes, so it always wants the
+              dark-surface green (12:1 on black) regardless of the app theme. */}
+          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
             ${speedCash}
           </span>
         </div>

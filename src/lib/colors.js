@@ -8,12 +8,12 @@
 // in the first place. One export so it can't drift per-file again.
 export const muted = dark => (dark ? '#9a9a9a' : '#5f5f5f')
 
-// Speed Cash amounts, for text sitting on a THEMED panel (#2e2e2e / #DBDBDB).
-// The game's yellow (#facc15) measures 8.87:1 on the dark card but only
-// 1.11:1 on the light one — effectively invisible — so light mode drops to a
-// dark amber at 5.24:1. Both clear WCAG AA.
+// Speed Cash amounts — money green, so cash never reads as the yellow the
+// game already uses for levels, held items, and the "next fight" highlight.
 //
-// Cash on a fixed dark backdrop (the map/Elite Four HUD pills, which use
-// rgba(0,0,0,0.55) in BOTH themes) keeps plain #facc15 — it is already 8.87:1
-// there and does not need this.
-export const cash = dark => (dark ? '#facc15' : '#6b5400')
+// Two values because no single green clears WCAG AA on both panels: a bright
+// green legible on the dark card (#2e2e2e) drops to ~1.3:1 on the light one
+// (#DBDBDB), and a dark green does the reverse. So dark mode takes #4ade80
+// (7.79:1) and light mode #166534 (5.15:1, and 4.26:1 on the inner card fill
+// #c8c8c8, which is the tightest surface either value has to sit on).
+export const cash = dark => (dark ? '#4ade80' : '#166534')

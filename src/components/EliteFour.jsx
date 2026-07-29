@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -223,7 +223,9 @@ export default function EliteFour({ region, character, starter, roster, setRoste
         backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
         pointerEvents: 'none',
       }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#facc15' }}>
+        {/* cash(true) unconditionally — this pill's backdrop is a fixed
+            rgba(0,0,0,0.55) in both themes. See NodeMap's matching HUD. */}
+        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
           ${speedCash}
         </span>
       </div>
