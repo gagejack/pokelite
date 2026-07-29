@@ -46,18 +46,30 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
         backgroundColor: bg,
         border: borderStyle,
         boxShadow: shadowStyle,
-        padding: isDesktop ? '29px' : '24px',
+        // Mobile trims padding and gap: with the shelf now ~330px, this chrome
+        // is the difference between fitting an iPhone SE and not. dvh over vh
+        // so mobile browser chrome doesn't push the Leave button off-screen.
+        padding: isDesktop ? '29px' : '16px 14px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: isDesktop ? '24px' : '20px',
+        gap: isDesktop ? '24px' : '12px',
         maxWidth: isDesktop ? '740px' : '560px', width: '94vw',
-        maxHeight: '90vh', overflowY: 'auto',
+        maxHeight: '90dvh', overflowY: 'auto',
       }}>
-        {/* Header — title, balance, close */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%', position: 'relative' }}>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>Pokémart</span>
+        {/* Header — title, balance, close. Mobile puts the title and balance
+            on ONE line: two short strings stacked cost a row the shelf needs,
+            and "Pokémart ... $420" reads as a single statement anyway. */}
+        <div style={{
+          display: 'flex',
+          flexDirection: isDesktop ? 'column' : 'row',
+          alignItems: 'center',
+          justifyContent: isDesktop ? 'flex-start' : 'space-between',
+          gap: '4px', width: '100%', position: 'relative',
+          paddingRight: isDesktop ? 0 : '34px',   // clear of the close button
+        }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '20px', color: textColor }}>Pokémart</span>
           {/* cash(dark), not a flat #facc15: this sits on the themed panel,
               where the yellow measures 1.11:1 in light mode. */}
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cash(dark) }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '14px' : '17px', color: cash(dark) }}>
             ${speedCash}
           </span>
           <button
@@ -71,7 +83,10 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
               background: 'none', border: 'none', cursor: 'pointer',
               minWidth: '44px', minHeight: '44px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'absolute', top: '-10px', right: '-10px',
+              position: 'absolute', right: '-10px',
+              // Desktop offsets up past the stacked title; mobile centers on
+              // the single header row.
+              ...(isDesktop ? { top: '-10px' } : { top: '50%', transform: 'translateY(-50%)' }),
             }}
           >
             X
@@ -82,12 +97,109 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
           <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
             Nothing in stock.
           </span>
+        ) : !isDesktop ? (
+          /* MOBILE — a price list, not five product cards.
+             Five stacked cards ran 955px inside a 600px panel on an iPhone SE:
+             you saw two and a half items and scrolled for the rest, including
+             Mega Revive, the most expensive thing in the game. The height went
+             to a 56px icon, a wrapped description line, a stock line, and a
+             44px Buy button — four rows per item to say name, price, effect,
+             count.
+             Here the PRICE is the button. That removes a whole 44px row per
+             item and turns the prices into one right-aligned column you can
+             read top to bottom to see what this stop can do for you. Shelf
+             drops ~783px to ~330px, so all five fit without scrolling. */
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+            {inventory.map((entry, i) => {
+              const left = stock[i]
+              const soldOut = left <= 0
+              const tooPoor = speedCash < entry.price
+              const blocked = soldOut ? 'Sold out' : tooPoor ? 'Costs more than you have' : null
+              const rarity = tierColor(entry.item)
+              return (
+                <div
+                  key={entry.item.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '9px 0',
+                    opacity: soldOut ? 0.45 : 1,
+                    // Hairline between rows, not a box around each — the list
+                    // is one object, and five bordered cards read as five.
+                    borderTop: i === 0 ? 'none' : `1px solid ${dark ? '#3a3a3a' : '#b4b4b4'}`,
+                  }}
+                >
+                  {/* 28px, down from 56: still aids recognition, no longer
+                      sets the row height. The tier color moves to a left rule,
+                      which reads at a glance without a full border. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ width: '3px', height: '32px', backgroundColor: rarity }} />
+                    <img
+                      src={itemIconUrl(entry.item)}
+                      alt=""
+                      style={{ width: '28px', height: '28px', imageRendering: 'pixelated', display: 'block' }}
+                    />
+                  </div>
+
+                  {/* Name over effect. Two lines, both flat sizes — no clamp,
+                      no viewport scaling, nothing under 12px. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0, flex: 1 }}>
+                    <span style={{
+                      fontFamily: 'Upheaval', fontSize: '15px', color: textColor,
+                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                    }}>
+                      {entry.item.name}
+                    </span>
+                    <span style={{
+                      fontFamily: 'Orange Kid', fontSize: '13px', color: blocked ? '#ef4444' : mutedColor,
+                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                    }}>
+                      {blocked ?? entry.item.description}
+                    </span>
+                  </div>
+
+                  {/* The price IS the buy button. Boxed so it reads as
+                      pressable, 44px tall for the touch minimum, and filled
+                      with cash green when affordable so the column scans as
+                      "what I can afford" at a glance. */}
+                  <button
+                    onClick={() => buy(entry, i)}
+                    disabled={!!blocked}
+                    aria-label={blocked ? `${entry.item.name}, ${blocked}` : `Buy ${entry.item.name} for $${entry.price}`}
+                    style={{
+                      fontFamily: 'Upheaval', fontSize: '14px',
+                      color: blocked ? mutedColor : (dark ? '#1a1a1a' : '#ffffff'),
+                      backgroundColor: blocked ? 'transparent' : cash(dark),
+                      border: blocked ? `2px solid ${mutedColor}` : borderStyle,
+                      minHeight: '44px', minWidth: '78px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      textDecoration: soldOut ? 'line-through' : 'none',
+                      cursor: blocked ? 'not-allowed' : 'pointer',
+                      opacity: blocked ? 0.5 : 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ${entry.price}
+                  </button>
+
+                  {/* Stock as a bare multiplier — "×2" carries it; "2 in
+                      stock" cost a whole row to say the same thing. Hidden at
+                      one unit, which is the default and therefore not news. */}
+                  <span style={{
+                    fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor,
+                    width: '18px', textAlign: 'right', flexShrink: 0,
+                  }}>
+                    {left > 1 ? `×${left}` : ''}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         ) : (
-          // Row on desktop, stack on mobile — three columns on a 375px screen
-          // squeezes the type below its legibility floor (see UI_TOUCHUPS #1).
+          // DESKTOP — the card row. Space is not scarce here, so the icon and
+          // full description stay.
           <div style={{
             display: 'flex',
-            flexDirection: isDesktop ? 'row' : 'column',
+            flexDirection: 'row',
             gap: '10px',
             width: '100%',
           }}>
@@ -108,13 +220,13 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                     backgroundColor: innerBg,
                     border: `2px solid ${rarity}`,
                     opacity: soldOut ? 0.45 : 1,
-                    padding: isDesktop ? '17px 12px' : '12px 14px',
+                    padding: '17px 12px',
                     display: 'flex',
-                    flexDirection: isDesktop ? 'column' : 'row',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: isDesktop ? '8px' : '14px',
-                    textAlign: isDesktop ? 'center' : 'left',
-                    flex: isDesktop ? '1 1 0' : '0 0 auto',
+                    gap: '8px',
+                    textAlign: 'center',
+                    flex: '1 1 0',
                     minWidth: 0, width: '100%',
                   }}
                 >
@@ -122,23 +234,23 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                     src={itemIconUrl(entry.item)}
                     alt={entry.item.name}
                     style={{
-                      width: isDesktop ? '68px' : '56px',
-                      height: isDesktop ? '68px' : '56px',
+                      width: '68px',
+                      height: '68px',
                       imageRendering: 'pixelated',
                       flexShrink: 0,
                     }}
                   />
                   <div style={{
                     display: 'flex', flexDirection: 'column',
-                    alignItems: isDesktop ? 'center' : 'flex-start',
-                    gap: isDesktop ? '8px' : '3px',
+                    alignItems: 'center',
+                    gap: '8px',
                     minWidth: 0, flex: 1,
                   }}>
                     <div style={{
                       display: 'flex', alignItems: 'baseline', gap: '8px',
-                      width: '100%', justifyContent: isDesktop ? 'center' : 'space-between',
+                      width: '100%', justifyContent: 'center',
                     }}>
-                      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '17px', color: textColor }}>
+                      <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>
                         {entry.item.name}
                       </span>
                       <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: cash(dark), flexShrink: 0 }}>
@@ -147,9 +259,9 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose }) {
                     </div>
                     <span style={{
                       fontFamily: 'Orange Kid',
-                      fontSize: isDesktop ? '21px' : '15px',
+                      fontSize: '21px',
                       color: mutedColor,
-                      textAlign: isDesktop ? 'center' : 'left',
+                      textAlign: 'center',
                       lineHeight: 1.35,
                     }}>
                       {entry.item.description}
