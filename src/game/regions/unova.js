@@ -654,7 +654,10 @@ export const unovaConfig = {
   // Flat set of every legendary species id (for the stats "Legendaries" box).
   legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
   // Pokémart shelves — see game/shop.js and the note in kanto.js.
-  shopGeneric: ['max_heal'],
+  // Same generic shelf as Kanto. No curated plates yet: the per-map plate
+  // mapping is authored against a region's gym-type order, which hasn't been
+  // done for Unova. Empty shopPools resolves to no curated items, not an error.
+  shopGeneric: ['max_heal', 'muscle_band', 'light_clay', 'mega_revive'],
   shopPools: [],
   badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.

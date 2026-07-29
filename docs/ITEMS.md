@@ -247,14 +247,50 @@ page sums that column across every run to show lifetime Speed Cash earned.
 
 ### Shop
 
-| Item | Price | Stock per shop |
-|---|---|---|
-| Max Heal | $150 | 2 |
+Five items per shop: four generics offered everywhere, plus the map's plate.
 
-Purchases go straight to the bag. A sold-out entry stays visible and greyed.
+| Item | Price | Stock per shop | |
+|---|---|---|---|
+| Max Heal | $150 | 2 | consumable |
+| Muscle Band | $200 | 1 | +20% physical damage |
+| Light Clay | $200 | 1 | −20% physical damage taken |
+| Mega Revive | $900 | 1 | revives the whole team |
+| Map plate | $300 | 1 | +50% damage on one type |
+
+The spread is the design. Against ~$293 per map the player faces a ladder
+rather than a single yes/no: a cheap heal, two mid-priced permanent upgrades,
+and one purchase that costs three maps of saving. Muscle Band and Light Clay
+are priced identically — one offensive, one defensive — so the choice is about
+the run you are having, not about value. Total shelf value is $1,750, so no
+run buys everything.
+
+Purchases go straight to the bag. Held items are then equipped like any dropped
+item. A sold-out entry stays visible and greyed.
+
+### Map plates
+
+One type-boost plate per map, matched to that map's **gym type**:
+
+| Map | City | Gym | Plate |
+|---|---|---|---|
+| 1 | Pewter | Brock (rock) | Stone Plate |
+| 2 | Cerulean | Misty (water) | Splash Plate |
+| 3 | Vermilion | Lt. Surge (electric) | Zap Plate |
+| 4 | Celadon | Erika (grass) | Meadow Plate |
+| 5 | Fuchsia | Koga (poison) | Toxic Plate |
+| 6 | Saffron | Sabrina (psychic) | Mind Plate |
+| 7 | Cinnabar | Blaine (fire) | Flame Plate |
+| 8 | Viridian | Giovanni (ground) | Earth Plate |
+
+Thematic, not counter-typed — so the plate on sale is the one that helps least
+against that map's gym. Its value is the *next* map. This makes the shop a
+place to invest ahead rather than tool up for the fight in front of you, and
+keeps plates from competing with the Max Heal for urgent money.
 
 Inventory is authored per region: `shopGeneric` (offered at every map) plus
-`shopPools[mapIndex]` (curated per map, currently empty). Both are arrays of
-item ids; price and stock come from `BALANCE.economy`. See `src/game/shop.js`.
+`shopPools[mapIndex]` (curated per map). Both are arrays of item ids; price and
+stock come from `BALANCE.economy`. See `src/game/shop.js`. Unova carries the
+generic shelf but has no plates — that mapping is authored per region against
+its gym-type order.
 
 All numbers live in `src/game/balance.js` under `economy`.

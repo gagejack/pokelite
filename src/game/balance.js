@@ -118,9 +118,46 @@ export const BALANCE = deepFreeze({
       node: 10,         // pokéball / item / TM — the income floor
     },
     // Keyed by item id (see game/items.js). An item with no entry is not sold.
-    prices: { max_heal: 150 },
+    //
+    // The spread is the design: against ~293/map the player faces a ladder,
+    // not a single yes/no. One cheap heal, two mid-priced permanent upgrades,
+    // one purchase that costs three maps of saving.
+    //
+    // Muscle Band and Light Clay sit just ABOVE the heal and are priced
+    // identically to each other — one offensive, one defensive, same tier —
+    // so choosing between them is about the run you're having, not value.
+    // They're held items (permanent) where the heal is consumed once; the
+    // extra 50 buys that durability.
+    //
+    // mega_revive at 900 is the ceiling and must not be an impulse buy: to
+    // afford it you pass on roughly six Max Heals, and that sustained refusal
+    // to spend IS the strategy. 400 was rejected — buyable twice a run turns
+    // wipe-recovery into routine maintenance and undoes the attrition pressure
+    // the healing items were designed around.
+    //
+    // Plates are 300: +50% damage on one type is the strongest single-item
+    // damage effect in the game, but only for a Pokémon of that type. Higher
+    // ceiling than the 200 generics, more conditional than mega_revive.
+    prices: {
+      max_heal: 150,
+      muscle_band: 200,
+      light_clay: 200,
+      mega_revive: 900,
+      plate_rock: 300,
+      plate_water: 300,
+      plate_electric: 300,
+      plate_grass: 300,
+      plate_poison: 300,
+      plate_psychic: 300,
+      plate_fire: 300,
+      plate_ground: 300,
+    },
     // Units a single shop stocks. Uncapped stock would turn a legendary
     // windfall into five heals and undo the attrition pressure.
+    // Only max_heal is listed: getShopInventory falls back to 1, which is
+    // right for the rest. A second Muscle Band on one shelf is a strictly
+    // worse buy than almost anything else, and one Mega Revive is already
+    // the ceiling purchase.
     shopStock: { max_heal: 2 },
   },
 

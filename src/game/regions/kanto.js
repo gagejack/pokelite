@@ -476,11 +476,28 @@ export const kantoConfig = {
   // Pokémart shelves (see game/shop.js). Both are arrays of item ids from
   // game/items.js; price and stock come from BALANCE.economy, not from here.
   // `shopGeneric` is offered at EVERY map's shop; `shopPools[i]` is map i's
-  // curated extra. The curated lists are authored by hand and are intentionally
-  // empty for now — a separate design decision.
-  shopGeneric: ['max_heal'],
+  // curated extra. Five items per shop: these four plus the map's plate.
+  shopGeneric: ['max_heal', 'muscle_band', 'light_clay', 'mega_revive'],
+  // One type-boost plate per map, matched to that map's GYM TYPE (verified
+  // against each leader's lead Pokémon in kanto.teams.js). Kanto's eight gyms
+  // cover eight distinct types, so the mapping is one-to-one with no repeats.
+  //
+  // Thematic, NOT counter-typed — and the consequence is deliberate: the plate
+  // sold on a map is the one that helps least against that map's gym (a Flame
+  // Plate does nothing to Blaine). It makes the shop where you invest in the
+  // NEXT map rather than where you tool up for this one, reads as a regional
+  // speciality, and keeps plates from competing with the Max Heal for the same
+  // urgent money. If this reads as broken rather than as flavour in
+  // play-testing, counter-typing is a one-line change to this table.
   shopPools: [
-    [], [], [], [], [], [], [], [],   // maps 1–8
+    ['plate_rock'],       // Map 1 — Pewter, Brock (rock)
+    ['plate_water'],      // Map 2 — Cerulean, Misty (water)
+    ['plate_electric'],   // Map 3 — Vermilion, Lt. Surge (electric)
+    ['plate_grass'],      // Map 4 — Celadon, Erika (grass)
+    ['plate_poison'],     // Map 5 — Fuchsia, Koga (poison)
+    ['plate_psychic'],    // Map 6 — Saffron, Sabrina (psychic)
+    ['plate_fire'],       // Map 7 — Cinnabar, Blaine (fire)
+    ['plate_ground'],     // Map 8 — Viridian, Giovanni (ground)
   ],
   badges: BADGES,
   // Battle data (see kanto.teams.js) — read by the generic loop via config.
