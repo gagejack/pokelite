@@ -83,6 +83,47 @@ export const BALANCE = deepFreeze({
     levelsGained: { grass: 1, default: 2, rival: 4, eliteFour: 2 },
   },
 
+  // ── Speed Cash economy (NodeMap / EliteFour victory handlers, shop.js) ────
+  // Money compensates for FORGONE LEVELS: the weaker a fight's XP reward, the
+  // stronger its cash. Grass pays more than a trainer precisely because a
+  // trainer already pays 2 levels to grass's 1 (see progression.levelsGained)
+  // and levels compound. Flipping this ordering collapses the grass/trainer
+  // fork back into "trainer always wins".
+  //
+  // Legendary sits ABOVE a gym leader on purpose: a Master Ball fight awards
+  // only levelsGained.default (2) — the same as a route trainer — for a Lv70
+  // Mewtwo. It cannot be farmed, so it doesn't move the average.
+  //
+  // `node` is the FLOOR: a token payout for non-fight nodes (pokéball / item /
+  // TM). Without it a map whose six random rows all roll non-fight pays only
+  // the boss's 120 — less than one Max Heal, so the guaranteed shop is
+  // guaranteed useless. At a fifth of a grass node it can't rival fighting.
+  //
+  // Expected income per map: rowWidths gives 7 rows, but row 0 is the
+  // pre-cleared START node (NodeMap seeds clearedNodes with Set([0])), so
+  // there are 6 random rows plus the boss:
+  //   grass    6 × 0.28 × 50  =  84
+  //   trainer  6 × 0.28 × 30  =  50
+  //   floor    6 × 0.38 × 10  =  23
+  //   mystery  6 × 0.06 × ~45 =  16
+  //   boss                    = 120   →  ≈ $293/map (floor $180, ceiling ~$420)
+  economy: {
+    payouts: {
+      grass: 50,
+      trainer: 30,
+      rival: 60,
+      boss: 120,        // gym leader
+      legendary: 250,   // Master Ball node — paid on WIN, never on catch
+      eliteFour: 200,
+      node: 10,         // pokéball / item / TM — the income floor
+    },
+    // Keyed by item id (see game/items.js). An item with no entry is not sold.
+    prices: { max_heal: 150 },
+    // Units a single shop stocks. Uncapped stock would turn a legendary
+    // windfall into five heals and undo the attrition pressure.
+    shopStock: { max_heal: 2 },
+  },
+
   // ── Trainer team generation (battleTeams.js) ─────────────────────────────
   trainers: {
     // pickLevel: t = clamp01(positionWeight*posFactor + rand*randSpan - randOffset)
