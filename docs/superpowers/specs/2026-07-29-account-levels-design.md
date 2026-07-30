@@ -119,7 +119,8 @@ single knob to turn (it scales every threshold linearly), not the curve's shape.
 
 ### 4. The module
 
-A new leaf module, `src/game/level.js`, importing nothing:
+A new leaf module, `src/game/level.js`, importing only `balance.js` (which is
+itself import-free, so the pair stays Node-loadable with no bundler):
 
 ```js
 export const MAX_LEVEL = 100
@@ -135,8 +136,9 @@ re-derives thresholds:
 - `xpForNext` — the current level's step cost (`0` at MAX_LEVEL)
 - `progress` — `0..1` fraction toward the next level (`1` at MAX_LEVEL)
 
-Pure and leaf, matching `dailyScore.js` and `balance.js`: no React, no Supabase,
-no rng. Node-testable in isolation, which matters because an off-by-one in the
+Pure, in the sense `dailyScore.js` and `balance.js` are: no React, no Supabase,
+no rng, and no import that reaches any of those. Node-testable in isolation,
+which matters because an off-by-one in the
 threshold arithmetic is the likeliest defect here.
 
 Level 100 is terminal. XP past `xpToReach(100)` is retained in the sum but
@@ -186,14 +188,28 @@ The existing tile grid gains a level tile showing `LV 16`, and a full-width XP
 bar sits directly beneath the grid with the remaining XP as its label:
 
 ```
-┌──────────┬──────────┬──────────┐
-│    43    │    12    │   16     │
-│  Total   │   Wins   │  Level   │
-│   Runs   │          │          │
-└──────────┴──────────┴──────────┘
-▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░
-860 XP to level 17
+┌────────────────────────────────────────────────────┐
+│  LV 16                          860 XP to level 17 │
+│  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
+└────────────────────────────────────────────────────┘
+┌───────────┬───────────┬───────────┬───────────┐
+│    43     │    12     │    31     │    28%    │
+│Total Runs │   Wins    │  Losses   │ Win Rate  │
+├───────────┼───────────┼───────────┼───────────┤
+│    88     │    2.0    │    41     │  $12,740  │
+│  Badges   │ Avg / Run │  Catches  │Speed Cash │
+└───────────┴───────────┴───────────┴───────────┘
 ```
+
+**A full-width panel above the grid, not a ninth tile in it.** Three reasons,
+in order of weight:
+
+1. The level is what the tallies below it add up to. A summary belongs above its
+   inputs rather than filed as one more equal-weight cell among them.
+2. The bar must sit beside the number it describes, and a grid cell is roughly
+   square. Full width gives the bar room without breaking that pairing.
+3. The grid is `repeat(4, 1fr)` on desktop (`Stats.jsx:274`) and already holds 8
+   tiles in two clean rows. A ninth would sit alone on a third row.
 
 (Figures are the real 12,740 lifetime cash: level 16, 740 XP into a 1,600 XP
 step, so 46% filled with 860 to go.)
@@ -318,6 +334,13 @@ round trip per leaderboard load, not one per row.
    never rows, never cash-per-run, and it cannot be coerced into returning
    anything else. `set search_path = public` is not optional — without it a
    definer function can be hijacked by a caller-controlled search path.
+   Shape is not the only axis, though: `p_user_ids` is caller-supplied and
+   execute is granted to `anon`, so this is a batch endpoint any visitor can
+   call with an arbitrary array. The ids themselves are already public via
+   `getLeaderboard` and the return is one integer each, so there is little to
+   enumerate — but unbounded work per request is a separate property from a
+   small payload, so the function caps the array at 100 ids (five times the
+   leaderboard's default page) and returns nothing above that.
 5. **The leaderboard's level does not survive a stale RPC.** If the call fails,
    the board must still render with levels omitted rather than showing zeros — a
    `LV 1` on every row is worse than no badge, because it reads as data rather

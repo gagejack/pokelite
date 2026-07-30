@@ -20,6 +20,7 @@ Copy these verbatim; every task inherits them.
 - **No `xp` column and no `level` column.** Level is derived on read everywhere.
 - **Never render Upheaval or Orange Kid below 12px** — they are pixel display faces that stop resolving (see `docs/UI_TOUCHUPS.md`). The one exception already in the codebase is `Stats.jsx`'s 9px tile labels; match that file's existing pattern rather than "fixing" it.
 - **Muted text uses `muted(dark)`** from `src/lib/colors.js`. Never re-declare `dark ? '#888' : '#777'`.
+- **The level renders as `LV 16`** — uppercase, one space, no padding — on all three surfaces. One format so the same number reads the same everywhere.
 - **Pre-existing lint baselines — count ERRORS, not eslint's bundled "N problems" total** (which includes warnings). Whole repo: **43 errors, 5 warnings**. Per file: `Stats.jsx` 9, `Roster.jsx` 3, `App.jsx` 1, `NodeMap.jsx` 3, `BattleCard.jsx` 18, `DailyChallenge.jsx` 2. Do not let these grow and do not "fix" them.
 - **`react-hooks/static-components` fires once per `<Stat>` call site** in `Stats.jsx`. A new `<Stat>` grows that file's baseline, which is why the Speed Cash tile at `Stats.jsx:282` is inlined. Follow that precedent.
 - **Verification is `npm run lint`, `npm run build`, and a Node check of the pure module.** No test framework exists; never add one.
@@ -82,6 +83,14 @@ Pure arithmetic, no consumers yet. Everything downstream depends on these exact 
   - `progress` — 0..1 toward the next level; **`1` at MAX_LEVEL**
 
   **Remaining XP is `xpForNext - xpIntoLevel`, computed by the caller.** It is deliberately not returned — one derived field is enough, and returning both invites picking the wrong one (see Task 4).
+
+  Task 3 adds one more export to this same file:
+  ```js
+  export function sumSpeedCashEarned(rows)  // rows from `runs` -> total XP
+  ```
+  It lives here beside the curve because both surfaces that sum the column need
+  the identical reduce, and the spec's §6 says the sum moves to one place as
+  soon as a second consumer exists. Task 4 is that second consumer.
 
 - [ ] **Step 1: Add the balance block**
 
@@ -358,7 +367,7 @@ In `src/components/Stats.jsx`, add after the `BalanceDashboard` import (line 8):
 
 ```js
 import LevelBar from './LevelBar'
-import { levelForXp } from '../game/level.js'
+import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 ```
 
 - [ ] **Step 2: Derive the level beside the existing cash total**
@@ -379,74 +388,110 @@ Add immediately after it:
       const levelInfo = levelForXp(totalCashEarned)
 ```
 
-Then add `levelInfo` to the object passed to `setStats(...)` in the same function, alongside `totalCashEarned`.
+**Also replace the `totalCashEarned` line itself** with a call to the shared
+helper you are about to write, so the reduce exists in one place:
 
-- [ ] **Step 3: Add the level tile**
-
-The tile grid is at `Stats.jsx:274`. Add the level tile as the **last** child of that grid, immediately after the inlined Speed Cash tile's closing `</div>`.
-
-Inline the markup rather than adding a ninth `<Stat>` call: `react-hooks/static-components` fires once per call site, so another `<Stat>` grows this file's 9-error baseline. The Speed Cash tile above is inlined for exactly this reason.
-
-```jsx
-                {/* Level tile — inlined, not a <Stat>, for the same reason the
-                    Speed Cash tile above is: react-hooks/static-components
-                    fires per call site, so a ninth <Stat> would grow this
-                    file's lint baseline. */}
-                <div style={{
-                  backgroundColor: innerBg, border: panelBorder,
-                  boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                  padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>
-                    {stats.levelInfo.level}
-                  </span>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>
-                    Level
-                  </span>
-                </div>
+```js
+      const totalCashEarned = sumSpeedCashEarned(rows)
 ```
 
-The 9px label and `#facc15` value match the other tiles exactly — this is the one file whose sub-12px labels are the established pattern, so a 12px label here would look like the odd one out.
+Task 4 adds a second consumer of this exact sum, and the design says the sum
+moves to a shared helper the moment that happens. Doing it now rather than after
+means the two surfaces cannot drift apart on `?? 0` handling or column name.
 
-- [ ] **Step 4: Add the XP bar below the grid**
+Add to `src/game/level.js`, below `levelForXp`:
 
-Immediately after the tile grid's closing `</div>`, still inside the `<div className="flex flex-col gap-6">`:
+```js
+// Sum lifetime XP from `runs` rows. Every caller does the same reduce over the
+// same column, so it lives here beside the curve rather than being copied into
+// each surface. `?? 0` covers runs recorded before speed_cash_earned existed.
+export function sumSpeedCashEarned(rows) {
+  return (rows ?? []).reduce((sum, r) => sum + (r.speed_cash_earned ?? 0), 0)
+}
+```
+
+(Step 1's import line already brings it in.)
+```
+
+Then add `levelInfo` to the object passed to `setStats(...)` in the same function, alongside `totalCashEarned`.
+
+- [ ] **Step 3: Add the level panel ABOVE the tile grid**
+
+One full-width panel — level number, bar, and remaining-XP label together —
+placed **before** the tile grid, as the first child of the
+`<div className="flex flex-col gap-6">` at `Stats.jsx:273`.
+
+Not a ninth tile in the grid. Three reasons, and the first is the one that
+matters:
+
+1. **The level summarizes the tiles below it.** Runs, wins, badges and catches
+   are the tallies; the level is what they add up to. A summary belongs above
+   its inputs, not filed as one more equal-weight cell among them.
+2. **A bar wants width.** The bar has to live next to the number it belongs to,
+   and a grid cell is roughly square. Full width gives the bar room and keeps
+   the pairing intact.
+3. **It avoids an orphan.** The grid is `repeat(4, 1fr)` on desktop
+   (`Stats.jsx:274`) and holds 8 tiles today, so a ninth would sit alone on a
+   third row.
 
 ```jsx
-              {/* XP progress toward the next level. Below the grid rather than
-                  inside a tile: a tile is square-ish and a bar wants width, and
-                  this summarizes the whole page rather than one stat.
-                  The label is the REMAINING XP (xpForNext - xpIntoLevel), not
-                  the XP earned into the level — both are on hand and mixing
-                  them up is the easy mistake here. */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <LevelBar progress={stats.levelInfo.progress} dark={dark} height="8px" />
-                <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor, textAlign: 'center' }}>
-                  {stats.levelInfo.xpForNext === 0
-                    ? 'Max level'
-                    : `${(stats.levelInfo.xpForNext - stats.levelInfo.xpIntoLevel).toLocaleString()} XP to level ${stats.levelInfo.level + 1}`}
-                </span>
+              {/* Account level — a full-width panel above the tiles, not a
+                  ninth tile in them. The level is what the tallies below add
+                  up to, so it reads as a summary rather than a peer; and the
+                  progress bar needs width a ~square grid cell can't give it.
+                  Inlined markup (not the <Stat> helper) because
+                  react-hooks/static-components fires once per <Stat> call
+                  site, and another call would grow this file's 9-error
+                  baseline — the same reason the Speed Cash tile below is
+                  inlined. */}
+              <div style={{
+                backgroundColor: innerBg, border: panelBorder,
+                boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '28px' : '22px', color: '#facc15' }}>
+                    LV {stats.levelInfo.level}
+                  </span>
+                  {/* The REMAINING XP (xpForNext - xpIntoLevel), not the XP
+                      earned into the level. Both are on hand and mixing them
+                      up is the easy mistake here — at 12,740 this reads 860,
+                      not 740. */}
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
+                    {stats.levelInfo.xpForNext === 0
+                      ? 'Max level'
+                      : `${(stats.levelInfo.xpForNext - stats.levelInfo.xpIntoLevel).toLocaleString()} XP to level ${stats.levelInfo.level + 1}`}
+                  </span>
+                </div>
+                <LevelBar progress={stats.levelInfo.progress} dark={dark} height="10px" />
               </div>
 ```
 
-The `xpForNext === 0` branch is not decorative: at level 100 the arithmetic would read "0 XP to level 101", which is both wrong and unreachable-sounding.
+The `xpForNext === 0` branch is not decorative: at level 100 the arithmetic
+would otherwise read "0 XP to level 101", which is both wrong and
+unreachable-sounding.
 
-- [ ] **Step 5: Lint and build**
+The label sits on the same line as the level rather than under the bar, so the
+panel is two rows instead of three and reads as one object.
+
+- [ ] **Step 4: Lint and build**
 
 Run: `npm run lint && npm run build`
-Expected: `Stats.jsx` stays at its **9-error** baseline. If it reports 10, you added a `<Stat>` instead of inlining — fix that rather than the baseline.
+Expected: `Stats.jsx` stays at its **9-error** baseline. Count ERRORS, not eslint's "N problems" total. If it reports 10, you used the `<Stat>` helper instead of inlining — fix that rather than the baseline.
 
-- [ ] **Step 6: Manual verification**
+- [ ] **Step 5: Manual verification**
 
 Run `npm run dev`, sign in, open Stats:
 
-1. The Level tile shows a number consistent with the Speed Cash tile beside it. With 12,740 earned it reads **16**.
-2. The bar sits below the grid, full width, and its fill matches the label — a level just reached reads near-empty, not near-full. (Filling from the wrong end is the classic bug here.)
-3. The label reads the REMAINING XP: at 12,740 it says **"860 XP to level 17"**, not "740".
-4. Check both light and dark themes: the bar's track and fill are both visible in each.
-5. Check at 375px: the tile grid is 2-up on mobile, and the bar spans the panel without overflowing.
+1. The level panel sits **above** the tile grid, spanning the full panel width.
+2. Its level is consistent with the Speed Cash tile below. With 12,740 earned it reads **LV 16**.
+3. The bar's fill matches the label — a level just reached reads near-empty, not near-full. (Filling from the wrong end is the classic bug here.)
+4. The label reads the REMAINING XP: at 12,740 it says **"860 XP to level 17"**, not "740".
+5. The tile grid below still holds 8 tiles in two clean rows of four on desktop — the level did NOT become a ninth tile leaving an orphan row.
+6. Check both light and dark themes: the bar's track and fill are both visible in each.
+7. Check at 375px: the panel's level and label stay on one line without wrapping, and the bar spans the panel without overflowing.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/components/Stats.jsx
@@ -470,7 +515,7 @@ In `src/components/menu/CallingCard.jsx`, add after the supabase import (line 2)
 
 ```js
 import LevelBar from '../LevelBar'
-import { levelForXp } from '../../game/level.js'
+import { levelForXp, sumSpeedCashEarned } from '../../game/level.js'
 ```
 
 Note the paths: this file is in `src/components/menu/`, so both need `../` / `../../`.
@@ -488,10 +533,12 @@ No new request — the same query gains a column.
 In the `setStats({...})` call (line 24), add one field after `shinies`:
 
 ```js
-        levelInfo: levelForXp((runs ?? []).reduce((s, r) => s + (r.speed_cash_earned ?? 0), 0)),
+        levelInfo: levelForXp(sumSpeedCashEarned(runs)),
 ```
 
-`?? 0` covers runs recorded before the column existed.
+`sumSpeedCashEarned` is the shared helper Task 3 added to `level.js` — it
+handles the null rows and the `?? 0` for pre-column runs. This surface and the
+Stats page now sum the column through the same function, so they cannot drift.
 
 - [ ] **Step 3: Put the level in the header band**
 
@@ -621,9 +668,35 @@ grant execute on function public.user_levels(uuid[]) to authenticated;
 grant execute on function public.user_levels(uuid[]) to anon;
 ```
 
+**On the cardinality cap.** `p_user_ids` is caller-supplied and execute is
+granted to `anon`, so this is a batch endpoint any visitor can call with an
+arbitrary array. The exposure is small — `user_id` is already public via
+`getLeaderboard`, and the return is one integer per user — but "small payload"
+and "unbounded work per request" are different properties, and only the first is
+covered by returning an aggregate.
+
+The `where` clause is therefore bounded by `array_length`. Add this line to the
+function body, immediately after the `where r.user_id = any(p_user_ids)` line
+and before `group by`:
+
+```sql
+    and array_length(p_user_ids, 1) <= 100
+```
+
+100 is five times the leaderboard's `limit = 20` default, so no legitimate call
+comes close. A larger array returns zero rows rather than erroring, which the
+client already treats as "no levels available" via its `?? 0` fallback.
+
 - [ ] **Step 2: Run it**
 
 Paste the file's contents into the Supabase SQL editor and execute. This is the one step in the plan that touches the live database.
+
+**This step gates Tasks 6 and 7.** Do not start them until Step 3 passes. The
+client degrades gracefully when the RPC is missing (Task 6 logs a warning, Task 7
+hides the badge), which is correct behaviour in production and actively
+dangerous during implementation: a forgotten migration looks exactly like "no
+one has any XP yet". Task 7's verification catches it, but only if you know to
+look — hence the explicit gate here.
 
 - [ ] **Step 3: Verify the function**
 
@@ -635,11 +708,37 @@ select * from public.user_levels(array(select distinct user_id from public.runs 
 
 -- Must return ZERO ROWS, not an error.
 select count(*) as empty_array_rows from public.user_levels('{}'::uuid[]);
+
+-- Cardinality cap: 101 ids must return zero rows, not 101 results.
+select count(*) as over_cap_rows
+from public.user_levels(array(select gen_random_uuid() from generate_series(1, 101)));
 ```
 
-Expected: the first returns `user_id` / `xp` pairs with plausible totals; the second returns `0`.
+Expected: the first returns `user_id` / `xp` pairs with plausible totals; the
+second and third both return `0`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Verify the client can actually reach it**
+
+The SQL editor runs as a privileged role, so passing Step 3 proves the function
+exists — not that the browser's anon key may call it. A missing `grant` fails
+only from the client, and fails the same silent way a missing function does.
+
+With the dev server running (`npm run dev`), paste this into the browser console
+on any page of the app:
+
+```js
+const { data, error } = await (await import('/src/lib/supabase.js')).supabase
+  .rpc('user_levels', { p_user_ids: [] })
+console.log({ data, error })
+```
+
+Expected: `{ data: [], error: null }`.
+
+A `404` or "function not found" in `error` means the SQL did not apply, or the
+grants did not. **Do not proceed to Task 6 until this returns `error: null`** —
+past this point a missing RPC is indistinguishable from an empty leaderboard.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add supabase/user_levels.sql
@@ -746,17 +845,21 @@ Left of the name rather than as a new right-hand column: the level is identity, 
 ```jsx
                 {/* Account level — identity, so it sits with the name rather
                     than among the ranking columns to its right.
-                    Hidden at xp 0: that means either a brand-new account or a
-                    failed user_levels lookup, and "LV 1" on every row reads as
-                    real data while a missing badge reads as missing.
-                    Desktop only — the mobile row is already at its width limit
+                    BLANK, not absent, at xp 0: the cell keeps its width so
+                    usernames stay aligned down the column, exactly as the medal
+                    cell above does for ranks 4+. xp 0 means a brand-new account
+                    or a failed user_levels lookup, and printing "LV 1" there
+                    would read as real data where a blank reads as absent.
+                    46px fits "LV 100" — the widest value — at 12px Upheaval.
+                    Sizing to "LV 16" would let the cap overflow into the name.
+                    Desktop only: the mobile row is already at its width limit
                     with rank, medal, sprite, name, maps and run. */}
-                {isDesktop && e.xp > 0 && (
+                {isDesktop && (
                   <span style={{
                     fontFamily: 'Upheaval', fontSize: '12px', color: text,
-                    opacity: 0.75, flexShrink: 0, width: '34px',
+                    opacity: 0.75, flexShrink: 0, width: '46px',
                   }}>
-                    LV{levelForXp(e.xp).level}
+                    {e.xp > 0 ? `LV ${levelForXp(e.xp).level}` : ''}
                   </span>
                 )}
 ```
@@ -810,3 +913,5 @@ State these plainly if asked; do not "fix" them without a new decision.
 5. **Retuning a payout moves everyone's level.** Correct behaviour for a derived value, but it means economy changes are now progression changes too.
 6. **Every level read is a full scan of the user's runs.** Fine at 43 rows, fine at a few thousand. At tens of thousands it wants a materialized total; watch the Stats page load time as the signal.
 7. **Two code paths show the same level.** Stats and the calling card sum client-side; the leaderboard uses the RPC. They should always agree — if they ever don't, the RPC is authoritative and the client sum is the one to suspect.
+8. **`getLeaderboard` still fetches every `daily_attempts` row for the date.** It ranks client-side and slices 20, so a popular day loads every attempt from every player. Pre-existing, and Task 6 rewrites that exact function without fixing it — deliberately. A `.limit()` on the query would cut rows *before* the best-attempt reduction in `rankLeaderboard`, silently changing who ranks. Doing it correctly means moving the ranking into SQL, which is its own change with its own verification. Flagged, not smuggled in.
+9. **`Stats.jsx:283`'s existing comment miscounts the `<Stat>` call sites** (there are 7, not 8). Harmless — the surrounding reasoning about `react-hooks/static-components` is correct and the count is incidental. Left alone rather than fixed, since touching it grows the diff of a file this plan already edits for real reasons.
