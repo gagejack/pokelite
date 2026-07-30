@@ -137,9 +137,14 @@ export default function App() {
     setScreen('starter')
   }
 
-  async function initRoster(starter) {
+  // `honorShiny` carries the shininess of the instance StarterSelect displayed,
+  // so the sprite you picked is the one you get. Only the initial pick does
+  // this: a restart must re-roll, or a shiny starter would be permanent across
+  // every Play Again (and a seeded run's replay has to reproduce the seed's own
+  // roll, not the previous life's outcome).
+  async function initRoster(starter, honorShiny = false) {
     const base = await fetchPokemonBase(starter.id)
-    const instance = buildPokemonInstance(base, 5, true)
+    const instance = buildPokemonInstance(base, 5, true, honorShiny ? !!starter.shiny : null)
     setRoster([instance])
     // The starter is an owned species for the Pokédex (not a wild catch).
     recordSpeciesOwned(instance.pokeId, !!instance.shiny)
@@ -160,7 +165,9 @@ export default function App() {
     if (runSeed) seedRng(runSeed.seed)
     else clearRng()
     runStartedAt.current = Date.now()
-    initRoster(starter)
+    // honorShiny: `starter` here is the instance StarterSelect rendered, so the
+    // shiny sprite the player just chose is the one that enters the roster.
+    initRoster(starter, true)
     // Starting a fresh run discards any previously saved one.
     mapProgress.current = null
     savedRunData.current = null

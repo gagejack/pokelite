@@ -227,7 +227,14 @@ export const SHINY_ODDS = BALANCE.pokemon.shinyOdds
 
 // Build a full battle-ready Pokémon instance from base data + level.
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
-export function buildPokemonInstance(base, rawLevel, isStarter = false) {
+// `forceShiny` skips the roll and uses the given value. Only the starter needs
+// it: StarterSelect builds preview instances to render the three choices, then
+// App.initRoster rebuilds the chosen one to apply the 1.3× starter boost. Left
+// to roll again, that rebuild would decide shininess a SECOND time — so the
+// shiny Charmander you picked could arrive normal, and a normal one could
+// arrive shiny. Passing the preview's flag through makes the sprite on the
+// select screen a promise. Everything else passes nothing and rolls once.
+export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShiny = null) {
   // Clamp here too, not just in levelUp: this is the single constructor for
   // every instance (spawns, evolutions, enemy teams), so nothing can enter the
   // game above MAX_LEVEL regardless of what a caller passes.
@@ -235,7 +242,9 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false) {
   const boost = isStarter ? BALANCE.pokemon.starterBoost : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
   const move = getTypeMove(base.types[0], tierForLevel(level))
-  const shiny = rng() < SHINY_ODDS
+  // Null (not false) means "no opinion, roll it" — so an explicit false can
+  // still force a non-shiny without being mistaken for an absent argument.
+  const shiny = forceShiny === null ? rng() < SHINY_ODDS : !!forceShiny
   return {
     pokeId:     base.pokeId,
     name:       base.name,

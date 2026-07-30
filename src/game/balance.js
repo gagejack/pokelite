@@ -72,7 +72,12 @@ export const BALANCE = deepFreeze({
   pokemon: {
     maxLevel: 100,
     starterBoost: 1.3,      // ×stats for the run's starter
-    shinyOdds: 1 / 512,
+    // 1/256 (~0.39%). Every spawned Pokémon rolls once, and a run spawns on
+    // the order of 100 of them (grass, trainer teams, catch offers), so this
+    // puts a shiny somewhere in roughly a third of runs. The mainline rates
+    // are 1/512 (Gen 2-5) and 1/4096 (Gen 6+); both are tuned for a hundreds-
+    // of-hours playthrough rather than a 30-minute roguelike run.
+    shinyOdds: 1 / 256,
     victoryHealPct: 0.05,   // surviving mons heal this fraction of max HP on a win
     nonLevelEvoLevel: 20,   // level an ALLOWLISTED non-level evo auto-triggers
     autoEvolveNonLevel: [133], // Eevee — the only non-level evo that auto-triggers
