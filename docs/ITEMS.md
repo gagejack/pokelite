@@ -32,12 +32,12 @@ budget. See `itemWeight()` in `items.js:119`.
 | Tier | Budget | Items | Each | Border color |
 |---|---|---|---|---|
 | common | 60% | 24 | **2.50%** | `#9ca3af` grey |
-| rare | 25% | 12 | **2.08%** | `#3b82f6` blue |
+| rare | 25% | 13 | **1.92%** | `#3b82f6` blue |
 | epic | 10% | 6 | **1.67%** | `#a855f7` purple |
 | legendary | 5% | 4 | **1.25%** | `#facc15` yellow |
 
 > **Counterintuitive but correct:** a *common* item is individually rarer than a
-> *rare* one (2.50% vs 2.08%), because the 18 type plates dilute the common
+> *rare* one (2.50% vs 1.92%), because the 18 type plates dilute the common
 > tier. The tier names describe the tier's total share, not per-item odds.
 
 Adding an item to a tier makes every existing item in that tier proportionally
@@ -103,7 +103,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Rare (12 items, 2.08% each)
+## Rare (13 items, 1.92% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
@@ -119,6 +119,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 | `max_heal` | Max Heal | Restores one Pokémon to full HP | **Consumable** — `consumable: 'heal'` |
 | `max_revive` | Max Revive | Revives a fainted Pokémon at full HP; full-heals a healthy one | **Consumable** — `consumable: 'revive'` |
 | `evolve_stone` | Moon Stone | Instantly evolves the Pokémon it is given to | **Consumable** — `consumable: 'evolve'` |
+| `rare_candy` | Rare Candy | Raises one Pokémon by 3 levels | **Consumable** — `consumable: 'level'`, `rareCandyLevels` 3 |
 
 ---
 
@@ -152,8 +153,8 @@ Most items are **held**: equipped to one Pokémon, modifying battle math. A
 consumable is different — it is *used*, produces an immediate effect, and is
 destroyed.
 
-There are four: `evolve_stone`, `max_heal`, `max_revive`, and `mega_revive`.
-They share one mechanism:
+There are five: `evolve_stone`, `rare_candy`, `max_heal`, `max_revive`, and
+`mega_revive`. They share one mechanism:
 
 - Each carries a `consumable` field the UI keys off. None reaches `battle.js`,
   so the sim needs no case for any of them.
@@ -164,6 +165,13 @@ They share one mechanism:
   because no branch matches `'consumed'`.
 - **If it can't do anything, it is kept** — a stone dropped on a Pokémon with no
   evolution, or a Max Heal on a full-HP Pokémon, is not wasted.
+
+`evolve_stone` and `rare_candy` route through `useEvolutionFlow` rather than
+`applyConsumable`: both can change a Pokémon's species, so they need the same
+notice/choice popups a battle win uses. The candy calls `applyRareCandy`
+(`pokemon.js`), which levels one roster member and runs the identical evolution
+pass — a candy that crosses an evolution level evolves the Pokémon exactly as
+the win would have. It is kept only at MAX_LEVEL.
 
 The three healing items route through `applyConsumable` in `App.jsx`, which
 calls a pure helper in `src/game/roster.js` (`healOne` / `reviveOne` /

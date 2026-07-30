@@ -79,6 +79,10 @@ export const BALANCE = deepFreeze({
     // of-hours playthrough rather than a 30-minute roguelike run.
     shinyOdds: 1 / 256,
     victoryHealPct: 0.05,   // surviving mons heal this fraction of max HP on a win
+    // Levels granted by one Rare Candy. Three is about a trainer fight and a
+    // half (progression.levelsGained.default is 2), so it meaningfully moves one
+    // Pokémon without replacing the reason to fight.
+    rareCandyLevels: 3,
     nonLevelEvoLevel: 20,   // level an ALLOWLISTED non-level evo auto-triggers
     autoEvolveNonLevel: [133], // Eevee — the only non-level evo that auto-triggers
   },

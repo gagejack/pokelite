@@ -99,6 +99,11 @@ export const ITEMS = [
   // doubles its draw rate (1.00% → 2.08%) and lifts each remaining legendary
   // from 1.00% to 1.25%.
   { id: 'evolve_stone',   name: 'Moon Stone',     description: 'Instantly evolves the Pokémon it is given to', tier: 'rare', icon: 'moon-stone', consumable: 'evolve' },
+  // Levels one Pokémon by BALANCE.pokemon.rareCandyLevels, and can trigger an
+  // evolution exactly as a battle win does. Rare rather than epic: three levels
+  // is roughly one and a half trainer fights, which is a real boost but not a
+  // fight-deciding one.
+  { id: 'rare_candy',     name: 'Rare Candy',     description: 'Raises one Pokémon by 3 levels',           tier: 'rare', icon: 'rare-candy', consumable: 'level' },
 
   // --- Epic ---
   { id: 'life_orb',       name: 'Life Orb',       description: '+30% damage on all moves',                 tier: 'epic',     icon: 'life-orb' },

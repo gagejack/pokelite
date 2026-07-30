@@ -5,6 +5,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
+import { MAX_LEVEL } from '../game/pokemon.js'
 import { PokemonCardContent } from './Roster'
 
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
@@ -123,6 +124,10 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 }
                 if (c === 'revive_all' && !roster.some(p => p.fainted || p.stats.hp < p.stats.maxHp)) {
                   return 'Whole team already healthy'
+                }
+                // Rare Candy: mirrors applyRareCandy's only refusal.
+                if (c === 'level' && pokemon.level >= MAX_LEVEL) {
+                  return 'Already max level'
                 }
                 return null
               })()

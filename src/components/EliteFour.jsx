@@ -204,6 +204,12 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       return
     }
+    // Rare Candy: levels the target and may evolve it. Kept only at MAX_LEVEL.
+    if (item?.consumable === 'level' && to.kind === 'pokemon') {
+      const used = await evo.useRareCandy(to.pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      return
+    }
     onMoveItem?.({ item, from, to })
   }
   const rosterItemProps = {

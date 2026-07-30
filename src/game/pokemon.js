@@ -572,3 +572,56 @@ export function levelUp(instance, base, levels) {
     },
   }
 }
+
+// Rare Candy — level ONE roster member, then check it for an evolution.
+//
+// Distinct from applyBattleVictory, which levels the whole team: this targets a
+// single index, grants no victory heal, and skips the `_enteredFainted` gate. A
+// fainted Pokémon can be fed a candy — it levels and stays fainted (levelUp
+// already refuses to revive), because the candy is not a heal.
+//
+// Returns the same { roster, used } contract the healing helpers use, plus the
+// evolution notices and choices applyBattleVictory produces, so the caller can
+// drive the same popups. `used: false` means the item did nothing and must be
+// KEPT: that happens only at MAX_LEVEL, or on a Pokémon with no `_base` (which
+// would make the stat recalculation impossible).
+export async function applyRareCandy(roster, index, levels, { maxSpeciesId = Infinity } = {}) {
+  const target = roster[index]
+  const none = { roster, used: false, evolutionNotices: [], evolutionChoices: [] }
+  if (!target || !target._base) return none
+  // Already capped — levelUp would return an identical instance, so consuming
+  // the candy would destroy it for nothing.
+  if (target.level >= MAX_LEVEL) return none
+
+  const leveled = levelUp(target, target._base, levels)
+  let next = roster.map((p, i) => (i === index ? leveled : p))
+
+  // Same evolution pass the post-battle path runs, scoped to the one Pokémon
+  // that changed. Multi-branch lines (Eevee, Tyrogue…) queue a choice instead
+  // of evolving, exactly as they do after a win.
+  const evolutionNotices = []
+  const evolutionChoices = []
+  // `options` is checked BEFORE `evolved`, matching applyBattleVictory: a
+  // multi-branch result can carry both, and the player's choice must win over
+  // an auto-evolution.
+  const result = await checkEvolution(leveled, leveled.level, { maxSpeciesId })
+  if (result?.options) {
+    evolutionChoices.push({
+      index,
+      fromId: leveled.pokeId,
+      fromName: leveled.name,
+      sprite: leveled.sprite,
+      options: result.options,
+    })
+  } else if (result?.evolved) {
+    next = next.map((p, i) => (i === index ? result.evolved : p))
+    evolutionNotices.push({
+      from: leveled.name,
+      to: result.evolved.name,
+      pokeId: result.evolved.pokeId,
+      shiny: !!result.evolved.shiny,
+    })
+  }
+
+  return { roster: next, used: true, evolutionNotices, evolutionChoices }
+}

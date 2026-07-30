@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { applyBattleVictory, evolveInto, checkEvolution, GEN_MAX_ID } from '../game/pokemon.js'
+import { applyBattleVictory, evolveInto, checkEvolution, applyRareCandy, GEN_MAX_ID } from '../game/pokemon.js'
+import { BALANCE } from '../game/balance.js'
 import EvolutionNotice from '../components/EvolutionNotice'
 import EvolutionChoice from '../components/EvolutionChoice'
 
@@ -47,6 +48,23 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
   // EvolutionChoice popup used post-battle. Returns true if the stone was
   // consumed — i.e. the Pokémon either evolved or has a pending choice — and
   // false if it has no evolution at all, so the caller can keep the item.
+  // Rare Candy — level one Pokémon and run the same evolution pass a battle
+  // win runs, so a candy that pushes a Pokémon over its evolution level shows
+  // the same notice (or choice popup) the win would have. Returns true if the
+  // candy did something; false means KEEP it (already at MAX_LEVEL), matching
+  // the Evolve Stone's contract on a Pokémon that cannot evolve.
+  async function useRareCandy(pokeIndex) {
+    const maxSpeciesId = GEN_MAX_ID[config?.generation] ?? Infinity
+    const { roster: next, used, evolutionNotices: notices, evolutionChoices: choices } =
+      await applyRareCandy(roster, pokeIndex, BALANCE.pokemon.rareCandyLevels, { maxSpeciesId })
+    if (!used) return false
+    notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
+    setRoster(next)
+    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...notices])
+    if (choices.length > 0) setEvolutionChoices(prev => [...prev, ...choices])
+    return true
+  }
+
   async function evolveWithStone(pokeIndex) {
     const target = roster[pokeIndex]
     if (!target) return false
@@ -102,5 +120,5 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     return <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
   }
 
-  return { applyVictory, evolveWithStone, render, evolutionNotices, evolutionChoices }
+  return { applyVictory, evolveWithStone, useRareCandy, render, evolutionNotices, evolutionChoices }
 }

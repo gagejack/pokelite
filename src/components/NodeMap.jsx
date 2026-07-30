@@ -1020,6 +1020,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       return
     }
+    // Rare Candy: levels the target and may evolve it. Kept only if the target
+    // is already at MAX_LEVEL, where the candy would do nothing.
+    if (item?.consumable === 'level') {
+      const used = await evo.useRareCandy(pokeIndex)
+      if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      else setNotice(`${roster[pokeIndex]?.name ?? 'That Pokémon'} is already max level`)
+      return
+    }
     onMoveItem?.({ item, from, to: { kind: 'pokemon', pokeIndex } })
   }
 
@@ -1450,6 +1458,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             // target on the spot and is used up, so it never gets equipped.
             if (item?.consumable === 'evolve') {
               await evo.evolveWithStone(pokemonIndex)
+            } else if (item?.consumable === 'level') {
+              await evo.useRareCandy(pokemonIndex)
             } else if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
               // Used straight from the offer. A no-op (full-HP target) still
               // clears the node — the player picked it from three; it simply
