@@ -10,9 +10,9 @@ import { supabase } from './supabase'
 import { regionNames } from '../game/regionRegistry'
 import { hashDateToSeed, pickDailyRegion } from '../game/dailyDerive.js'
 import { encodeSeed } from '../game/seed.js'
-import { bestOfFirst3, rankLeaderboard, SCORED_ATTEMPTS } from '../game/dailyScore.js'
+import { bestAttempt, rankLeaderboard, attemptsTaken } from '../game/dailyScore.js'
 
-export { bestOfFirst3, rankLeaderboard, SCORED_ATTEMPTS }
+export { bestAttempt, rankLeaderboard, attemptsTaken }
 
 // Current UTC day as "YYYY-MM-DD".
 export function todayUtc() {
@@ -37,12 +37,13 @@ export async function getTodayAttempts(userId, dateStr) {
   const used = data.length
   return {
     used,
-    best: bestOfFirst3(data),
+    best: bestAttempt(data),
   }
 }
 
-// Insert one finished-run attempt for `dailyDate`. Total attempts are unlimited;
-// only the first SCORED_ATTEMPTS are ranked (enforced in scoring, not here).
+// Insert one finished-run attempt for `dailyDate`. Attempts are unlimited and
+// EVERY one is scored — `attempt_no` is the tiebreaker between equal depths, so
+// the number still matters even though nothing is excluded.
 export async function submitAttempt({ userId, username, dailyDate, region, maps_cleared, elapsed_ms, starter }) {
   const { data, error: countErr } = await supabase
     .from('daily_attempts')
@@ -64,7 +65,7 @@ export async function submitAttempt({ userId, username, dailyDate, region, maps_
   return error ? { error: error.message } : { ok: true }
 }
 
-// The day's leaderboard (best-of-first-N per user, ranked), capped at `limit`.
+// The day's leaderboard (each user's best attempt, ranked), capped at `limit`.
 export async function getLeaderboard(dateStr, limit = 20) {
   const { data, error } = await supabase
     .from('daily_attempts')

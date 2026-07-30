@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { dailyFor, getTodayAttempts, getLeaderboard, SCORED_ATTEMPTS, todayUtc } from '../lib/daily.js'
+import { dailyFor, getTodayAttempts, getLeaderboard, todayUtc } from '../lib/daily.js'
 import { msUntilNextUtcDay } from '../game/dailyDerive.js'
 import SeedCodeChip from './SeedCodeChip'
 
@@ -23,12 +23,6 @@ function fmtCountdown(ms) {
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   return `${h}h ${m}m`
-}
-
-// Format elapsed ms as "M:SS".
-function fmtTime(ms) {
-  const s = Math.round(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 export default function DailyChallenge({ user, onPlay, onClose }) {
@@ -97,8 +91,10 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
             <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: text, textAlign: 'center' }}>
               Daily Seed
             </span>
+            {/* No date: the countdown already says which day this is, in the
+                only terms that matter here (how long you have left). */}
             <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
-              {date} · {daily.region} · resets in {fmtCountdown(countdown)}
+              {daily.region} · resets in {fmtCountdown(countdown)}
             </span>
             {/* Today's seed code, tap-to-copy (spec §3: the Daily view shows it
                 too). Nudged down a little to sit lower in the header. */}
@@ -117,17 +113,13 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
 
         {/* What this mode is. Sits under the header so it lands right after the
             seed chip it's describing, and above the play controls so a first-
-            time player reads the rules before the button.
-            Two sentences, two jobs: the first says everyone gets the same map,
-            the second says speed is what's scored. Kept to that — the attempt
-            count and reset timer are already on screen, and repeating them here
-            would make this a wall of text nobody reads twice. */}
+            time player reads the rules before the button. */}
         <span style={{
           fontFamily: 'Orange Kid', fontSize: '15px', color: text,
           textAlign: 'center', lineHeight: 1.4, opacity: 0.85,
         }}>
-          Everyone plays the same seed today — the same maps, the same
-          encounters. Race to clear it fastest.
+          Race to be the first to complete the Daily Seed. Complete it in the
+          fewest runs possible to score big on the leaderboard.
         </span>
 
         {/* Play controls are gated behind sign-in; the leaderboard below is
@@ -140,11 +132,15 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: cellBg, border, padding: '10px' }}>
               <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: text }}>
-                Attempt {used + 1} · unlimited plays (first {SCORED_ATTEMPTS} are scored)
+                Attempt {used + 1}
               </span>
+              {/* "on run N" rather than a time: the run number is the
+                  tiebreaker now, so this is the number that decides ties on
+                  the board below. Elapsed time is still recorded, just not
+                  what ranks you. */}
               <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: text }}>
                 Your best: {attempts?.best
-                  ? `${attempts.best.maps_cleared} maps · ${fmtTime(attempts.best.elapsed_ms)}`
+                  ? `${attempts.best.maps_cleared} maps on run ${attempts.best.attempt_no}`
                   : '—'}
               </span>
             </div>
@@ -200,8 +196,14 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {e.username ?? 'anon'}
                 </span>
+                {/* The two ranking columns, in ranking order: depth first,
+                    then the run that reached it. Elapsed time is recorded but
+                    no longer shown here — it doesn't affect standing, and a
+                    column that looks like a rank but isn't one misleads. */}
                 <span style={{ width: '60px', textAlign: 'right' }}>{e.maps_cleared} maps</span>
-                <span style={{ width: '48px', textAlign: 'right' }}>{fmtTime(e.elapsed_ms)}</span>
+                <span style={{ width: '56px', textAlign: 'right' }} title={`Scored on attempt ${e.attempt_no}`}>
+                  run {e.attempt_no}
+                </span>
               </div>
             )
           })}
