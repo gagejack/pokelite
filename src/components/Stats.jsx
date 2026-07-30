@@ -8,6 +8,7 @@ import LoginModal from './LoginModal'
 import BalanceDashboard from './BalanceDashboard'
 import LevelBar from './LevelBar'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
+import { TYPE_COLORS } from '../game/types.js'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
@@ -232,42 +233,136 @@ export default function Stats({ onClose, role = null }) {
             <BalanceDashboard />
           ) : tab === 'halloffame' ? (
             <div className="flex flex-col gap-6">
-              <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
-                Hall of Fame — Winning Teams
-              </span>
+              {/* "Winning Teams" was doing the subtitle's job inside the
+                  title. The count is the more useful second line: it says how
+                  many trophies are in the case. */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor }}>
+                  Hall of Fame
+                </span>
+                {stats?.winRosters?.length > 0 && (
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
+                    {stats.winRosters.length === 1 ? 'One winning team' : `${stats.winRosters.length} winning teams`}
+                  </span>
+                )}
+              </div>
               {(!stats?.winRosters || stats.winRosters.length === 0) ? (
-                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '14px' : '12px', color: mutedColor, textAlign: 'center' }}>
-                  No wins yet. Complete a run to see your team here!
+                // An empty case is an invitation, not an error — so it says
+                // what lands a team here rather than apologising for the gap.
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor, textAlign: 'center', lineHeight: 1.4 }}>
+                  Beat the Champion and the team that did it is enshrined here.
                 </span>
               ) : (
                 stats.winRosters.map((roster, i) => (
                   <div key={i} style={{
                     backgroundColor: innerBg, border: panelBorder,
                     boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                    padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
+                    padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
                   }}>
                     <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: '#facc15' }}>
                       Win #{i + 1}
                     </span>
-                    <div style={{ display: 'flex', gap: isDesktop ? '10px' : '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {roster.map(p => (
-                        <div key={p.id} style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                          width: isDesktop ? '116px' : '86px',
-                        }}>
-                          <img
-                            src={SPRITE(p.id)}
-                            alt={p.name}
-                            style={{ width: isDesktop ? '84px' : '60px', height: isDesktop ? '84px' : '60px', imageRendering: 'pixelated' }}
-                          />
-                          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '13px' : '11px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>
-                            {p.name}
-                          </span>
-                          <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '11px' : '10px', color: '#facc15' }}>
-                            LVL {p.level}
-                          </span>
-                        </div>
-                      ))}
+                    {/* Three across on desktop, two on mobile. A fixed count
+                        rather than wrapping: six Pokémon divide evenly into
+                        both, so no card is ever left orphaned on its own row
+                        the way flex-wrap leaves them. */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
+                      gap: '8px',
+                    }}>
+                      {roster.map((p, j) => {
+                        // Ending the run at 0 HP is the most commemorative fact
+                        // this screen can carry — you won the champion fight with
+                        // this one down — and it was previously invisible.
+                        const fainted = p.stats?.hp === 0
+                        return (
+                          <div
+                            key={`${p.id}-${j}`}
+                            style={{
+                              backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                              // Shiny gets the epic-tier purple; fainted a muted
+                              // red. Otherwise the standard panel border.
+                              border: p.shiny ? '2px solid #a855f7'
+                                : fainted ? `2px solid ${dark ? '#7f1d1d' : '#b91c1c'}`
+                                : panelBorder,
+                              padding: '8px 6px',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                              minWidth: 0,
+                            }}
+                          >
+                            {/* Shiny sprite for shinies — SHINY_SPRITE already
+                                existed in this file and the Pokédex below uses
+                                it, but the Hall of Fame drew every winner in its
+                                normal colours. A shiny on a winning team is the
+                                rarest thing this screen can show. */}
+                            <img
+                              src={p.shiny ? SHINY_SPRITE(p.id) : SPRITE(p.id)}
+                              alt={p.name}
+                              style={{
+                                width: isDesktop ? '72px' : '56px',
+                                height: isDesktop ? '72px' : '56px',
+                                imageRendering: 'pixelated',
+                                // Fainted reads at a glance without hiding the
+                                // sprite — it earned its place on this team.
+                                filter: fainted ? 'grayscale(0.7)' : 'none',
+                                opacity: fainted ? 0.75 : 1,
+                              }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', maxWidth: '100%' }}>
+                              <span style={{
+                                fontFamily: 'Upheaval', fontSize: isDesktop ? '14px' : '13px', color: textColor,
+                                textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                              }}>
+                                {p.name}
+                              </span>
+                              {p.shiny && (
+                                <span title="Shiny" style={{ fontSize: '13px', color: '#a855f7', flexShrink: 0 }}>✦</span>
+                              )}
+                            </div>
+                            {/* Type chips — the same colours and shape the
+                                battle and roster cards use, so a team reads the
+                                same way here as it did in play. */}
+                            <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {(p.types ?? []).map(t => (
+                                <span key={t} style={{
+                                  fontFamily: 'Upheaval', fontSize: '12px', color: '#fff',
+                                  backgroundColor: TYPE_COLORS[t] ?? '#888',
+                                  padding: '1px 5px', textTransform: 'capitalize',
+                                }}>
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                            <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15' }}>
+                              {fainted ? 'FAINTED' : `LV ${p.level}`}
+                            </span>
+                            {/* Move and held item. Stored on every winning
+                                roster since the feature shipped and never shown
+                                until now — they are what made this team beat the
+                                game, and a trophy case that omits them is a list
+                                of names. Moves are kebab-case in the database. */}
+                            {p.move && (
+                              <span style={{
+                                fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor,
+                                textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.2,
+                                overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
+                              }}>
+                                {p.move.replace(/-/g, ' ')}
+                              </span>
+                            )}
+                            {p.item && (
+                              <span style={{
+                                fontFamily: 'Orange Kid', fontSize: '13px', color: cash(dark),
+                                textAlign: 'center', lineHeight: 1.2,
+                                overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
+                              }}>
+                                {p.item}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 ))
