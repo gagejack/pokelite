@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
 import LoginModal from './LoginModal'
 import BalanceDashboard from './BalanceDashboard'
+import LevelBar from './LevelBar'
+import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
@@ -86,7 +88,10 @@ export default function Stats({ onClose, role = null }) {
       // Lifetime Speed Cash EARNED across every recorded run — purchases never
       // reduce it (App tracks earned separately from the spendable balance).
       // `?? 0` covers runs recorded before the column existed.
-      const totalCashEarned = rows.reduce((s, r) => s + (r.speed_cash_earned ?? 0), 0)
+      const totalCashEarned = sumSpeedCashEarned(rows)
+      // Account level is derived from that same lifetime total — XP IS the cash
+      // earned, so there is nothing extra to fetch.
+      const levelInfo = levelForXp(totalCashEarned)
 
       // Unique caught species across all runs → per-region completion.
       const caught = new Set()
@@ -124,7 +129,7 @@ export default function Stats({ onClose, role = null }) {
         .filter(r => r.result === 'win' && r.winning_roster)
         .map(r => r.winning_roster)
 
-      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, totalCashEarned, regions, legendaries, shinies, winRosters })
+      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, totalCashEarned, levelInfo, regions, legendaries, shinies, winRosters })
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -270,6 +275,37 @@ export default function Stats({ onClose, role = null }) {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
+              {/* Account level — a full-width panel above the tiles, not a
+                  ninth tile in them. The level is what the tallies below add
+                  up to, so it reads as a summary rather than a peer; and the
+                  progress bar needs width a ~square grid cell can't give it.
+                  Inlined markup (not the <Stat> helper) because
+                  react-hooks/static-components fires once per <Stat> call
+                  site, and another call would grow this file's 9-error
+                  baseline — the same reason the Speed Cash tile below is
+                  inlined. */}
+              <div style={{
+                backgroundColor: innerBg, border: panelBorder,
+                boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '28px' : '22px', color: '#facc15' }}>
+                    LV {stats.levelInfo.level}
+                  </span>
+                  {/* The REMAINING XP (xpForNext - xpIntoLevel), not the XP
+                      earned into the level. Both are on hand and mixing them
+                      up is the easy mistake here — at 12,740 this reads 860,
+                      not 740. */}
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
+                    {stats.levelInfo.xpForNext === 0
+                      ? 'Max level'
+                      : `${(stats.levelInfo.xpForNext - stats.levelInfo.xpIntoLevel).toLocaleString()} XP to level ${stats.levelInfo.level + 1}`}
+                  </span>
+                </div>
+                <LevelBar progress={stats.levelInfo.progress} dark={dark} height="10px" />
+              </div>
+
               {/* Run stats */}
               <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)', gap: '8px' }}>
                 <Stat label="Total Runs" value={stats.totalRuns} />

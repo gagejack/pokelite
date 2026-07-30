@@ -47,3 +47,10 @@ export function levelForXp(xp) {
     progress: atMax ? 1 : xpIntoLevel / xpForNext,
   }
 }
+
+// Sum lifetime XP from `runs` rows. Every caller does the same reduce over the
+// same column, so it lives here beside the curve rather than being copied into
+// each surface. `?? 0` covers runs recorded before speed_cash_earned existed.
+export function sumSpeedCashEarned(rows) {
+  return (rows ?? []).reduce((sum, r) => sum + (r.speed_cash_earned ?? 0), 0)
+}
