@@ -83,6 +83,20 @@ export const BALANCE = deepFreeze({
     autoEvolveNonLevel: [133], // Eevee — the only non-level evo that auto-triggers
   },
 
+  // ── Account levels (game/level.js) ───────────────────────────────────────
+  // Lifetime XP is SUM(runs.speed_cash_earned) — the same number the Stats
+  // page already shows. Leaving level n costs n * xpPerLevelStep, so total XP
+  // to reach level L is step * L(L-1)/2.
+  //
+  // At 100: level 2 costs 100, level 50 sits at 122,500, level 100 at 495,000
+  // (~216 winning runs at ~$2,300 a win). Tuned so every finished run levels a
+  // new player up — even a first-map death earns ~$296 and clears level 2 —
+  // because a progression number has to move on the first run to be believed.
+  //
+  // This multiplier scales every threshold linearly, so it is the one knob to
+  // turn if pacing needs work. Do not reshape the curve.
+  levels: { maxLevel: 100, xpPerLevelStep: 100 },
+
   // ── XP / level rewards (component victory handlers) ──────────────────────
   progression: {
     levelsGained: { grass: 1, default: 2, rival: 4, eliteFour: 2 },
