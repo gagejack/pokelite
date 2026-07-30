@@ -103,7 +103,7 @@ export const ITEMS = [
   // --- Epic ---
   { id: 'life_orb',       name: 'Life Orb',       description: '+30% damage on all moves',                 tier: 'epic',     icon: 'life-orb' },
   { id: 'razor_claw',     name: 'Razor Claw',     description: '+60% crit rate',                           tier: 'epic',     icon: 'razor-claw' },
-  { id: 'bright_powder',  name: 'Bright Powder',  description: '15% chance an incoming hit is halved',     tier: 'epic',     icon: 'bright-powder' },
+  { id: 'bright_powder',  name: 'Bright Powder',  description: '20% chance an incoming hit is halved',     tier: 'epic',     icon: 'bright-powder' },
   { id: 'eviolite',       name: 'Eviolite',       description: 'Takes 33% less damage from all moves',     tier: 'epic',     icon: 'eviolite' },
   { id: 'cell_battery',   name: 'Cell Battery',   description: '+30% damage after it is first hit',        tier: 'epic',     icon: 'cell-battery' },
   { id: 'kings_rock',     name: "King's Rock",    description: 'Critical hits deal 100% more damage',      tier: 'epic',     icon: 'kings-rock' },

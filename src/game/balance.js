@@ -222,7 +222,7 @@ export const BALANCE = deepFreeze({
       typePlate: 1.5,
       weaknessPolicy: 1.5,
       cellBattery: 1.3,
-      brightPowderChance: 0.15,
+      brightPowderChance: 0.20,
       brightPowderFactor: 0.5,
       resistCharm: 0.5,
       shellBellHeal: 0.2,       // heals this fraction of damage dealt

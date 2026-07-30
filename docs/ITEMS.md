@@ -128,7 +128,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 |---|---|---|---|
 | `life_orb` | Life Orb | +30% damage on all moves | `lifeOrb` ×1.3 |
 | `razor_claw` | Razor Claw | +60% crit rate | `razorClawCrit` ×1.6 |
-| `bright_powder` | Bright Powder | 15% chance an incoming hit is halved | `brightPowderChance` 0.15, `brightPowderFactor` 0.5 |
+| `bright_powder` | Bright Powder | 20% chance an incoming hit is halved | `brightPowderChance` 0.20, `brightPowderFactor` 0.5 |
 | `eviolite` | Eviolite | Takes 33% less damage from all moves | `eviolite` def ×1.5 |
 | `cell_battery` | Cell Battery | +30% damage after it is first hit | `cellBattery` ×1.3 |
 | `kings_rock` | King's Rock | Critical hits deal 100% more damage | `kingsRockCritFactor` 2/1.5 |
