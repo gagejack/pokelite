@@ -337,14 +337,16 @@ export default function Stats({ onClose, role = null }) {
                                 </span>
                               ))}
                             </div>
-                            {/* Drop shadow, offset down-right. Yellow on the
-                                light-theme panel is thin on its own; the shadow
-                                lifts it off the card without the hard outline
-                                the battle screen uses over sprites. */}
+                            {/* Blurred drop shadow, offset down-right. Yellow on
+                                the light-theme panel is thin on its own; the
+                                shadow lifts it off the card without the hard
+                                outline the battle screen uses over sprites.
+                                3px of blur — enough to read as a soft shadow,
+                                short of the halo that swallows a 12px glyph. */}
                             <span style={{
                               fontFamily: 'Upheaval', fontSize: '12px',
                               color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15',
-                              textShadow: '1px 2px 0 rgba(0,0,0,0.55)',
+                              textShadow: '1px 2px 3px rgba(0,0,0,0.6)',
                             }}>
                               {fainted ? 'FAINTED' : `LV ${p.level}`}
                             </span>
