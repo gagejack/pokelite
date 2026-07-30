@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted, cash, TEXT_OUTLINE } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
@@ -322,20 +322,14 @@ export default function Stats({ onClose, role = null }) {
                             </div>
                             {/* Type chips — same colours and shape the battle
                                 and roster cards use, so a team reads the same
-                                way here as it did in play.
-                                Orange Kid with a black outline rather than flat
-                                Upheaval. It also fixes a contrast problem: white
-                                on the type hues runs as low as 1.49:1 (electric
-                                #F8D030) and no single text colour clears AA on
-                                all eighteen, but an outlined glyph is bounded by
-                                black whatever sits behind it. 14px because
-                                Orange Kid renders smaller than Upheaval at the
-                                same size. */}
+                                way here as it did in play. Orange Kid at 14px,
+                                which is larger than the Upheaval it replaces
+                                because Orange Kid renders smaller at the same
+                                size. */}
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {(p.types ?? []).map(t => (
                                 <span key={t} style={{
                                   fontFamily: 'Orange Kid', fontSize: '14px', color: '#fff',
-                                  textShadow: TEXT_OUTLINE,
                                   backgroundColor: TYPE_COLORS[t] ?? '#888',
                                   padding: '0 5px', textTransform: 'capitalize',
                                 }}>
@@ -343,14 +337,14 @@ export default function Stats({ onClose, role = null }) {
                                 </span>
                               ))}
                             </div>
-                            {/* Outlined like the level numbers over sprites in
-                                battle: yellow on the light-theme panel is weak
-                                on its own, and the black edge makes it read on
-                                either theme without a second colour. */}
+                            {/* Drop shadow, offset down-right. Yellow on the
+                                light-theme panel is thin on its own; the shadow
+                                lifts it off the card without the hard outline
+                                the battle screen uses over sprites. */}
                             <span style={{
                               fontFamily: 'Upheaval', fontSize: '12px',
-                              color: fainted ? '#f87171' : '#facc15',
-                              textShadow: TEXT_OUTLINE,
+                              color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15',
+                              textShadow: '1px 2px 0 rgba(0,0,0,0.55)',
                             }}>
                               {fainted ? 'FAINTED' : `LV ${p.level}`}
                             </span>
