@@ -11,7 +11,7 @@ when the two disagree, the code is right and this file needs updating.
 > a `weight` column that does not exist, and no mention of the 18 generated
 > type-boost plates.
 
-**Last verified:** 2026-07-26 — every multiplier below was checked against its
+**Last verified:** 2026-07-30 — every multiplier below was checked against its
 implementation, and every description against its actual effect.
 
 ---
@@ -32,12 +32,12 @@ budget. See `itemWeight()` in `items.js:119`.
 | Tier | Budget | Items | Each | Border color |
 |---|---|---|---|---|
 | common | 60% | 24 | **2.50%** | `#9ca3af` grey |
-| rare | 25% | 11 | **2.27%** | `#3b82f6` blue |
+| rare | 25% | 12 | **2.08%** | `#3b82f6` blue |
 | epic | 10% | 6 | **1.67%** | `#a855f7` purple |
-| legendary | 5% | 5 | **1.00%** | `#facc15` yellow |
+| legendary | 5% | 4 | **1.25%** | `#facc15` yellow |
 
 > **Counterintuitive but correct:** a *common* item is individually rarer than a
-> *rare* one (2.50% vs 2.27%), because the 18 type plates dilute the common
+> *rare* one (2.50% vs 2.08%), because the 18 type plates dilute the common
 > tier. The tier names describe the tier's total share, not per-item odds.
 
 Adding an item to a tier makes every existing item in that tier proportionally
@@ -103,7 +103,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Rare (11 items, 2.27% each)
+## Rare (12 items, 2.08% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
@@ -118,6 +118,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 | `black_sludge` | Black Sludge | Restores 12% max HP each turn | `passiveHeal.blackSludge` 0.12 |
 | `max_heal` | Max Heal | Restores one Pokémon to full HP | **Consumable** — `consumable: 'heal'` |
 | `max_revive` | Max Revive | Revives a fainted Pokémon at full HP; full-heals a healthy one | **Consumable** — `consumable: 'revive'` |
+| `evolve_stone` | Moon Stone | Instantly evolves the Pokémon it is given to | **Consumable** — `consumable: 'evolve'` |
 
 ---
 
@@ -134,14 +135,13 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Legendary (5 items, 1.00% each)
+## Legendary (4 items, 1.25% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
 | `focus_sash` | Focus Sash | Survive any KO hit at full HP | Once per battle, at full HP only |
-| `weakness_policy` | Weakness Policy | +50% damage after a super-effective hit | `weaknessPolicy` ×1.5 |
+| `weakness_policy` | Weakness Policy | Super-effective moves deal 50% more damage | `weaknessPolicy` ×1.5 when `effectiveness > 1` |
 | `resist_charm` | Resist Charm | Super-effective hits deal 50% less damage | `resistCharm` ×0.5 (icon: `chople-berry`) |
-| `evolve_stone` | Moon Stone | Instantly evolves the Pokémon it is given to | **Consumable** — `consumable: 'evolve'` |
 | `mega_revive` | Mega Revive | Revives and fully heals the whole roster | **Consumable** — `consumable: 'revive_all'` |
 
 ---

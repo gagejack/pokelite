@@ -35,8 +35,8 @@ function effSpeed(p) {
 
 // Gen 5 damage formula with critical hits (1/16 chance, 1.5x, ignores defense drops).
 // Held-item effects are applied here for whichever side holds them — see the
-// per-item branches below. Attacker-side flags (`_wpActive`, `_cellActive`) are
-// set elsewhere in the loop and read here as persistent damage bonuses.
+// per-item branches below. The attacker-side flag `_cellActive` is set
+// elsewhere in the loop and read here as a persistent damage bonus.
 // `damageMultiplier` is the ATTACKER's multiplier — the caller passes the
 // player's or the enemy's depending on who is swinging (see simulateBattle).
 // Asymmetric values are the difficulty knob: a lower enemy multiplier makes the
@@ -79,9 +79,11 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   if (aItem === 'kings_rock' && crit) itemDmg *= HI.kingsRockCritFactor
   // Type-boost plates — damage boost when the move's type matches the plate.
   if (attacker.heldItem?.boostType && attacker.heldItem.boostType === move.type) itemDmg *= HI.typePlate
+  // Weakness Policy — the attacking mirror of Resist Charm below: it scales the
+  // hits Resist Charm blunts. Always on, no trigger.
+  if (aItem === 'weakness_policy' && effectiveness > 1) itemDmg *= HI.weaknessPolicy
   // Persistent bonuses granted after a trigger earlier in the battle.
-  if (aItem === 'weakness_policy' && attacker._wpActive)  itemDmg *= HI.weaknessPolicy
-  if (aItem === 'cell_battery'   && attacker._cellActive) itemDmg *= HI.cellBattery
+  if (aItem === 'cell_battery' && attacker._cellActive) itemDmg *= HI.cellBattery
 
   // Bright Powder — chance an incoming hit is halved.
   let defDmg = 1
@@ -190,12 +192,6 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
       if (itemId(defender) === 'cell_battery' && damage > 0 && !defender._cellActive) {
         defender._cellActive = true
       }
-      // Weakness Policy — after taking a super-effective hit, gain +50% damage
-      // for the rest of the battle.
-      if (itemId(defender) === 'weakness_policy' && damage > 0 && effectiveness > 1 && !defender._wpActive) {
-        defender._wpActive = true
-      }
-
       // Sitrus Berry — once per battle, heal 25% max HP the first time the
       // holder drops below 50% (and survives).
       if (itemId(defender) === 'sitrus_berry' && !defender._sitrusUsed && !defender.fainted

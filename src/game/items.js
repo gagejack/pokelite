@@ -84,11 +84,21 @@ export const ITEMS = [
   { id: 'iron_ball',      name: 'Iron Ball',      description: '+35% damage dealt, but −40% Speed',        tier: 'rare', icon: 'iron-ball' },
   { id: 'shell_bell',     name: 'Shell Bell',     description: 'Restores HP = 20% of damage dealt',        tier: 'rare', icon: 'shell-bell' },
   { id: 'black_sludge',   name: 'Black Sludge',   description: 'Restores 12% max HP each turn',            tier: 'rare', icon: 'black-sludge' },
-  // Consumables, NOT held items — same mechanism as the Evolve Stone (see the
-  // note in Legendary below). Max Revive doubles as a full heal on a healthy
+  // Consumables, NOT held items. Max Revive doubles as a full heal on a healthy
   // target so a mis-drop is never wasted.
   { id: 'max_heal',       name: 'Max Heal',       description: 'Restores one Pokémon to full HP',          tier: 'rare', icon: 'max-potion', consumable: 'heal' },
   { id: 'max_revive',     name: 'Max Revive',     description: 'Revives a fainted Pokémon at full HP',     tier: 'rare', icon: 'max-revive', consumable: 'revive' },
+  // Applying it evolves the Pokémon on the spot (any level, stone/friendship
+  // evolutions included) and the stone is used up. `consumable: 'evolve'` is
+  // what the UI keys off — see handleItemAssign in App.jsx. It never reaches
+  // battle, so battle.js needs no case for it.
+  //
+  // Rare rather than legendary: it accelerates a Pokémon you already have
+  // rather than changing how a fight resolves, which is a smaller effect than
+  // anything else that was sharing the top tier with it. The move roughly
+  // doubles its draw rate (1.00% → 2.08%) and lifts each remaining legendary
+  // from 1.00% to 1.25%.
+  { id: 'evolve_stone',   name: 'Moon Stone',     description: 'Instantly evolves the Pokémon it is given to', tier: 'rare', icon: 'moon-stone', consumable: 'evolve' },
 
   // --- Epic ---
   { id: 'life_orb',       name: 'Life Orb',       description: '+30% damage on all moves',                 tier: 'epic',     icon: 'life-orb' },
@@ -100,13 +110,15 @@ export const ITEMS = [
 
   // --- Legendary ---
   { id: 'focus_sash',     name: 'Focus Sash',     description: 'Survive any KO hit at full HP',            tier: 'legendary',     icon: 'focus-sash' },
-  { id: 'weakness_policy',name: 'Weakness Policy',description: '+50% damage after a super-effective hit',  tier: 'legendary',     icon: 'weakness-policy' },
+  // The mirror of Resist Charm below: one makes type weaknesses hurt more, the
+  // other makes them hurt less, and between them the legendary tier is about
+  // type matchups.
+  //
+  // Was "+50% damage AFTER taking a super-effective hit" — a stateful buff that
+  // did nothing until you were already losing, and that the player had no way
+  // to see was active. Always-on needs no flag and no explanation.
+  { id: 'weakness_policy',name: 'Weakness Policy',description: 'Super-effective moves deal 50% more damage', tier: 'legendary',   icon: 'weakness-policy' },
   { id: 'resist_charm',   name: 'Resist Charm',   description: 'Super-effective hits deal 50% less damage', tier: 'legendary',    icon: 'chople-berry' },
-  // Consumable, NOT a held item: applying it evolves the Pokémon on the spot
-  // (any level, stone/friendship evolutions included) and the stone is used up.
-  // `consumable: 'evolve'` is what the UI keys off — see handleItemAssign in
-  // App.jsx. It never reaches battle, so battle.js needs no case for it.
-  { id: 'evolve_stone',   name: 'Moon Stone',     description: 'Instantly evolves the Pokémon it is given to', tier: 'legendary', icon: 'moon-stone', consumable: 'evolve' },
   // Ignores its drop target — always applies to the whole roster.
   { id: 'mega_revive',    name: 'Mega Revive',    description: 'Revives and fully heals the whole team', tier: 'legendary', icon: 'sacred-ash', consumable: 'revive_all' },
 
