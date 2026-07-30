@@ -337,16 +337,20 @@ export default function Stats({ onClose, role = null }) {
                                 </span>
                               ))}
                             </div>
-                            {/* Blurred drop shadow, offset down-right. Yellow on
-                                the light-theme panel is thin on its own; the
-                                shadow lifts it off the card without the hard
-                                outline the battle screen uses over sprites.
-                                3px of blur — enough to read as a soft shadow,
-                                short of the halo that swallows a 12px glyph. */}
+                            {/* A legibility halo, not a visible shadow. Yellow
+                                is thin on the light-theme panel, so it needs
+                                something behind it — but anything you can point
+                                at is decoration on a 12px label.
+                                Zero offset and 6px of blur puts the darkening
+                                evenly behind the glyph instead of beside it, and
+                                two stacked passes at low alpha build density at
+                                the edges without any one of them reading as an
+                                object. Net effect: the text is easier to read
+                                and nothing looks added. */}
                             <span style={{
                               fontFamily: 'Upheaval', fontSize: '12px',
                               color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15',
-                              textShadow: '1px 2px 3px rgba(0,0,0,0.6)',
+                              textShadow: '0 0 6px rgba(0,0,0,0.45), 0 0 3px rgba(0,0,0,0.35)',
                             }}>
                               {fainted ? 'FAINTED' : `LV ${p.level}`}
                             </span>
