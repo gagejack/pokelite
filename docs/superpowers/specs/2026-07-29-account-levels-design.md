@@ -166,15 +166,137 @@ sum. If a second consumer appears, the sum should move into a shared helper in
 `src/lib/` rather than being re-queried per component — but that is a
 refactor to make when the second consumer exists, not before.
 
+### 7. Where the level appears
+
+Three surfaces. The nav bar and map HUD are deliberately excluded: levels are
+meta-progression and a run is not, so putting a number you cannot change this
+run beside numbers that only matter right now devalues both.
+
+**The XP bar is shared.** Two of the three surfaces show progress toward the next
+level, so it belongs in one component — `src/components/LevelBar.jsx` — rather
+than being rebuilt twice. It takes `progress` (0..1) and a height, and uses the
+`twoTone(STAT_BAR_LIGHT, STAT_BAR_DARK)` treatment the roster stat bars already
+use. Those two constants are currently module-private in `Roster.jsx:17-18`; they
+move to `src/lib/colors.js` beside `muted()` and `cash()` so both consumers read
+one definition.
+
+**1. Stats page** — a tile plus a bar.
+
+The existing tile grid gains a level tile showing `LV 16`, and a full-width XP
+bar sits directly beneath the grid with the remaining XP as its label:
+
+```
+┌──────────┬──────────┬──────────┐
+│    43    │    12    │   16     │
+│  Total   │   Wins   │  Level   │
+│   Runs   │          │          │
+└──────────┴──────────┴──────────┘
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░
+860 XP to level 17
+```
+
+(Figures are the real 12,740 lifetime cash: level 16, 740 XP into a 1,600 XP
+step, so 46% filled with 860 to go.)
+
+The bar goes below the grid rather than inside the tile because a tile is
+square-ish and a progress bar wants width — and because this bar summarizes the
+whole page, which no single tile should.
+
+**Note on the tile:** `react-hooks/static-components` fires once per `<Stat>`
+call site, so an additional `<Stat>` grows this file's lint baseline. The Speed
+Cash tile at `Stats.jsx:282` is inlined for exactly this reason; the level tile
+follows that precedent and is inlined too, with a comment pointing at the same
+rule.
+
+**2. Desktop calling card** — the level joins the identity header, not the stats.
+
+`RUNS`, `BEST`, and `SHINY` are things the player did. The level is what those
+things made them, so filing it as a fourth row would bury the one number meant
+to summarize the others. It goes in the yellow header band beside the username,
+with the XP bar spanning the full card width immediately below:
+
+```
+┌────────────────────────────┐
+│  GAGE                  16  │   yellow band, level right-aligned
+├────────────────────────────┤
+│  ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░   │   4px, full width
+│  RUNS                  43  │
+│  BEST              6 maps  │
+│  SHINY                  2  │
+└────────────────────────────┘
+```
+
+The bar is the only continuous element on a card otherwise made entirely of
+discrete numbers, which is what makes the level read as momentum rather than one
+more tally.
+
+Cost: `CallingCard`'s existing runs query becomes
+`.select('maps_cleared, speed_cash_earned')`. No new request.
+
+Signed out, the level shows `—` like every other field, so the layout never
+reflows between states.
+
+**3. Daily Seed leaderboard** — a `LV n` badge immediately left of the username.
+
+Left of the name rather than as a new right-hand column: the level is identity,
+and the two right-hand columns (`maps`, `run n`) are the ranking, which the level
+does not affect. Putting it among them would imply it ranks.
+
+The row already carries rank, medal, sprite, name, maps, and run at 14px. The
+badge costs ~34px, absorbed by the `flex: 1` name column. It does **not** show
+on mobile widths — see the risk below.
+
+### 8. The leaderboard needs a server-side level
+
+**This is the one part of the feature that cannot be derived client-side.**
+
+`runs` is protected by `runs_select_own` (`auth.uid() = user_id`), so a client
+can sum its own cash and no one else's. `daily_attempts` is publicly readable,
+which is why the board works at all — but it has no cash column, and adding one
+would duplicate data that already exists.
+
+**Solution: a `SECURITY DEFINER` RPC returning level only.**
+
+```sql
+create or replace function public.user_levels(p_user_ids uuid[])
+returns table (user_id uuid, xp bigint)
+language sql
+security definer
+set search_path = public
+as $$
+  select r.user_id, coalesce(sum(r.speed_cash_earned), 0)::bigint
+  from public.runs r
+  where r.user_id = any(p_user_ids)
+  group by r.user_id
+$$;
+```
+
+It returns **XP, not cash rows** — one aggregate integer per user, for a caller-
+supplied set of ids. The client maps XP through `levelForXp`, so the curve stays
+in one place (`level.js`) and a tuning change needs no migration.
+
+Precedent: `increment_badge` and the `username_auth.sql` functions already use
+`SECURITY DEFINER` in this project.
+
+**Why not the alternatives.** A public view of `(user_id, total_cash)` publishes
+everyone's lifetime earnings, which is strictly more than the feature needs. A
+stored `profiles.level` column abandons §2's derived-only decision and
+reintroduces the drift it exists to prevent.
+
+`getLeaderboard` calls this once with the ids it already fetched — one extra
+round trip per leaderboard load, not one per row.
+
 ## What this does NOT include
 
-- **Any UI.** No badge, no bar, no level-up notification. Separate design.
 - **Rewards.** Levels unlock nothing. They are a number that goes up.
 - **Guest levels.** Requires local storage and a merge story on sign-in.
 - **XP from non-cash sources.** Requires stored XP.
 - **Level-up detection.** Nothing knows the moment a level is crossed, because
-  nothing stores the previous level. A "You reached level 12" moment needs a
-  stored high-water mark and belongs with the UI spec.
+  nothing stores the previous level. A "You reached level 17" moment needs a
+  stored high-water mark and is a separate design.
+- **Mobile calling card.** The CallingCard is desktop-only; mobile's menu is the
+  stacked button column and has no equivalent surface. Mobile players see their
+  level on the Stats page, which both platforms share.
 
 ## Risks
 
@@ -190,9 +312,25 @@ refactor to make when the second consumer exists, not before.
    retroactively raises the level of anyone who ever beat one. That is the
    correct behaviour for a derived value, but it does mean economy changes are
    also progression changes.
-4. **Nothing surfaces the level yet.** Shipping derivation with no display means
-   the feature is invisible until the UI spec lands — deliberate, but it means
-   this cannot be play-tested on its own beyond a console check.
+4. **The RPC is the one privileged surface.** `SECURITY DEFINER` bypasses RLS by
+   design, so a bug there leaks more than a bug elsewhere. Mitigated by shape:
+   it returns a single aggregate integer per user for a caller-supplied id list,
+   never rows, never cash-per-run, and it cannot be coerced into returning
+   anything else. `set search_path = public` is not optional — without it a
+   definer function can be hijacked by a caller-controlled search path.
+5. **The leaderboard's level does not survive a stale RPC.** If the call fails,
+   the board must still render with levels omitted rather than showing zeros — a
+   `LV 1` on every row is worse than no badge, because it reads as data rather
+   than as a failure.
+6. **The leaderboard row is at its width limit.** Rank, medal, sprite, name,
+   maps, and run already share 14px rows inside a 440px modal. The badge is
+   dropped on mobile widths rather than shrinking the name to an ellipsis; if
+   even desktop feels tight in practice, the badge is the thing to cut, not the
+   ranking columns.
+7. **Two surfaces show the same level from different queries.** Stats sums the
+   client's own rows; the leaderboard reads the RPC. They should always agree,
+   but they are separate paths — if they ever disagree, the RPC is authoritative
+   and the client sum is the one to suspect.
 
 ## Verification
 
@@ -211,4 +349,24 @@ module.
 9. Every level from 1 to 100: `levelForXp(xpToReach(n)).level === n`, and
    `levelForXp(xpToReach(n) - 1).level === n - 1`. This round-trip is the real
    test — it catches every off-by-one in one pass.
-10. Stats page shows a level consistent with its own displayed lifetime cash.
+
+Then, per surface:
+
+10. **Stats page** shows a level consistent with its own displayed lifetime cash,
+    and the bar's fill matches `progress` (a level just reached reads near-empty,
+    not near-full — the classic off-by-one here is filling from the wrong end).
+11. **Stats bar label** reads the REMAINING XP, not the XP earned into the level:
+    at 12,740 it says "860 XP to level 17", not "740". Both numbers are available
+    from `levelForXp` and mixing them up is the easy mistake — `xpForNext -
+    xpIntoLevel`, not `xpIntoLevel`.
+12. **Calling card** shows the same level as the Stats page for the same account.
+    Signed out, it shows `—` and the layout does not reflow.
+13. **Leaderboard** shows a level for every row, including other players — this
+    is what proves the RPC works, since RLS makes it impossible client-side.
+14. **RPC returns nothing for an empty id array** and does not error.
+15. **RPC failure degrades gracefully**: kill the call and confirm the board
+    still renders with no badges rather than `LV 1` everywhere.
+16. **A user with no runs** resolves to level 1, not a missing row that renders
+    blank — `coalesce` in the SQL plus the client's own `?? 0`.
+17. **375px width**: the leaderboard row drops the badge without ellipsising the
+    username.
