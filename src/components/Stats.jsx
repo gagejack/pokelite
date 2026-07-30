@@ -9,35 +9,39 @@ import BalanceDashboard from './BalanceDashboard'
 import LevelBar from './LevelBar'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 import { TYPE_COLORS } from '../game/types.js'
+import { REGION_STARTERS } from '../game/starters.js'
+
+// Every region's three starters, flattened. The top-caught list excludes them:
+// a starter is chosen, not caught, so counting it would answer a different
+// question than the one that list asks.
+const STARTER_IDS = new Set(Object.values(REGION_STARTERS).flat())
+
+// The fifteen starters by name. A literal table rather than pokemon.js's
+// cachedName(), which only answers once the species cache is warm — Stats can
+// open before any run has populated it, and a starter with no name is worse
+// than no starter panel.
+const STARTER_NAMES = {
+  1: 'Bulbasaur',  4: 'Charmander', 7: 'Squirtle',
+  152: 'Chikorita', 155: 'Cyndaquil', 158: 'Totodile',
+  252: 'Treecko',  255: 'Torchic',  258: 'Mudkip',
+  387: 'Turtwig',  390: 'Chimchar', 393: 'Piplup',
+  495: 'Snivy',    498: 'Tepig',    501: 'Oshawott',
+}
+
+// Run length as "12m 04s", or "1h 05m" once it passes the hour. Minutes are the
+// unit a run is actually felt in, so seconds drop off rather than crowd the
+// hour. Returns null for runs recorded before elapsed_ms existed.
+function fmtRunTime(ms) {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return null
+  const total = Math.round(ms / 1000)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(s).padStart(2, '0')}s`
+}
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
-
-// Region → national-dex id range (matches the Pokédex gen ranges). Used for the
-// per-region completion rows.
-const REGION_RANGES = {
-  Kanto:  { offset: 0,   limit: 151 },
-  Johto:  { offset: 151, limit: 100 },
-  Hoenn:  { offset: 251, limit: 135 },
-  Sinnoh: { offset: 386, limit: 107 },
-  Unova:  { offset: 493, limit: 156 },
-}
-
-// Per-region completion-bar color, drawn from each region's version-game
-// identity. Each is one hue in two monochrome shades: `light` fills the bar,
-// `dark` shades its lower half for a two-tone look.
-//   Kanto  — Red version red
-//   Johto  — Gold version gold
-//   Hoenn  — Emerald green
-//   Sinnoh — Diamond/Pearl icy blue
-//   Unova  — Black/White deep slate
-const REGION_COLORS = {
-  Kanto:  { light: '#ef4444', dark: '#991b1b' },
-  Johto:  { light: '#facc15', dark: '#a16207' },
-  Hoenn:  { light: '#10b981', dark: '#065f46' },
-  Sinnoh: { light: '#38bdf8', dark: '#0369a1' },
-  Unova:  { light: '#64748b', dark: '#1e293b' },
-}
 
 export default function Stats({ onClose, role = null }) {
   const { dark } = useTheme()
@@ -74,7 +78,7 @@ export default function Stats({ onClose, role = null }) {
       setLoggedIn(true)
       const { data, error } = await supabase
         .from('runs')
-        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster')
+        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster, elapsed_ms, starter_id')
         .eq('user_id', user.id)
       if (cancelled) return
       const rows = (!error && data) ? data : []
@@ -84,7 +88,6 @@ export default function Stats({ onClose, role = null }) {
       const losses = rows.filter(r => r.result === 'loss').length
       const winRate = totalRuns ? Math.round((wins / totalRuns) * 100) : 0
       const totalBadges = rows.reduce((s, r) => s + (r.maps_cleared ?? 0), 0)
-      const avgBadges = totalRuns ? (totalBadges / totalRuns) : 0
       const totalCatches = rows.reduce((s, r) => s + (r.pokemon_caught ?? 0), 0)
       // Lifetime Speed Cash EARNED across every recorded run — purchases never
       // reduce it (App tracks earned separately from the spendable balance).
@@ -93,14 +96,6 @@ export default function Stats({ onClose, role = null }) {
       // Account level is derived from that same lifetime total — XP IS the cash
       // earned, so there is nothing extra to fetch.
       const levelInfo = levelForXp(totalCashEarned)
-
-      // Unique caught species across all runs → per-region completion.
-      const caught = new Set()
-      rows.forEach(r => (r.pokemon_caught_ids ?? []).forEach(id => caught.add(id)))
-      const regions = Object.entries(REGION_RANGES).map(([name, { offset, limit }]) => {
-        const have = [...caught].filter(id => id > offset && id <= offset + limit).length
-        return { name, have, total: limit, pct: Math.round((have / limit) * 100) }
-      })
 
       // Catches table → per-species counts for the Legendary + Shiny popups.
       const { data: catchRows } = await supabase
@@ -126,11 +121,47 @@ export default function Stats({ onClose, role = null }) {
       const legendaries = [...legMap.values()].sort(byCountThenId)
       const shinies = [...shinyMap.values()].sort(byCountThenId)
 
+      // Deepest single run, and how long that run took. Ranked on depth alone —
+      // time is shown as a detail of the best run, not as a second ranking, so
+      // a fast shallow run never outranks a deeper slow one. `elapsed_ms` is
+      // null on runs recorded before the column existed.
+      const best = rows.reduce((b, r) =>
+        (r.maps_cleared ?? 0) > (b?.maps_cleared ?? -1) ? r : b, null)
+      const bestRun = best
+        ? { maps: best.maps_cleared ?? 0, elapsedMs: best.elapsed_ms ?? null }
+        : null
+
+      // Top 10 most-caught species, starters excluded. A starter is not caught,
+      // it is chosen — counting it here would put whatever you pick most at the
+      // top of a list about catching, which is a different question (answered
+      // by favouriteStarter below).
+      const topCaught = [...(() => {
+        const m = new Map()
+        ;(catchRows ?? []).forEach(row => {
+          if (STARTER_IDS.has(row.species_id)) return
+          const e = m.get(row.species_id) ?? { id: row.species_id, name: row.name, count: 0 }
+          e.count += 1; m.set(row.species_id, e)
+        })
+        return m.values()
+      })()].sort(byCountThenId).slice(0, 10)
+
+      // Most-chosen starter, counted over runs STARTED — the honest reading of
+      // "favourite". Counting wins instead would answer "most successful",
+      // which is a different stat. Null until runs carry a starter_id.
+      const starterCounts = new Map()
+      rows.forEach(r => {
+        if (r.starter_id == null) return
+        starterCounts.set(r.starter_id, (starterCounts.get(r.starter_id) ?? 0) + 1)
+      })
+      const favouriteStarter = [...starterCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+        .map(([id, count]) => ({ id, count }))[0] ?? null
+
       const winRosters = rows
         .filter(r => r.result === 'win' && r.winning_roster)
         .map(r => r.winning_roster)
 
-      setStats({ totalRuns, wins, losses, winRate, totalBadges, avgBadges, totalCatches, totalCashEarned, levelInfo, regions, legendaries, shinies, winRosters })
+      setStats({ totalRuns, wins, losses, winRate, totalBadges, totalCatches, totalCashEarned, levelInfo, legendaries, shinies, winRosters, bestRun, topCaught, favouriteStarter })
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -143,7 +174,7 @@ export default function Stats({ onClose, role = null }) {
       padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
     }}>
       <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>{value}</span>
-      <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>{label}</span>
+      <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>{label}</span>
     </div>
   )
 
@@ -169,7 +200,7 @@ export default function Stats({ onClose, role = null }) {
               onClick={() => setTab('stats')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'stats' ? textColor : mutedColor,
-                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
                 borderBottom: tab === 'stats' ? `2px solid ${textColor}` : '2px solid transparent',
               }}
             >
@@ -179,7 +210,7 @@ export default function Stats({ onClose, role = null }) {
               onClick={() => setTab('halloffame')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'halloffame' ? textColor : mutedColor,
-                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
                 borderBottom: tab === 'halloffame' ? `2px solid ${textColor}` : '2px solid transparent',
               }}
             >
@@ -193,7 +224,7 @@ export default function Stats({ onClose, role = null }) {
                 onClick={() => setTab('balance')}
                 style={{
                   fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'balance' ? '#facc15' : mutedColor,
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
                   borderBottom: tab === 'balance' ? '2px solid #facc15' : '2px solid transparent',
                 }}
               >
@@ -201,8 +232,24 @@ export default function Stats({ onClose, role = null }) {
               </button>
             )}
           </div>
-          <button onClick={onClose} className="hover:opacity-70 transition-opacity"
-            style={{ fontFamily: 'Upheaval', fontSize: '18px', color: textColor }}>X</button>
+          {/* 44px touch target with the glyph still visually 18px — it was a
+              bare glyph with no padding, which is a hard tap to land on a
+              phone. Negative margin absorbs the extra box so the header's
+              height doesn't change. (UI_TOUCHUPS #5; same pattern as
+              ItemNode's close button.) */}
+          <button
+            onClick={onClose}
+            aria-label="Close stats"
+            className="hover:opacity-70 transition-opacity"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '18px', color: textColor,
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              minWidth: '44px', minHeight: '44px', margin: '-11px -11px -11px 0',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            }}
+          >
+            X
+          </button>
         </div>
 
         {/* Body */}
@@ -425,7 +472,30 @@ export default function Stats({ onClose, role = null }) {
                 <Stat label="Losses" value={stats.losses} />
                 <Stat label="Win Rate" value={`${stats.winRate}%`} />
                 <Stat label="Badges Earned" value={stats.totalBadges} />
-                <Stat label="Avg Badges / Run" value={stats.avgBadges.toFixed(1)} />
+                {/* Best run replaced "Avg Badges / Run", which for a player
+                    whose runs mostly end early is always ≈1 and says nothing.
+                    A deepest run is a thing you remember. Inlined rather than a
+                    <Stat> because it carries a second line — and because
+                    react-hooks/static-components fires per <Stat> call site. */}
+                <div style={{
+                  backgroundColor: innerBg, border: panelBorder,
+                  boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                  padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>
+                    {stats.bestRun ? stats.bestRun.maps : '—'}
+                  </span>
+                  {/* The time only appears once there is one. Runs recorded
+                      before elapsed_ms existed simply show the depth. */}
+                  {stats.bestRun && fmtRunTime(stats.bestRun.elapsedMs) && (
+                    <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor }}>
+                      {fmtRunTime(stats.bestRun.elapsedMs)}
+                    </span>
+                  )}
+                  <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
+                    Best Run
+                  </span>
+                </div>
                 <Stat label="Wild Catches" value={stats.totalCatches} />
                 {/* Same tile markup as <Stat> above, inlined rather than a
                     ninth <Stat> call site: react-hooks/static-components fires
@@ -441,35 +511,110 @@ export default function Stats({ onClose, role = null }) {
                   <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: cash(dark) }}>
                     ${stats.totalCashEarned.toLocaleString()}
                   </span>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor, textAlign: 'center' }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
                     Speed Cash earned
                   </span>
                 </div>
               </div>
 
-              {/* Per-region dex completion */}
-              <div className="flex flex-col gap-3">
-                <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: textColor }}>Region Completion</span>
-                {stats.regions.map(r => (
-                  <div key={r.name} className="flex flex-col gap-1">
-                    <div className="flex justify-between">
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: textColor }}>{r.name}</span>
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor }}>{r.have}/{r.total} · {r.pct}%</span>
-                    </div>
-                    <div style={{ height: '12px', backgroundColor: innerBg, border: panelBorder }}>
-                      <div style={{
-                        width: `${r.pct}%`, height: '100%', transition: 'width 0.3s',
-                        // Two-tone monochrome fill: light shade on top, dark on
-                        // bottom (hard 50/50 split), colored by the region.
-                        background: `linear-gradient(to bottom,
-                          ${(REGION_COLORS[r.name] ?? { light: '#22c55e' }).light} 0%,
-                          ${(REGION_COLORS[r.name] ?? { light: '#22c55e' }).light} 50%,
-                          ${(REGION_COLORS[r.name] ?? { dark: '#15803d' }).dark} 50%,
-                          ${(REGION_COLORS[r.name] ?? { dark: '#15803d' }).dark} 100%)`,
-                      }} />
+              {/* Most-caught species. Replaced the per-region completion bars,
+                  which said the same thing the Pokédex says better and said it
+                  in five rows of identical weight. This answers a question the
+                  Dex can't: not what you've filled in, but who you keep
+                  reaching for. */}
+              <div className="flex flex-col gap-2">
+                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '14px', color: textColor }}>
+                  Most Caught
+                </span>
+                {stats.topCaught.length === 0 ? (
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
+                    Catch a Pokémon and it starts counting here.
+                  </span>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isDesktop ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)',
+                    gap: '6px',
+                  }}>
+                    {stats.topCaught.map((m, i) => (
+                      <div key={m.id} style={{
+                        backgroundColor: innerBg, border: panelBorder,
+                        boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                        padding: '6px 4px', display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', gap: '1px', position: 'relative',
+                      }}>
+                        {/* Rank in the corner rather than a column of its own:
+                            the list is already in order, so the number is a
+                            reference point, not the thing you read. */}
+                        <span style={{
+                          position: 'absolute', top: '3px', left: '5px',
+                          fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor,
+                        }}>
+                          {i + 1}
+                        </span>
+                        <img src={SPRITE(m.id)} alt={m.name} style={{
+                          width: isDesktop ? '56px' : '48px', height: isDesktop ? '56px' : '48px',
+                          imageRendering: 'pixelated',
+                        }} />
+                        <span style={{
+                          fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+                          textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.1,
+                          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
+                        }}>
+                          {m.name.replace(/-/g, ' ')}
+                        </span>
+                        <span style={{
+                          fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15',
+                          textShadow: '0 0 6px rgba(0,0,0,0.45), 0 0 3px rgba(0,0,0,0.35)',
+                        }}>
+                          ×{m.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Favourite starter — counted over runs STARTED, not runs won,
+                  because "favourite" is about what you reach for rather than
+                  what worked. One entry: a podium of three would imply a
+                  ranking nobody is competing in. */}
+              <div className="flex flex-col gap-2">
+                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '14px', color: textColor }}>
+                  Favourite Starter
+                </span>
+                {!stats.favouriteStarter ? (
+                  // Runs recorded before starter_id existed carry no starter, so
+                  // this stays empty until the next run rather than guessing.
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
+                    Your next run picks one.
+                  </span>
+                ) : (
+                  <div style={{
+                    backgroundColor: innerBg, border: panelBorder,
+                    boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
+                    padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '14px',
+                  }}>
+                    <img
+                      src={SPRITE(stats.favouriteStarter.id)}
+                      alt=""
+                      style={{ width: '72px', height: '72px', imageRendering: 'pixelated', flexShrink: 0 }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                      <span style={{
+                        fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '18px', color: textColor,
+                        textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      }}>
+                        {STARTER_NAMES[stats.favouriteStarter.id] ?? `#${stats.favouriteStarter.id}`}
+                      </span>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
+                        {stats.favouriteStarter.count === 1
+                          ? 'Chosen once'
+                          : `Chosen ${stats.favouriteStarter.count} times`}
+                      </span>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
 
               {/* Collection boxes — open detail popups. Each has a gradient
@@ -543,8 +688,11 @@ export default function Stats({ onClose, role = null }) {
                         }}>
                           <img src={spriteFor(m.id)} alt={m.name}
                             style={{ width: isDesktop ? '64px' : '52px', height: isDesktop ? '64px' : '52px', imageRendering: 'pixelated' }} />
-                          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>{m.name}</span>
-                          <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#facc15' }}>×{m.count}</span>
+                          {/* Species names arrive kebab-cased from the catches
+                              table (nidoran-f, mr-mime), so the hyphen has to
+                              go before capitalize does its work. */}
+                          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>{m.name.replace(/-/g, ' ')}</span>
+                          <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15' }}>×{m.count}</span>
                         </div>
                       ))}
                     </div>

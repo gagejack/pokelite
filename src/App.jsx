@@ -312,6 +312,13 @@ export default function App() {
       // The LIFETIME earned total, not the ending balance: the balance is an
       // artifact of when the player last shopped and says nothing about the run.
       speed_cash_earned: cashEarned,
+      // How long the run took, and what it was started with. Both were already
+      // on hand — the daily-attempt submission below computes the same elapsed
+      // value and reads the same starter — but neither was written to `runs`,
+      // so the Stats page could not show a best run or a favourite starter for
+      // anything but daily play. Runs recorded before this stay null.
+      elapsed_ms: Math.max(0, Date.now() - (runStartedAt.current || Date.now())),
+      starter_id: selectedStarter?.id ?? null,
     }
     if (result === 'win' && winRoster?.length) {
       payload.winning_roster = winRoster.map(p => ({
