@@ -49,6 +49,14 @@ Copy these verbatim; every task inherits them.
 | `src/lib/daily.js` | `getLeaderboard` calls the RPC and attaches `xp` per row. |
 | `src/components/DailyChallenge.jsx` | `LV n` badge left of each username. |
 
+**No documentation task.** `docs/ITEMS.md` is an item reference — its own header
+says so, and levels are not an item. The design spec
+(`docs/superpowers/specs/2026-07-29-account-levels-design.md`) already covers the
+curve, the derivation, and the RPC in more depth than a reference entry would,
+and `level.js` and `balance.js` carry the arithmetic in comments. A second prose
+copy of the same numbers is a thing that drifts — which is exactly why ITEMS.md
+exists in the first place (see its header note about `docs/DESIGN.md`).
+
 ---
 
 ## Task 1: The curve module
@@ -787,62 +795,6 @@ Run `npm run dev` and open the Daily Seed modal. This needs at least one leaderb
 ```bash
 git add src/components/DailyChallenge.jsx
 git commit -m "feat(levels): show account level on the Daily Seed leaderboard"
-```
-
----
-
-## Task 8: Document it
-
-**Files:**
-- Modify: `docs/ITEMS.md`
-
-**Interfaces:**
-- Consumes: the final numbers from Task 1.
-- Produces: nothing in code.
-
-- [ ] **Step 1: Read the existing doc**
-
-Read `docs/ITEMS.md` in full. Its last section is "Pokémart & Speed Cash", which is where the XP source is described — match that section's heading depth, table style, and prose voice. Do not restructure anything.
-
-- [ ] **Step 2: Append the levels section**
-
-Add at the end of `docs/ITEMS.md`:
-
-```markdown
-### Account levels
-
-Lifetime Speed Cash earned doubles as account XP. Leaving level *n* costs
-`n × 100` XP, so the total to reach level *L* is `100 × L(L-1)/2`. A new account
-is level 1 at 0 XP; the cap is level 100 at 495,000.
-
-| Level | Total XP | ≈ winning runs |
-|---|---|---|
-| 2 | 100 | 1 |
-| 10 | 4,500 | 2 |
-| 25 | 30,000 | 14 |
-| 50 | 122,500 | 54 |
-| 100 | 495,000 | 216 |
-
-Only *earned* cash counts — spending at the Pokémart never costs a level.
-
-The level is derived on read, never stored: there is no `xp` or `level` column,
-so retuning a payout or deleting a run recomputes it correctly instead of
-leaving a stale counter behind. It shows on the Stats page (with a progress bar),
-in the desktop calling card's header, and on the Daily Seed leaderboard.
-
-The leaderboard is the exception to "derived client-side": `runs` is readable
-only by its owner, so other players' totals come from the `user_levels` RPC
-(`supabase/user_levels.sql`), which returns one aggregate integer per user.
-
-Curve numbers live in `src/game/balance.js` under `levels`; the arithmetic is in
-`src/game/level.js`.
-```
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add docs/ITEMS.md
-git commit -m "docs: document account levels"
 ```
 
 ---
