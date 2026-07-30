@@ -1,21 +1,14 @@
 import { useState, useRef } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, twoTone, STAT_BAR_LIGHT, STAT_BAR_DARK } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 
-// Two-tone bar fill: the light shade on the top half, a darker shade of the same
-// hue on the bottom half (hard 50/50 split), matching the stats-screen bars.
-function twoTone(light, dark) {
-  return `linear-gradient(to bottom, ${light} 0%, ${light} 50%, ${dark} 50%, ${dark} 100%)`
-}
 // Darker partner shades. HP uses the same green/yellow/red thresholds as
 // hpColor(); STAT_BAR is the stat bars' blue.
 const HP_DARK = { '#22c55e': '#15803d', '#facc15': '#a16207', '#ef4444': '#991b1b' }
-const STAT_BAR_LIGHT = '#6890F0'
-const STAT_BAR_DARK = '#3b5aa8'
 
 // Exported so the item-assign screen (ItemNode) can show the SAME stat card
 // the map roster shows on hover — one visual language for "here are this

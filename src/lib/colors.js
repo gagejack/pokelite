@@ -27,3 +27,15 @@ export const cash = dark => (dark ? '#4ade80' : '#166534')
 // control would say "something is wrong here", which is not what an item you
 // simply haven't saved for yet means.
 export const cashShort = dark => (dark ? '#f87171' : '#b91c1c')
+
+// Two-tone bar fill: the light shade on the top half, a darker shade of the
+// same hue on the bottom half (hard 50/50 split). Shared by the roster stat
+// bars and the account-level XP bar so both read as the same object.
+// Lived in Roster.jsx's module scope until the level bar needed it too.
+export function twoTone(light, dark) {
+  return `linear-gradient(to bottom, ${light} 0%, ${light} 50%, ${dark} 50%, ${dark} 100%)`
+}
+
+// The stat bars' blue and its darker partner shade.
+export const STAT_BAR_LIGHT = '#6890F0'
+export const STAT_BAR_DARK = '#3b5aa8'
