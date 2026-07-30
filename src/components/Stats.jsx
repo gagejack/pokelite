@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted, cash } from '../lib/colors'
+import { muted, cash, TEXT_OUTLINE } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
@@ -320,21 +320,38 @@ export default function Stats({ onClose, role = null }) {
                                 <span title="Shiny" style={{ fontSize: '13px', color: '#a855f7', flexShrink: 0 }}>✦</span>
                               )}
                             </div>
-                            {/* Type chips — the same colours and shape the
-                                battle and roster cards use, so a team reads the
-                                same way here as it did in play. */}
+                            {/* Type chips — same colours and shape the battle
+                                and roster cards use, so a team reads the same
+                                way here as it did in play.
+                                Orange Kid with a black outline rather than flat
+                                Upheaval. It also fixes a contrast problem: white
+                                on the type hues runs as low as 1.49:1 (electric
+                                #F8D030) and no single text colour clears AA on
+                                all eighteen, but an outlined glyph is bounded by
+                                black whatever sits behind it. 14px because
+                                Orange Kid renders smaller than Upheaval at the
+                                same size. */}
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {(p.types ?? []).map(t => (
                                 <span key={t} style={{
-                                  fontFamily: 'Upheaval', fontSize: '12px', color: '#fff',
+                                  fontFamily: 'Orange Kid', fontSize: '14px', color: '#fff',
+                                  textShadow: TEXT_OUTLINE,
                                   backgroundColor: TYPE_COLORS[t] ?? '#888',
-                                  padding: '1px 5px', textTransform: 'capitalize',
+                                  padding: '0 5px', textTransform: 'capitalize',
                                 }}>
                                   {t}
                                 </span>
                               ))}
                             </div>
-                            <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15' }}>
+                            {/* Outlined like the level numbers over sprites in
+                                battle: yellow on the light-theme panel is weak
+                                on its own, and the black edge makes it read on
+                                either theme without a second colour. */}
+                            <span style={{
+                              fontFamily: 'Upheaval', fontSize: '12px',
+                              color: fainted ? '#f87171' : '#facc15',
+                              textShadow: TEXT_OUTLINE,
+                            }}>
                               {fainted ? 'FAINTED' : `LV ${p.level}`}
                             </span>
                             {/* Move and held item. Stored on every winning

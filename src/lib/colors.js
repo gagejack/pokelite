@@ -39,3 +39,13 @@ export function twoTone(light, dark) {
 // The stat bars' blue and its darker partner shade.
 export const STAT_BAR_LIGHT = '#6890F0'
 export const STAT_BAR_DARK = '#3b5aa8'
+
+// A hard 1px black outline in all eight directions — the sprite-era way to keep
+// light text readable over an arbitrary background. An 8-way text-shadow rather
+// than -webkit-text-stroke, which eats thin glyphs on pixel fonts.
+//
+// The same string is declared locally in BattleCard (as LV_OUTLINE) and Roster
+// for level numbers over sprites; this export exists so new callers don't add a
+// third copy. Those two are left alone — they work, and rewiring them is a
+// separate change.
+export const TEXT_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
