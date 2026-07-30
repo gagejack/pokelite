@@ -68,26 +68,26 @@ spec.
 
 ### 3. The curve
 
-**Quadratic: leaving level *n* costs `n × 200` XP.**
+**Quadratic: leaving level *n* costs `n × 100` XP.**
 
 ```
-cost(n)  = 200 × n           XP to go from level n to n+1
-total(L) = 200 × L(L-1)/2    XP required to REACH level L
+cost(n)  = 100 × n           XP to go from level n to n+1
+total(L) = 100 × L(L-1)/2    XP required to REACH level L
 ```
 
 Level 1 is the starting state at 0 XP — a new account is level 1, never level
-0. Reaching level 2 takes 200.
+0. Reaching level 2 takes 100.
 
 | Level | Step cost | Total XP to reach | ≈ winning runs | ≈ average runs |
 |---|---|---|---|---|
-| 1 | 200 | 0 | 0 | 0 |
-| 2 | 400 | 200 | 1 | 1 |
-| 5 | 1,000 | 2,000 | 1 | 7 |
-| 10 | 2,000 | 9,000 | 4 | 31 |
-| 25 | 5,000 | 60,000 | 27 | 203 |
-| 50 | 10,000 | 245,000 | 107 | 828 |
-| 75 | 15,000 | 555,000 | 242 | 1,875 |
-| 100 | — | 990,000 | 431 | 3,345 |
+| 1 | 100 | 0 | 0 | 0 |
+| 2 | 200 | 100 | 1 | 1 |
+| 5 | 500 | 1,000 | 1 | 4 |
+| 10 | 1,000 | 4,500 | 2 | 16 |
+| 25 | 2,500 | 30,000 | 14 | 102 |
+| 50 | 5,000 | 122,500 | 54 | 414 |
+| 75 | 7,500 | 277,500 | 121 | 938 |
+| 100 | — | 495,000 | 216 | 1,673 |
 
 "Winning runs" assumes ~$2,300 for a full 8-map clear (~$293/map × 8, per the
 economy spec). "Average runs" uses the $296 the 43 recorded runs actually
@@ -95,25 +95,27 @@ average — roughly one map, since most runs die early. Real play sits between
 the two columns and drifts toward the left as a player improves.
 
 **Why quadratic.** It is the classic RPG shape and it is trivially explainable:
-*leaving level n costs n × 200.* A player can compute their own next threshold.
+*leaving level n costs n × 100.* A player can compute their own next threshold.
 A gentle exponential was rejected because it makes the last ten levels punishing
 in a way that reads as broken rather than aspirational; a hybrid
 linear-then-steep curve was rejected as two rules where one suffices.
 
-**The 200 multiplier is tuned for the early hook.** A first win reaches level 5,
-and ten wins reach level 15 — visible movement from the very first run, which is
-what a progression number has to deliver before anyone trusts it. A 1000
-multiplier put the same milestones at level 2 and level 5, where the number
-barely moves and reads as broken.
+**The 100 multiplier is tuned for the early hook.** Every finished run levels a
+new player up — even a first-map death earns ~$296 and clears level 2 — and one
+win reaches level 7. Movement on the very first run is what a progression number
+has to deliver before anyone trusts it. Multipliers of 1000 and 200 were both
+tried on paper and put a first win at level 2 and level 5 respectively; at 1000
+the number barely moves at all.
 
-**Calibration check against real data.** 12,740 lifetime cash lands at level 11
-of 100. That is the right shape for 43 mostly-losing runs: unmistakable
-progress, nowhere near the ceiling.
+**Calibration check against real data.** 12,740 lifetime cash lands at level 16
+of 100 — about a sixth of the way up for 43 mostly-losing runs. Enough to feel
+earned, with the ceiling still far off.
 
-**Level 100 stays a long-haul target: ~431 winning runs.** Not a grind target —
-a number that exists so the scale has a top. If play-testing shows the mid-game
-stalls, the multiplier is the single knob to turn (it scales every threshold
-linearly), not the curve's shape.
+**Level 100 remains a long-haul target: ~216 winning runs.** Reachable by a
+dedicated player rather than nobody, which is the right call for a ceiling that
+currently unlocks nothing — an unreachable number that grants no reward is just
+decoration. If play-testing shows the mid-game stalls, the multiplier is the
+single knob to turn (it scales every threshold linearly), not the curve's shape.
 
 ### 4. The module
 
@@ -147,7 +149,7 @@ The multiplier and max level live in `src/game/balance.js` under a new
 `levels` block, per the standing rule that numeric knobs belong there:
 
 ```js
-levels: { maxLevel: 100, xpPerLevelStep: 200 },
+levels: { maxLevel: 100, xpPerLevelStep: 100 },
 ```
 
 `level.js` reads them. This is the one place a playtest tweak happens.
@@ -199,11 +201,11 @@ module.
 
 1. `npm run lint` and `npm run build` clean, no growth past recorded baselines.
 2. `levelForXp(0)` → level 1, `xpIntoLevel` 0, `progress` 0.
-3. `levelForXp(199)` → level 1. `levelForXp(200)` → level 2 exactly on the
+3. `levelForXp(99)` → level 1. `levelForXp(100)` → level 2 exactly on the
    boundary.
-4. `levelForXp(1999)` → level 4; `levelForXp(2000)` → level 5.
-5. `xpToReach(100)` === 990,000.
-6. `levelForXp(990_000)` → level 100, `xpForNext` 0, `progress` 1.
+4. `levelForXp(999)` → level 4; `levelForXp(1000)` → level 5.
+5. `xpToReach(100)` === 495,000.
+6. `levelForXp(495_000)` → level 100, `xpForNext` 0, `progress` 1.
 7. `levelForXp(999_999_999)` → level 100, not 101 or beyond.
 8. `levelForXp(-5)` and `levelForXp(null)` → level 1, no throw.
 9. Every level from 1 to 100: `levelForXp(xpToReach(n)).level === n`, and
