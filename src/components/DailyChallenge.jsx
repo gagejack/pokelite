@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { dailyFor, getTodayAttempts, getLeaderboard, todayUtc } from '../lib/daily.js'
 import { msUntilNextUtcDay } from '../game/dailyDerive.js'
 import SeedCodeChip from './SeedCodeChip'
+import { levelForXp } from '../game/level.js'
 
 // PokéAPI front sprites for the day's two box legendaries (version mascots),
 // keyed by region — the same duo shown on that region's card in RegionSelect.
@@ -27,6 +29,7 @@ function fmtCountdown(ms) {
 
 export default function DailyChallenge({ user, onPlay, onClose }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const date = todayUtc()
   const daily = dailyFor(date)
   const [attempts, setAttempts] = useState(null)   // { used, best } | null
@@ -193,6 +196,25 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
                     }} />
                   </span>
                 ) : <span style={{ width: '24px', flexShrink: 0 }} />}
+                {/* Account level — identity, so it sits with the name rather
+                    than among the ranking columns to its right.
+                    BLANK, not absent, at xp 0: the cell keeps its width so
+                    usernames stay aligned down the column, exactly as the medal
+                    cell above does for ranks 4+. xp 0 means a brand-new account
+                    or a failed user_levels lookup, and printing "LV 1" there
+                    would read as real data where a blank reads as absent.
+                    46px fits "LV 100" — the widest value — at 12px Upheaval.
+                    Sizing to "LV 16" would let the cap overflow into the name.
+                    Desktop only: the mobile row is already at its width limit
+                    with rank, medal, sprite, name, maps and run. */}
+                {isDesktop && (
+                  <span style={{
+                    fontFamily: 'Upheaval', fontSize: '12px', color: text,
+                    opacity: 0.75, flexShrink: 0, width: '46px',
+                  }}>
+                    {e.xp > 0 ? `LV ${levelForXp(e.xp).level}` : ''}
+                  </span>
+                )}
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {e.username ?? 'anon'}
                 </span>
