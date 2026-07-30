@@ -95,7 +95,7 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: 0 }}>
             <span style={{ fontFamily: 'Upheaval', fontSize: '24px', color: text, textAlign: 'center' }}>
-              Daily Challenge
+              Daily Seed
             </span>
             <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center' }}>
               {date} · {daily.region} · resets in {fmtCountdown(countdown)}
@@ -115,11 +115,26 @@ export default function DailyChallenge({ user, onPlay, onClose }) {
           ) : <div style={{ width: '72px', flexShrink: 0 }} />}
         </div>
 
+        {/* What this mode is. Sits under the header so it lands right after the
+            seed chip it's describing, and above the play controls so a first-
+            time player reads the rules before the button.
+            Two sentences, two jobs: the first says everyone gets the same map,
+            the second says speed is what's scored. Kept to that — the attempt
+            count and reset timer are already on screen, and repeating them here
+            would make this a wall of text nobody reads twice. */}
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '15px', color: text,
+          textAlign: 'center', lineHeight: 1.4, opacity: 0.85,
+        }}>
+          Everyone plays the same seed today — the same maps, the same
+          encounters. Race to clear it fastest.
+        </span>
+
         {/* Play controls are gated behind sign-in; the leaderboard below is
             public and renders for everyone. */}
         {!user ? (
           <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: text, textAlign: 'center', padding: '12px' }}>
-            Sign in to play the daily challenge.
+            Sign in to play today's seed.
           </span>
         ) : (
           <>

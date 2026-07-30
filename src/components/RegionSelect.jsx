@@ -169,13 +169,13 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
             className="hover:opacity-70 transition-opacity"
             style={{
               fontFamily: 'Upheaval', fontSize: '12px',
-              // Red to match the Daily Challenge button on the main menu.
+              // Red to match the Daily Seed button on the main menu.
               color: '#fff',
               border: borderStyle, boxShadow: shadowStyle,
               backgroundColor: '#ef4444', padding: '8px 16px',
             }}
           >
-            Daily Challenge
+            Daily Seed
           </button>
           <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: cards ? '#DBDBDB' : '#333333' }}>
             Custom Seed:
@@ -253,7 +253,7 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
               </span>
             </div>
             <MenuButton
-              def={{ id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)', color: '#fff', fontSize: '22px', onClick: onOpenDaily, className: 'daily-glow' }}
+              def={{ id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)', color: '#fff', fontSize: '22px', onClick: onOpenDaily, className: 'daily-glow' }}
               dark={dark}
             />
             {REGIONS.map(region => (

@@ -45,7 +45,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   const buttonDefs = [
     { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
       color: '#fff', fontSize: '26px', onClick: () => (isDesktop ? changeMode('region') : onPlay()), visible: true },
-    { id: 'daily', label: 'DAILY CHALLENGE', background: 'linear-gradient(to top, #dc2626, #f97316)',
+    { id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)',
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
       color: '#fff', fontSize: '22px', onClick: onResume, visible: !!hasSavedRun },
@@ -100,7 +100,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       </div>
 
       {/* Version tag — sits under the last button (Resume when a run is
-          saved, otherwise Daily Challenge). */}
+          saved, otherwise Daily Seed). */}
       <span style={{
         fontFamily: 'Orange Kid', fontSize: '14px',
         color: dark ? '#888' : '#999',

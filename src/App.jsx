@@ -122,7 +122,7 @@ export default function App() {
     return () => { cancelled = true }
   }, [user])
 
-  // Launch today's daily challenge: derive region+seed from the UTC date,
+  // Launch today's daily seed: derive region+seed from the UTC date,
   // seed the run, and record the start-date so the attempt submits under the
   // day it began (even across a midnight rollover). Called from DailyChallenge.
   function startDailyRun() {

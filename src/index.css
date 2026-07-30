@@ -46,7 +46,7 @@ html, body {
   height: 100dvh;
 }
 
-/* Soft red pulse on the main-menu Daily Challenge button. The button keeps its
+/* Soft red pulse on the main-menu Daily Seed button. The button keeps its
    hard offset shadow (passed inline via --btn-shadow); the glow is layered
    after it so both render. */
 @keyframes daily-glow {
