@@ -22,6 +22,7 @@ import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollSta
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
+import { attackTypeFor } from '../game/attackTypes.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { BALANCE } from '../game/balance.js'
@@ -1494,7 +1495,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setRoster(prev => prev.map((p, i) => {
               if (i !== pokemonIndex) return p
               const nextTier = Math.min(4, (p.move?.tier ?? 1) + 1)
-              return { ...p, move: getTypeMove(p.types[0], nextTier) }
+              // Same attacking-type choice the Pokémon spawned with — a TM
+              // raises the move's tier, it does not re-type the Pokémon.
+              return { ...p, move: getTypeMove(attackTypeFor(p.pokeId, p.types), nextTier) }
             }))
             setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
             setCurrentNode(pendingPower.node.id)

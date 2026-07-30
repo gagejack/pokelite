@@ -1,4 +1,5 @@
 import { getTypeMove, tierForLevel } from './typeMoves.js'
+import { attackTypeFor } from './attackTypes.js'
 import { slimChain, speciesIdFromUrl, levelUpPathTo, downgradeTarget } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
@@ -241,7 +242,7 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
   const level = Math.min(MAX_LEVEL, Math.max(1, rawLevel))
   const boost = isStarter ? BALANCE.pokemon.starterBoost : 1
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
-  const move = getTypeMove(base.types[0], tierForLevel(level))
+  const move = getTypeMove(attackTypeFor(base.pokeId, base.types), tierForLevel(level))
   // Null (not false) means "no opinion, roll it" — so an explicit false can
   // still force a non-shiny without being mistaken for an absent argument.
   const shiny = forceShiny === null ? rng() < SHINY_ODDS : !!forceShiny
@@ -444,7 +445,10 @@ function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     sprite:     shiny ? evolvedBase.shinySprite : evolvedBase.sprite,
     spriteBack: shiny ? evolvedBase.shinySpriteBack : evolvedBase.spriteBack,
     stats: { ...evolved.stats, hp: evolvedHp },
-    move: getTypeMove(evolvedBase.types[0], preservedTier),
+    // The evolved form re-picks its attacking type: an evolution can change
+    // typing entirely (Charmeleon fire → Charizard fire/flying), so the
+    // pre-evolution's choice may no longer apply.
+    move: getTypeMove(attackTypeFor(evolvedBase.pokeId, evolvedBase.types), preservedTier),
     // Carry the held item through evolution (buildPokemonInstance omits it).
     heldItem: instance.heldItem ?? null,
     fainted: instance.fainted,
