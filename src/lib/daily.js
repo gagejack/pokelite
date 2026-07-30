@@ -66,11 +66,28 @@ export async function submitAttempt({ userId, username, dailyDate, region, maps_
 }
 
 // The day's leaderboard (each user's best attempt, ranked), capped at `limit`.
+// Rows carry `xp` (lifetime Speed Cash earned) so the board can show account
+// levels. That number can't be summed client-side — `runs` is own-rows-only
+// under RLS and this board shows other players — so it comes from the
+// user_levels RPC (see supabase/user_levels.sql).
 export async function getLeaderboard(dateStr, limit = 20) {
   const { data, error } = await supabase
     .from('daily_attempts')
     .select('user_id, username, attempt_no, maps_cleared, elapsed_ms, starter')
     .eq('daily_date', dateStr)
   if (error || !data) return []
-  return rankLeaderboard(data).slice(0, limit)
+  const ranked = rankLeaderboard(data).slice(0, limit)
+  if (ranked.length === 0) return ranked
+
+  // One call for the whole page, not one per row.
+  const { data: levels, error: lvlErr } = await supabase
+    .rpc('user_levels', { p_user_ids: ranked.map(e => e.user_id) })
+  // A failed lookup must not take the board down with it: rank and score are
+  // the point here, the level is an adornment. Rows fall back to xp 0, and the
+  // UI hides the badge at 0 rather than printing "LV 1" on everyone — a wrong
+  // number reads as data, while a missing one reads as missing.
+  if (lvlErr) console.warn('user_levels failed:', lvlErr.message)
+  const xpByUser = new Map((levels ?? []).map(r => [r.user_id, Number(r.xp) || 0]))
+
+  return ranked.map(e => ({ ...e, xp: xpByUser.get(e.user_id) ?? 0 }))
 }
