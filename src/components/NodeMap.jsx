@@ -78,7 +78,7 @@ function MapSvg({
   mapContainerRef, holdTimerRef, holdActivatedRef,
   setContainerSize, setHoveredNode,
   handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
-  mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY, background,
+  mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY, background, bgKnown,
 }) {
   // The SVG stretches to fill the card on both axes (preserveAspectRatio none),
   // so node POSITIONS fill the card even when the card ratio differs from the
@@ -122,10 +122,29 @@ function MapSvg({
       style={{ flex: 1, minHeight: 0, border: borderStyle, boxShadow: shadowStyle }}
     >
       <style>{`@keyframes nodeSpin { to { transform: rotate(360deg); } }`}</style>
+      {/* `cover` once the card is sized to THIS image's ratio, `contain` until
+          then.
+
+          The card is sized from bgRatio, so cover and contain agree on how the
+          art should look — but they disagree about rounding. Card height is
+          `width / ratio`, a float that layout rounds, and contain answers a
+          sub-pixel mismatch by letterboxing; with objectPosition 'top center'
+          the whole remainder collected at the BOTTOM, as a hairline strip
+          between the art and the card's stroke. cover answers the same mismatch
+          by overflowing, which the parent's overflow-hidden clips, so the art
+          reaches the stroke on all four sides. The overflow is the rounding
+          error itself — well under a pixel — so nothing real is cropped.
+
+          That argument only holds while the card actually has the image's
+          ratio. bgRatio resets to null on every map change (not just first
+          load), and the card falls back to the NODE layout's ratio, which
+          genuinely differs — cover there would crop real art. So the fallback
+          keeps contain and accepts the letterbox for the frame or two before
+          the image reports its size. */}
       <img
         src={background}
         alt="map background"
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'top center', imageRendering: 'pixelated', filter: 'brightness(0.9)' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgKnown ? 'cover' : 'contain', objectPosition: 'top center', imageRendering: 'pixelated', filter: 'brightness(0.9)' }}
       />
       <svg
         width="100%"
@@ -1017,6 +1036,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
     mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY,
     background: mapConfig.background,
+    // Whether the card is sized to the image's own ratio yet — gates cover vs
+    // contain on the background (see MapSvg).
+    bgKnown: !!bgRatio,
   }
 
   const swapRoster = swapInRoster(setRoster)
