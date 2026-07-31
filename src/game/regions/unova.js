@@ -653,12 +653,30 @@ export const unovaConfig = {
   legendaryPools: LEGENDARY_POOLS,
   // Flat set of every legendary species id (for the stats "Legendaries" box).
   legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
-  // Pokémart shelves — see game/shop.js and the note in kanto.js.
-  // Same generic shelf as Kanto. No curated plates yet: the per-map plate
-  // mapping is authored against a region's gym-type order, which hasn't been
-  // done for Unova. Empty shopPools resolves to no curated items, not an error.
-  shopGeneric: ['max_heal', 'muscle_band', 'light_clay', 'mega_revive'],
-  shopPools: [],
+  // Pokémart shelves — see game/shop.js and
+  // docs/superpowers/specs/2026-07-31-map-shop-curation-design.md.
+  //
+  // Only the heal is universal, matching Kanto. Unova's per-map plates and
+  // town fiction are NOT yet authored: the plate mapping is written against a
+  // region's gym-type order, and the town-by-town pass Kanto received has not
+  // been done here. Rather than invent one blind, Unova re-homes the three
+  // former generics onto the same rungs Kanto uses and leaves the remaining
+  // pools empty — an empty pool resolves to no curated items, not an error.
+  //
+  // To finish Unova: give each map a `plate_<gymtype>` plus two items drawn
+  // from what that city is, keeping roughly one mid-tier and one ceiling item
+  // per shelf. See kanto.js shopPools for the worked example.
+  shopGeneric: ['max_heal'],
+  shopPools: [
+    ['light_clay'],                                     // map 1 — mid-tier defensive
+    [],
+    ['muscle_band'],                                    // map 3 — mid-tier offensive
+    ['mega_revive', { id: 'max_heal', stock: 3 }],      // map 4 — the logistics stop
+    [],
+    [],
+    [],
+    [],
+  ],
   badges: BADGES,
   // Battle data (see unova.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,
