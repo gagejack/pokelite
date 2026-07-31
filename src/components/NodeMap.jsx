@@ -484,6 +484,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // depending on the map's ratio and how much height the Roster/Bag rows leave).
   const [mobileSlot, setMobileSlot] = useState({ w: 0, h: 0 })
   const mobileSlotRef = useRef(null)
+  // Height of the Roster/Bag/badge stack. The map ruler stops short of it, so
+  // the card is fitted to the space that is genuinely available rather than to
+  // the whole column. Starts at 0: the first paint over-reports by the stack's
+  // height, the ResizeObserver corrects it on the next frame.
+  const [mobileBarsHeight, setMobileBarsHeight] = useState(0)
+  const mobileBarsRef = useRef(null)
   const mapContainerRef = useRef(null)
   const holdTimerRef = useRef(null)
   const holdActivatedRef = useRef(false)
@@ -511,6 +517,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
       if (width > 0 && height > 0) setMobileSlot({ w: width, h: height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isDesktop])
+
+  // Measure the Roster/Bag/badge stack so the ruler above can stop short of it.
+  // Separate observer from the slot's: this one watches a real, in-flow element
+  // whose height changes when the bag scrolls or badges are earned.
+  useEffect(() => {
+    const el = mobileBarsRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setMobileBarsHeight(entry.contentRect.height)
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -982,15 +1001,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return { width, height: width / ratio }
   })()
 
-  // Slot height the card does NOT use. On a narrow phone the card is
-  // width-bound (min(w, h * ratio)), so it is shorter than the slot and the
-  // remainder would otherwise push the Roster/Bag/badge bars far down the
-  // screen. The bars cancel it with a negative margin — see the slot's
-  // marginBottom, and the comment there for why the slot itself can't shrink.
-  const mobileSurplus = mobileCard
-    ? Math.max(0, mobileSlot.h - mobileCard.height)
-    : 0
-
   const mapSvgProps = {
     dark, borderStyle,
     // Mobile drops the offset drop shadow: at near-full width it pushes the
@@ -1261,6 +1271,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         </div>
       ) : (
         <div style={{
+          position: 'relative',
           flex: 1, minHeight: 0,
           backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
           display: 'flex', flexDirection: 'column',
@@ -1270,32 +1281,42 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           // and the card starts immediately below it. Bottom padding stays.
           padding: '0 5px 8px',
         }}>
-          {/* Map slot — measures the space available above the Roster/Bag/badge
-              stack so mobileCard can fit the card to whichever axis binds.
+          {/* The ruler. Invisible and out of flow, so it contributes NO height,
+              but stretched to the column's full content box — which is exactly
+              the space a map may occupy once the bars below are accounted for.
+              mobileCard is computed from this, and the map card is then sized
+              to hug its own content so the bars sit right beneath it.
 
-              `flex: 1` is load-bearing for that MEASUREMENT and must stay, and
-              this element must NOT be clamped by anything derived from
-              mobileCard: the ResizeObserver reads this exact node's
-              contentRect, so a maxHeight computed from mobileCard.height would
-              feed the measurement its own output and collapse it to zero on
-              successive passes.
+              It must be a separate element from the map: a single element
+              cannot both report the full available height and occupy only the
+              card's height. Previous passes tried a maxHeight (fed the
+              ResizeObserver its own output, collapsing toward zero) and a
+              negative margin (no effect — margin does not shrink a `flex: 1`
+              item; the flex algorithm hands back the freed space).
 
-              So the slot keeps reporting the full available height, and the
-              surplus is cancelled with a NEGATIVE bottom margin instead. Margin
-              does not affect contentRect, so the measurement stays honest while
-              the bars below slide up to sit 2px under the card. */}
+              `bottom` leaves room for the bars so the ruler never over-reports:
+              it spans the column minus the stack's measured height. */}
           <div
             ref={mobileSlotRef}
+            aria-hidden="true"
             style={{
-              flex: 1, minHeight: 0,
-              marginBottom: mobileSurplus ? `${2 - mobileSurplus}px` : '2px',
-              width: '100%', display: 'flex',
-              justifyContent: 'center', alignItems: 'flex-start',
+              position: 'absolute', left: 0, right: 0, top: 0,
+              bottom: `${mobileBarsHeight}px`,
+              pointerEvents: 'none', visibility: 'hidden',
             }}
-          >
+          />
+          {/* The map card. Sized to mobileCard, NOT flex:1 — it hugs its own
+              height so the bars below sit 2px beneath it instead of after a
+              column's worth of leftover space. */}
+          <div style={{
+            width: '100%',
+            flexShrink: 0, marginBottom: '2px',
+            height: mobileCard ? `${mobileCard.height}px` : '100%',
+            display: 'flex', justifyContent: 'center',
+          }}>
             <div style={{
               width: mobileCard ? `${mobileCard.width}px` : '100%',
-              height: mobileCard ? `${mobileCard.height}px` : '100%',
+              height: '100%',
               display: 'flex', flexDirection: 'column',
             }}>
               <MapSvg {...mapSvgProps} />
@@ -1303,10 +1324,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           </div>
           {/* Bottom bars (constrained to the map width): roster, then bag, then a
               horizontal gym-badge bar — all full-width, stacked. */}
-          {/* No marginTop:auto — that pinned the stack to the bottom of the
-              column, which WIDENED the gap it was meant to close. The slot's
-              negative bottom margin pulls these bars up under the map instead. */}
-          <div style={{
+          {/* Measured so the map ruler above can reserve exactly this much
+              height and no more. */}
+          <div ref={mobileBarsRef} style={{
             width: mobileCard ? `${mobileCard.width}px` : '100%', maxWidth: '100%',
             display: 'flex', flexDirection: 'column', gap: '6px',
           }}>
