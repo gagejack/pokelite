@@ -137,7 +137,7 @@ export const ITEMS = [
   // Gyarados its 4x Electric, and both drop from five resistances to two or
   // three. Legendary because it rewrites what a Pokémon is, permanently.
   // Kept, not consumed, on a single-type Pokémon — it has no alternate.
-  { id: 'type_prism',     name: 'Type Prism',     description: 'Permanently changes a Pokémon to its alternate type', tier: 'legendary', icon: 'griseous-orb', consumable: 'retype' },
+  { id: 'type_prism',     name: 'Type Prism',     description: 'Permanently changes a Pokémon to its alternate type, completely removes the main typing', tier: 'legendary', icon: 'griseous-orb', consumable: 'retype' },
   // Ignores its drop target — always applies to the whole roster.
   { id: 'mega_revive',    name: 'Mega Revive',    description: 'Revives and fully heals the whole team', tier: 'legendary', icon: 'sacred-ash', consumable: 'revive_all' },
 

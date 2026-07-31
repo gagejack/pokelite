@@ -7,6 +7,9 @@ import MenuButton from './menu/MenuButton'
 import WeeklyStat from './menu/WeeklyStat'
 import CallingCard from './menu/CallingCard'
 import RegionBar from './menu/RegionBar'
+import UpdateNotice from './UpdateNotice'
+import { hasSeenUpdate, markUpdateSeen } from '../lib/updateSeen'
+import { VERSION } from '../game/version'
 import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
@@ -30,6 +33,40 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   }
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
+
+  // Patch notes. `unread` is read once on mount so dismissing the popup can dim
+  // the badge in the same tick it writes the flag. The popup auto-opens only
+  // when unread; the badge reopens it forever after.
+  const [unread, setUnread] = useState(() => !hasSeenUpdate())
+  const [updateOpen, setUpdateOpen] = useState(() => !hasSeenUpdate())
+
+  function closeUpdate() {
+    markUpdateSeen()
+    setUnread(false)
+    setUpdateOpen(false)
+  }
+
+  // Sits with the version tag in both layouts: the tag says which build this
+  // is, and the badge is what changed in it. Dimmed once read, so it stops
+  // competing with PLAY but stays available.
+  const updateBadge = (
+    <button
+      type="button"
+      onClick={() => setUpdateOpen(true)}
+      className="hover:opacity-80 transition-opacity"
+      style={{
+        fontFamily: 'Upheaval', fontSize: '10px', letterSpacing: '1px',
+        color: unread ? '#1a1a1a' : (dark ? '#888' : '#ccc'),
+        backgroundColor: unread ? '#facc15' : 'transparent',
+        border: unread ? (dark ? '2px solid #121212' : '2px solid #2e2e2e') : '2px solid transparent',
+        padding: unread ? '2px 6px' : '2px 0',
+        cursor: 'pointer',
+        textShadow: unread ? 'none' : '1px 1px 0 rgba(0,0,0,0.9)',
+      }}
+    >
+      {unread ? 'NEW' : "WHAT'S NEW"}
+    </button>
+  )
 
   // Track auth state so the login/register card hides once signed in.
   useEffect(() => {
@@ -100,17 +137,20 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       </div>
 
       {/* Auth card — hidden once logged in. Above the version tag: it is a
-          control, and v1.0 is a footnote, so burying the only way to sign in
-          under the footnote read as an afterthought. */}
+          control, and the version is a footnote, so burying the only way to
+          sign in under the footnote read as an afterthought. */}
       {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
 
-      {/* Version tag — closes the column. */}
-      <span style={{
-        fontFamily: 'Orange Kid', fontSize: '14px',
-        color: dark ? '#888' : '#999',
-      }}>
-        v1.0
-      </span>
+      {/* Version tag — closes the column, with the patch-notes badge beside it. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '14px',
+          color: dark ? '#888' : '#999',
+        }}>
+          {VERSION}
+        </span>
+        {updateBadge}
+      </div>
 
       </div>
     </div>
@@ -213,11 +253,14 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
 
         {/* Bottom row: weekly stat left, calling card right */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '24px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
             <WeeklyStat dark={dark} />
-            <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: dark ? '#888' : '#ccc', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
-              v1.0
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: dark ? '#888' : '#ccc', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
+                {VERSION}
+              </span>
+              {updateBadge}
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
             <CallingCard dark={dark} />
@@ -231,6 +274,10 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   return (
     <Layout onHome={() => { setPokedexOpen(false); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
       {isDesktop ? desktopLayout : mobileLayout}
+      {/* Rendered last so it overlays whichever layout is active. Suppressed
+          while the Dex or Stats sheet is open — those are full-screen, and a
+          patch note landing on top of one would read as a bug. */}
+      {updateOpen && !pokedexOpen && !statsOpen && <UpdateNotice onClose={closeUpdate} />}
     </Layout>
   )
 }
