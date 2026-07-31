@@ -99,17 +99,18 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         ))}
       </div>
 
-      {/* Version tag — sits under the last button (Resume when a run is
-          saved, otherwise Daily Seed). */}
+      {/* Auth card — hidden once logged in. Above the version tag: it is a
+          control, and v1.0 is a footnote, so burying the only way to sign in
+          under the footnote read as an afterthought. */}
+      {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
+
+      {/* Version tag — closes the column. */}
       <span style={{
         fontFamily: 'Orange Kid', fontSize: '14px',
         color: dark ? '#888' : '#999',
       }}>
         v1.0
       </span>
-
-      {/* Auth card — hidden once logged in */}
-      {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
 
       </div>
     </div>
@@ -179,10 +180,15 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         }}
       />
       {/* Readability scrim: `cover` crops differently per aspect ratio, so on
-          wide viewports the bright hillside can creep under the column. */}
+          wide viewports the bright hillside can creep under the column. The
+          second stop darkens the bottom-right, where the calling card and the
+          auth card sit — the brightest part of most crops. */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(to right, rgba(0,0,0,0.55), transparent 45%)',
+        background: [
+          'linear-gradient(to right, rgba(0,0,0,0.55), transparent 45%)',
+          'linear-gradient(to top left, rgba(0,0,0,0.5), transparent 40%)',
+        ].join(', '),
       }} />
 
       <div style={{

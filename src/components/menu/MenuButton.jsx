@@ -13,8 +13,13 @@ export default function MenuButton({ def, dark, style }) {
 
   return (
     <button
+      // Explicit type: inside a <form> (LoginForm) an unset type defaults to
+      // "submit", which would make every secondary bar submit the form.
+      type={def.type ?? 'button'}
       onClick={def.onClick}
-      className={`hover:scale-105 active:scale-95 transition-transform duration-150${def.className ? ` ${def.className}` : ''}`}
+      disabled={def.disabled}
+      aria-busy={def.ariaBusy || undefined}
+      className={`hover:scale-105 active:scale-95 transition-transform duration-150 disabled:opacity-50 disabled:hover:scale-100${def.className ? ` ${def.className}` : ''}`}
       style={{
         width: '320px', maxWidth: '100%', height: '40px',
         background: def.background,
