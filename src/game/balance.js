@@ -174,6 +174,32 @@ export const BALANCE = deepFreeze({
       plate_psychic: 300,
       plate_fire: 300,
       plate_ground: 300,
+
+      // ── Curated-shelf items (2026-07-31-map-shop-curation-design.md) ─────
+      // Priced onto the EXISTING rungs rather than inventing new ones:
+      // $150 heal / $200 mid / $250 mid+ / $300 plate-class / $400-450 epic /
+      // $600 legendary / $900 ceiling.
+      //
+      // Sitrus Berry matches the Max Heal's price because it IS a heal — one
+      // you cannot aim. Wise Glasses matches Muscle Band because it is that
+      // item mirrored onto special attack; pricing them apart would make the
+      // choice about value rather than about the team you are running.
+      sitrus_berry: 150,
+      big_root: 200,
+      wise_glasses: 200,
+      iron_ball: 250,
+      black_sludge: 250,
+      assault_vest: 300,
+      // Epic tier sits above every plate: unconditional where a plate is
+      // type-locked.
+      bright_powder: 400,
+      eviolite: 400,
+      life_orb: 450,
+      kings_rock: 450,
+      // Legendary, but below Mega Revive: each changes ONE Pokémon, where the
+      // $900 ceiling recovers the whole team.
+      type_prism: 600,
+      focus_sash: 600,
     },
     // Units a single shop stocks. Uncapped stock would turn a legendary
     // windfall into five heals and undo the attrition pressure.
