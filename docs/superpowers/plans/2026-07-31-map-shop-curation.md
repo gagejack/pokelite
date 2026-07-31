@@ -1,8 +1,10 @@
-# Map Shop Curation Implementation Plan
+# Map Shop Curation Implementation Plan (Kanto)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn eight identical Pokémart shelves into eight town-specific shops, driven entirely by region config data plus one small change to stock resolution.
+**Goal:** Turn Kanto's eight identical Pokémart shelves into eight town-specific shops, driven entirely by region config data plus one small change to stock resolution.
+
+**Scope: Kanto only.** Tasks 1, 2 and 5 are region-agnostic (the stock mechanism, the shared price table, the mobile check). Task 3 authors Kanto's eight towns. Task 4 gives Unova a holding pattern, NOT curated content — its towns are not themed in this codebase and inventing a fiction blind would produce exactly the generic shelves this work removes. Curating another region is a separate spec section plus a separate plan; see §7 of the design doc for that checklist.
 
 **Architecture:** `getShopInventory(config, mapIndex)` already composes `shopGeneric` + `shopPools[mapIndex]`. This plan (1) teaches `toEntry` to accept `{ id, stock }` objects alongside bare string ids, (2) adds twelve price entries so currently-unpriced items become sellable, and (3) rewrites the `shopGeneric` / `shopPools` tables in `kanto.js` and `unova.js`. Everything except step 1 is data.
 
@@ -19,7 +21,8 @@
 - **`shop.js` stays pure.** No React, no `rng`, no side effects. Same inputs → same output.
 - **Stock precedence, exactly:** explicit per-map `stock` > `BALANCE.economy.shopStock[id]` > `1`.
 - **Prices are authoritative from the spec's pricing table.** Do not invent or round values.
-- **Hoenn and Sinnoh are untouched.** They are stubs (`maps: []`).
+- **Kanto is the only region curated.** Unova gets a holding pattern (Task 4). Do not author town fiction or plate mappings for any other region in this plan.
+- **Hoenn and Sinnoh are untouched.** They are stubs (`maps: []`). Johto has a menu thumbnail but no config file in `src/game/regions/`.
 - **Lint and build must stay clean:** `npm run lint` and `npm run build`.
 
 ---
@@ -290,9 +293,11 @@ git commit -m "balance: price the curated shelf items"
 
 ---
 
-### Task 3: Kanto's eight towns
+### Task 3: Kanto's eight towns *(Kanto content)*
 
-The content payload. Replaces Kanto's four-item generic shelf with one item, and fills all eight curated pools.
+The content payload, and the only region this plan curates. Replaces Kanto's four-item generic shelf with one item, and fills all eight curated pools.
+
+Another region's shelves are NOT part of this plan. When one is added, it gets its own spec section (design doc §7) and its own task modelled on this one — same shape, different content.
 
 **Files:**
 - Modify: `src/game/regions/kanto.js:478-501`
@@ -438,9 +443,11 @@ git commit -m "feat(shop): Kanto's eight towns get their own shelves"
 
 ---
 
-### Task 4: Unova's re-homed generics
+### Task 4: Unova's re-homed generics *(holding pattern, NOT curation)*
 
 Unova's towns are not themed in this codebase, and inventing a fiction blind would produce exactly the generic shelves this work removes. So Unova gets the same shrunk generic list and the mid-tier rungs re-homed onto three maps — no worse than today, with a template for the next pass.
+
+**This task deliberately does not theme Unova.** Do not invent town fiction or plate mappings here. Curating Unova means appending a section to the design doc (§7 checklist) and writing a task like Task 3, in a later cycle.
 
 **Files:**
 - Modify: `src/game/regions/unova.js:656-661`

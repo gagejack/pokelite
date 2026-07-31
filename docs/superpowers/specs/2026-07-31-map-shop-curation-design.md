@@ -1,7 +1,10 @@
-# Map Shop Curation — Design
+# Map Shop Curation — Design (Kanto)
 
 **Date:** 2026-07-31
 **Status:** Design approved; ready for an implementation plan
+**Scope:** **Kanto only.** The curation *system* is region-agnostic; the
+authored *content* in this spec covers Kanto's eight towns. Every other region
+is listed in §7 with what it would take to add it.
 **Builds on:** `2026-07-29-pokemart-shelf-design.md`
 **Supersedes:** §1 (the generic shelf) and §3 (shelf composition) of that spec
 
@@ -24,6 +27,12 @@ since the shelf spec shipped. What is missing is content.
 
 Make each map's shop feel like *that map's* shop, so the reason to buy is
 "that is a Cinnabar item" rather than "that is the item I can afford".
+
+**Kanto is the only region this spec authors.** The mechanism (§5) and the
+curation principle (§1) are region-agnostic and apply to every region that
+follows; the eight-town table in §3 is Kanto content and nothing else. Adding a
+region is a content pass, not a code change — see §7 for the checklist and the
+per-region sections to append.
 
 Two constraints inherited from the specs this builds on, both preserved:
 
@@ -80,7 +89,7 @@ times each:
 
 **Mega Revive → Celadon (map 4)**, and nowhere else. See §4.
 
-### 3. Kanto's eight towns
+### 3. Kanto's eight towns *(Kanto content — one section like this per region)*
 
 Each shelf is Max Heal plus three curated items, for **four entries per shop**.
 Celadon is the one exception: it curates only two new items and spends its third
@@ -153,25 +162,71 @@ global table stays as the fallback so nothing existing changes.
 
 This is the only code change in the spec. Everything else is data.
 
-### 6. Unova
+### 6. Unova *(holding pattern, not curated content)*
 
-Unova's `shopPools` is empty and its towns are not yet themed in this codebase.
+Unova's `shopPools` is empty and its towns are not themed in this codebase.
 Filling all eight Unova shelves is **out of scope** — it needs the same
 town-by-town fiction pass Kanto gets here, and doing it blind would produce
 exactly the generic shelves this spec exists to remove.
 
-Unova instead gets the shrunk generic list plus a **documented pattern to
-follow**, so its shops are no worse than today and the next pass has a template.
-Its four current generics collapse to `max_heal`; `muscle_band`, `light_clay`
-and `mega_revive` move into `shopPools` on maps 1, 3 and 4 respectively,
-mirroring Kanto's rung placement without claiming a fiction that has not been
-designed.
+Unova instead gets the shrunk generic list and the three former generics
+re-homed onto maps 1, 3 and 4, mirroring Kanto's rung placement without claiming
+a fiction that has not been designed. Its shops end up no worse than today, and
+the remaining pools stay empty — an empty pool resolves to no curated items,
+not an error.
 
-Hoenn and Sinnoh are stubs (`maps: []`) and are untouched.
+**This is a placeholder, not a design.** When Unova is curated properly, §7's
+checklist replaces this section with a real eight-town table.
 
-## Pricing
+## 7. Adding a region
 
-Nine items become purchasable for the first time. Prices are assigned to
+Every region needs its own authored content. The system does not generalise the
+*content* — that is the point of the design, since a shelf that could belong to
+any town belongs to none.
+
+**No code changes are required to add a region.** §5's mechanism and the pricing
+table below are shared. Adding a region is:
+
+1. **Append a section to this spec**, numbered after the last region section,
+   titled `### N. <Region>'s <count> towns`, containing the same three columns
+   as §3: map index, town, fiction, curated items.
+2. **Confirm the plate mapping.** One `plate_<gymtype>` per map, matched to that
+   map's gym type — thematic, not counter-typed (see
+   `2026-07-29-pokemart-shelf-design.md` §2). Verify each gym's type against
+   that region's `*.teams.js` lead Pokémon rather than from memory. A region
+   whose gyms repeat a type cannot use a one-to-one mapping and needs a note
+   saying what it does instead.
+3. **Keep the price ladder per shelf.** Roughly one item at each of $150 /
+   $200–300 / $400+. A new player who does not know the region reads the ladder,
+   not the fiction.
+4. **Price any item the region introduces to the shelf**, appending to the
+   shared Pricing table (next section). Reuse an existing price where the item
+   sits on an existing rung. An unpriced id is silently dropped by `toEntry`, so
+   an unpriced item renders as a missing shelf entry rather than an error —
+   check the region's shelves render at full length before calling it done.
+5. **Set `shopGeneric: ['max_heal']`** for the region. Healing must be
+   purchasable on every map of every region.
+6. **Add the region's tests** to `src/game/shop.test.js`, mirroring the Kanto
+   block: heal on every map, expected shelf size per map, plate per map, and any
+   single-vendor item appearing exactly once.
+
+**Region status:**
+
+| Region | Maps | Shop status |
+|---|---|---|
+| Kanto | 8 | **Curated** — §3 |
+| Unova | 8 | Holding pattern — §6. Needs a town-by-town pass. |
+| Johto | — | Not implemented in `regions/`. |
+| Hoenn | 0 | Stub (`maps: []`). Untouched. |
+| Sinnoh | 0 | Stub (`maps: []`). Untouched. |
+
+## Pricing *(shared by every region)*
+
+Prices live in `BALANCE.economy.prices` and are global — an item costs the same
+in every region's shops. A later region reuses these rungs rather than
+re-pricing, and appends only items no region has sold before.
+
+Twelve items become purchasable for the first time. Prices are assigned to
 preserve the existing ladder, not to introduce a new one:
 
 | Item | Price | Rung | Reasoning |
