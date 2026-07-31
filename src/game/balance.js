@@ -225,6 +225,11 @@ export const BALANCE = deepFreeze({
       kingsRockCritFactor: 2 / 1.5,
       typePlate: 1.5,
       weaknessPolicy: 1.5,
+      // Polarity Band — retypes the holder's MOVE to its alternate type and
+      // boosts it. The boost is the reason to hold it even when the swap alone
+      // isn't an upgrade: without it the band would be a strictly worse Life
+      // Orb on any Pokémon whose types are close in value.
+      polarityBand: 1.25,
       cellBattery: 1.3,
       brightPowderChance: 0.20,
       brightPowderFactor: 0.5,

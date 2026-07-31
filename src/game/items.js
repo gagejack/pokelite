@@ -104,6 +104,12 @@ export const ITEMS = [
   // is roughly one and a half trainer fights, which is a real boost but not a
   // fight-deciding one.
   { id: 'rare_candy',     name: 'Rare Candy',     description: 'Raises one Pokémon by 3 levels',           tier: 'rare', icon: 'rare-candy', consumable: 'level' },
+  // HELD, not consumed. Retypes the holder's move to its alternate type and
+  // adds 25% damage — the boost is what makes it worth a held slot even when
+  // the swap alone isn't an upgrade. Does nothing on a single-type Pokémon.
+  // The move is rebuilt on equip and restored on removal (see App.moveItem), so
+  // the move NAME always matches the damage it deals.
+  { id: 'polarity_band',  name: 'Polarity Band',  description: "Move uses the Pokémon's alternate type, +25% damage", tier: 'rare', icon: 'ability-urge', retype: 'move' },
 
   // --- Epic ---
   { id: 'life_orb',       name: 'Life Orb',       description: '+30% damage on all moves',                 tier: 'epic',     icon: 'life-orb' },
@@ -124,6 +130,14 @@ export const ITEMS = [
   // to see was active. Always-on needs no flag and no explanation.
   { id: 'weakness_policy',name: 'Weakness Policy',description: 'Super-effective moves deal 50% more damage', tier: 'legendary',   icon: 'weakness-policy' },
   { id: 'resist_charm',   name: 'Resist Charm',   description: 'Super-effective hits deal 50% less damage', tier: 'legendary',    icon: 'chople-berry' },
+  // CONSUMED. Collapses a dual-type Pokémon onto its alternate type entirely —
+  // Swampert (water/ground) becomes pure Ground, losing the Water half both
+  // offensively and DEFENSIVELY. That is the whole design: it trades
+  // resistances for the removal of 4x weaknesses. Swampert sheds its 4x Grass,
+  // Gyarados its 4x Electric, and both drop from five resistances to two or
+  // three. Legendary because it rewrites what a Pokémon is, permanently.
+  // Kept, not consumed, on a single-type Pokémon — it has no alternate.
+  { id: 'type_prism',     name: 'Type Prism',     description: 'Permanently changes a Pokémon to its alternate type', tier: 'legendary', icon: 'griseous-orb', consumable: 'retype' },
   // Ignores its drop target — always applies to the whole roster.
   { id: 'mega_revive',    name: 'Mega Revive',    description: 'Revives and fully heals the whole team', tier: 'legendary', icon: 'sacred-ash', consumable: 'revive_all' },
 
@@ -132,6 +146,19 @@ export const ITEMS = [
   // all 18 stay consistent; each carries `boostType` for the battle hook.
   ...TYPE_BOOST_ITEMS,
 ]
+
+// Consumables that route through App.applyConsumable — they share one contract
+// (`{ roster, used }`, kept when `used` is false) and every drop path treats
+// them identically. Listed here rather than inline at each of the three call
+// sites, which had already started to drift.
+//
+// NOT included: `evolve` and `level`, which go through useEvolutionFlow instead
+// because they can change a Pokémon's species and need its notice/choice popups.
+export const ROSTER_CONSUMABLES = ['heal', 'revive', 'revive_all', 'retype']
+
+export function isRosterConsumable(item) {
+  return ROSTER_CONSUMABLES.includes(item?.consumable)
+}
 
 export function itemIconUrl(item) {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.icon}.png`

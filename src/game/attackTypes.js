@@ -192,5 +192,23 @@ export const ATTACK_TYPE = {
 // `types` is the instance's own array, so a species missing from the table (a
 // new region, a form not yet authored) still resolves.
 export function attackTypeFor(pokeId, types) {
+  // A Type Prism leaves the Pokémon single-typed, so there is nothing to
+  // choose and the authored row no longer applies — consulting the table here
+  // would drag a prismed Swampert back to Water on its next TM or evolution.
+  if (types?.length === 1) return types[0]
   return ATTACK_TYPE[pokeId] ?? types?.[0] ?? 'normal'
+}
+
+// The OTHER type — the one `attackTypeFor` didn't pick. Null for a single-type
+// Pokémon, which has no alternate.
+//
+// This is the primitive behind both retyping items: the Polarity Band swaps
+// which type the MOVE uses, and the Type Prism collapses the Pokémon onto its
+// alternate entirely. Both are no-ops when this returns null, and both are KEPT
+// rather than consumed in that case — 209 of 371 species are single-type, so
+// this is the common case, not an edge case.
+export function alternateTypeFor(pokeId, types) {
+  if (!types || types.length < 2) return null
+  const primary = attackTypeFor(pokeId, types)
+  return types.find(t => t !== primary) ?? null
 }

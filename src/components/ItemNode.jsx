@@ -6,6 +6,7 @@ import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 import { MAX_LEVEL } from '../game/pokemon.js'
+import { alternateTypeFor } from '../game/attackTypes.js'
 import { PokemonCardContent } from './Roster'
 
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
@@ -128,6 +129,13 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 // Rare Candy: mirrors applyRareCandy's only refusal.
                 if (c === 'level' && pokemon.level >= MAX_LEVEL) {
                   return 'Already max level'
+                }
+                // Type Prism, and the Polarity Band's held-item equivalent:
+                // both need a second type to swap to. 209 of 371 species are
+                // single-type, so this reason is common rather than rare.
+                if ((c === 'retype' || selectedItem.retype === 'move')
+                    && !alternateTypeFor(pokemon.pokeId, pokemon.types)) {
+                  return 'Only one type — nothing to swap'
                 }
                 return null
               })()

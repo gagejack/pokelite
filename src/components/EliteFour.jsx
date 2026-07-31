@@ -12,7 +12,7 @@ import { BALANCE } from '../game/balance.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { swapInRoster } from '../game/roster.js'
-import { itemIconUrl } from '../game/items.js'
+import { itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
@@ -192,7 +192,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     setMovingItem(null)
     // Healing consumables: apply + consume, but KEEP the item on a no-op
     // (target already at full HP). Mirrors NodeMap's handler.
-    if (['heal', 'revive', 'revive_all'].includes(item?.consumable) && to.kind === 'pokemon') {
+    if (isRosterConsumable(item) && to.kind === 'pokemon') {
       const used = onApplyConsumable?.(item, to.pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       return

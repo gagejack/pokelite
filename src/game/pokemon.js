@@ -1,5 +1,5 @@
 import { getTypeMove, tierForLevel } from './typeMoves.js'
-import { attackTypeFor } from './attackTypes.js'
+import { attackTypeFor, alternateTypeFor } from './attackTypes.js'
 import { slimChain, speciesIdFromUrl, levelUpPathTo, downgradeTarget } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
@@ -589,6 +589,52 @@ export function levelUp(instance, base, levels) {
 // drive the same popups. `used: false` means the item did nothing and must be
 // KEPT: that happens only at MAX_LEVEL, or on a Pokémon with no `_base` (which
 // would make the stat recalculation impossible).
+// Polarity Band — rebuild a Pokémon's move on its alternate type (`on`) or on
+// its natural attacking type (`off`). Called when the band is equipped and
+// again when it leaves, so the move never outlives the item that changed it.
+//
+// The move's TIER is preserved: TM upgrades are progress the player paid for
+// and must survive an item swap. A single-type Pokémon has no alternate, so
+// this returns it untouched — the band is inert rather than broken.
+export function retypeMove(pokemon, on) {
+  if (!pokemon) return pokemon
+  const tier = pokemon.move?.tier ?? tierForLevel(pokemon.level)
+  const alt = alternateTypeFor(pokemon.pokeId, pokemon.types)
+  if (on && !alt) return pokemon
+  const type = on ? alt : attackTypeFor(pokemon.pokeId, pokemon.types)
+  return { ...pokemon, move: getTypeMove(type, tier) }
+}
+
+// Type Prism — collapse a dual-type Pokémon onto its alternate type, for good.
+//
+// This rewrites `types`, not just the move, so it changes DEFENSE as much as
+// offense: a water/ground Swampert becomes pure Ground, shedding its 4x Grass
+// weakness along with five resistances. Both halves of that trade are the point.
+//
+// The move is rebuilt to match, because a Pokémon whose displayed move type
+// disagrees with its actual typing reads as a bug.
+//
+// Returns { roster, used } like the healing helpers. `used: false` means KEEP
+// the item: a single-type Pokémon has no alternate, which is 209 of the 371
+// species in the dex — the common case, not an edge case.
+export function applyTypePrism(roster, index) {
+  const target = roster[index]
+  if (!target) return { roster, used: false }
+  const alt = alternateTypeFor(target.pokeId, target.types)
+  if (!alt) return { roster, used: false }
+
+  return {
+    roster: roster.map((p, i) => i === index ? {
+      ...p,
+      types: [alt],
+      // Preserve the move's TIER (set by TM nodes, not by level) while retyping
+      // it — the same rule evolution follows.
+      move: getTypeMove(alt, p.move?.tier ?? tierForLevel(p.level)),
+    } : p),
+    used: true,
+  }
+}
+
 export async function applyRareCandy(roster, index, levels, { maxSpeciesId = Infinity } = {}) {
   const target = roster[index]
   const none = { roster, used: false, evolutionNotices: [], evolutionChoices: [] }

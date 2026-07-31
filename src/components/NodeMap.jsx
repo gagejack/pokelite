@@ -15,7 +15,7 @@ import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
 import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
-import { pickThreeItems, itemIconUrl } from '../game/items.js'
+import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, GEN_MAX_ID } from '../game/pokemon.js'
@@ -1000,7 +1000,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   async function applyConsumableTo(item, from, pokeIndex) {
     // Healing consumables. A no-op (target already at full HP) KEEPS the item
     // rather than wasting it. Mega Revive ignores the target and heals all.
-    if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
+    if (isRosterConsumable(item)) {
       const used = onApplyConsumable?.(item, pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       // Kept, not consumed — say why, or the tap looks broken.
@@ -1461,7 +1461,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               await evo.evolveWithStone(pokemonIndex)
             } else if (item?.consumable === 'level') {
               await evo.useRareCandy(pokemonIndex)
-            } else if (['heal', 'revive', 'revive_all'].includes(item?.consumable)) {
+            } else if (isRosterConsumable(item)) {
               // Used straight from the offer. A no-op (full-HP target) still
               // clears the node — the player picked it from three; it simply
               // had no effect. The keep-on-no-op rule applies to the bag path,

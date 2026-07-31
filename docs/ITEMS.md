@@ -32,12 +32,12 @@ budget. See `itemWeight()` in `items.js:119`.
 | Tier | Budget | Items | Each | Border color |
 |---|---|---|---|---|
 | common | 60% | 24 | **2.50%** | `#9ca3af` grey |
-| rare | 25% | 13 | **1.92%** | `#3b82f6` blue |
+| rare | 25% | 14 | **1.79%** | `#3b82f6` blue |
 | epic | 10% | 6 | **1.67%** | `#a855f7` purple |
-| legendary | 5% | 4 | **1.25%** | `#facc15` yellow |
+| legendary | 5% | 5 | **1.00%** | `#facc15` yellow |
 
 > **Counterintuitive but correct:** a *common* item is individually rarer than a
-> *rare* one (2.50% vs 1.92%), because the 18 type plates dilute the common
+> *rare* one (2.50% vs 1.79%), because the 18 type plates dilute the common
 > tier. The tier names describe the tier's total share, not per-item odds.
 
 Adding an item to a tier makes every existing item in that tier proportionally
@@ -103,7 +103,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Rare (13 items, 1.92% each)
+## Rare (14 items, 1.79% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
@@ -120,6 +120,7 @@ offered per node** — once drawn, the rest are removed from that node's pool
 | `max_revive` | Max Revive | Revives a fainted Pokémon at full HP; full-heals a healthy one | **Consumable** — `consumable: 'revive'` |
 | `evolve_stone` | Moon Stone | Instantly evolves the Pokémon it is given to | **Consumable** — `consumable: 'evolve'` |
 | `rare_candy` | Rare Candy | Raises one Pokémon by 3 levels | **Consumable** — `consumable: 'level'`, `rareCandyLevels` 3 |
+| `polarity_band` | Polarity Band | Move uses the Pokémon's alternate type, +25% damage | **Held** — `retype: 'move'`, `polarityBand` ×1.25 |
 
 ---
 
@@ -136,14 +137,43 @@ offered per node** — once drawn, the rest are removed from that node's pool
 
 ---
 
-## Legendary (4 items, 1.25% each)
+## Legendary (5 items, 1.00% each)
 
 | id | Name | Effect | Implementation |
 |---|---|---|---|
 | `focus_sash` | Focus Sash | Survive any KO hit at full HP | Once per battle, at full HP only |
+| `type_prism` | Type Prism | Permanently changes a Pokémon to its alternate type | **Consumable** — `consumable: 'retype'` |
 | `weakness_policy` | Weakness Policy | Super-effective moves deal 50% more damage | `weaknessPolicy` ×1.5 when `effectiveness > 1` |
 | `resist_charm` | Resist Charm | Super-effective hits deal 50% less damage | `resistCharm` ×0.5 (icon: `chople-berry`) |
 | `mega_revive` | Mega Revive | Revives and fully heals the whole roster | **Consumable** — `consumable: 'revive_all'` |
+
+---
+
+## Alternate types
+
+Two items key off a Pokémon's **alternate type** — the one it is not currently
+attacking with. Both are inert on the 209 single-type species in the dex, and
+both are kept rather than spent in that case.
+
+`src/game/attackTypes.js` holds one authored row per dual-type species naming
+which type it attacks with; `alternateTypeFor()` returns the other one, or null.
+
+| Item | Scope | Reversible |
+|---|---|---|
+| Polarity Band | The move only. Types are untouched. | Yes — held, reverts on removal |
+| Type Prism | The whole Pokémon. `types` becomes `[alternate]`. | No — consumed |
+
+**The Prism changes defence, not just offence,** and that is the design. A
+water/ground Swampert becomes pure Ground: it sheds its 4× Grass weakness but
+drops from five resistances to two. Gyarados sheds 4× Electric the same way.
+Removing a 4× weakness in exchange for resistances is a real trade, not an
+upgrade.
+
+**The Band rebuilds the move at equip time** (`App.moveItem` and
+`App.handleItemAssign`) rather than reading the item during battle, so the
+displayed move name always matches the damage it deals. Its move tier survives
+the swap, because TM upgrades are progress the player paid for. Battle only owes
+it the ×1.25.
 
 ---
 
@@ -153,8 +183,8 @@ Most items are **held**: equipped to one Pokémon, modifying battle math. A
 consumable is different — it is *used*, produces an immediate effect, and is
 destroyed.
 
-There are five: `evolve_stone`, `rare_candy`, `max_heal`, `max_revive`, and
-`mega_revive`. They share one mechanism:
+There are six: `evolve_stone`, `rare_candy`, `type_prism`, `max_heal`,
+`max_revive`, and `mega_revive`. They share one mechanism:
 
 - Each carries a `consumable` field the UI keys off. None reaches `battle.js`,
   so the sim needs no case for any of them.

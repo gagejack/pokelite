@@ -10,7 +10,7 @@ import DailyChallenge from './components/DailyChallenge'
 // starts, so they load on demand instead of bloating the initial chunk.
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
-import { fetchPokemonBase, buildPokemonInstance, prewarmCache } from './game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
@@ -442,8 +442,19 @@ export default function App() {
     setCashEarned(0)
   }
 
+  // Equip straight from an item offer. This path bypasses moveItem, so it has
+  // to apply the Polarity Band's move retype itself — including releasing the
+  // one being swapped out, or a band displaced here would leave its retyped
+  // move behind on a Pokémon no longer holding it.
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
-    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? { ...p, heldItem: item } : p))
+    setRoster(prev => prev.map((p, i) => {
+      if (i !== pokemonIndex) return p
+      let next = p
+      if (swapBackItem?.retype === 'move') next = retypeMove(next, false)
+      next = { ...next, heldItem: item }
+      if (item?.retype === 'move') next = retypeMove(next, true)
+      return next
+    }))
     if (swapBackItem) setBag(prev => [...prev, swapBackItem])
   }
 
@@ -471,10 +482,24 @@ export default function App() {
     const displaced = to.kind === 'pokemon' ? (roster[to.pokeIndex]?.heldItem ?? null) : null
 
     // Roster: clear the source Pokémon (if any) and set the target's held item.
+    // The Polarity Band retypes its holder's move, so both ends of the move
+    // need a rebuild: the Pokémon losing it reverts to its natural attacking
+    // type, and the one gaining it switches to its alternate. Rebuilding here
+    // rather than reading the item during battle keeps the displayed move name
+    // honest — a move that says "Body Slam" always deals Normal damage.
     setRoster(prev => prev.map((p, i) => {
       let next = p
-      if (from.kind === 'pokemon' && i === from.pokeIndex) next = { ...next, heldItem: null }
-      if (to.kind === 'pokemon' && i === to.pokeIndex) next = { ...next, heldItem: item }
+      if (from.kind === 'pokemon' && i === from.pokeIndex) {
+        next = { ...next, heldItem: null }
+        if (item.retype === 'move') next = retypeMove(next, false)
+      }
+      if (to.kind === 'pokemon' && i === to.pokeIndex) {
+        // A displaced Polarity Band also has to release its hold on the move
+        // before the incoming item is applied.
+        if (displaced?.retype === 'move') next = retypeMove(next, false)
+        next = { ...next, heldItem: item }
+        if (item.retype === 'move') next = retypeMove(next, true)
+      }
       return next
     }))
 
@@ -497,6 +522,10 @@ export default function App() {
       heal:       r => healOne(r, pokeIndex),
       revive:     r => reviveOne(r, pokeIndex),
       revive_all: r => reviveAll(r),
+      // Type Prism. Shares the { roster, used } contract, so it needs no
+      // special case here — a single-type target returns used:false and the
+      // prism is kept, exactly like a Max Heal on a full-HP Pokémon.
+      retype:     r => applyTypePrism(r, pokeIndex),
     }[item?.consumable]
     if (!apply) return false
 

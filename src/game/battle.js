@@ -82,6 +82,9 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   // Weakness Policy — the attacking mirror of Resist Charm below: it scales the
   // hits Resist Charm blunts. Always on, no trigger.
   if (aItem === 'weakness_policy' && effectiveness > 1) itemDmg *= HI.weaknessPolicy
+  // Polarity Band — the move was already retyped at equip time (App.moveItem),
+  // so battle only owes it the damage boost. Nothing here reads the type.
+  if (aItem === 'polarity_band') itemDmg *= HI.polarityBand
   // Persistent bonuses granted after a trigger earlier in the battle.
   if (aItem === 'cell_battery' && attacker._cellActive) itemDmg *= HI.cellBattery
 
