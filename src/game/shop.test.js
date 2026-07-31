@@ -66,3 +66,13 @@ test('the price ladder keeps its rungs', () => {
   assert.equal(p.plate_rock, 300)
   assert.equal(p.mega_revive, 900)    // the ceiling, unchanged
 })
+
+// Kanto region-level shelf tests (kantoConfig content: every map sells a
+// heal, exactly one map at 3 entries / 5 stock units vs. 4 elsewhere, plate
+// coverage, Celadon-only Mega Revive, re-homed mid-tier items) are
+// deliberately NOT here. kanto.js eagerly imports ~140 .webp sprites at
+// module scope, which plain `node --test` cannot resolve (no bundler, no
+// asset loader) — importing kantoConfig here breaks the whole file before a
+// single test runs. Adding Vitest or restructuring kanto.js for testability
+// is out of scope for this task. Kanto's eight curated shelves are verified
+// by play-testing instead (see task-3-report.md, "known coverage gap").

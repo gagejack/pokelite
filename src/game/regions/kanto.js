@@ -473,31 +473,52 @@ export const kantoConfig = {
   catchPools: CATCH_POOLS,
   legendaryPools: LEGENDARY_POOLS,
   legendaryIds: [...new Set(LEGENDARY_POOLS.flat().map(l => l.id))],
-  // Pokémart shelves (see game/shop.js). Both are arrays of item ids from
-  // game/items.js; price and stock come from BALANCE.economy, not from here.
-  // `shopGeneric` is offered at EVERY map's shop; `shopPools[i]` is map i's
-  // curated extra. Five items per shop: these four plus the map's plate.
-  shopGeneric: ['max_heal', 'muscle_band', 'light_clay', 'mega_revive'],
-  // One type-boost plate per map, matched to that map's GYM TYPE (verified
-  // against each leader's lead Pokémon in kanto.teams.js). Kanto's eight gyms
-  // cover eight distinct types, so the mapping is one-to-one with no repeats.
+  // Pokémart shelves — see game/shop.js and
+  // docs/superpowers/specs/2026-07-31-map-shop-curation-design.md.
   //
-  // Thematic, NOT counter-typed — and the consequence is deliberate: the plate
-  // sold on a map is the one that helps least against that map's gym (a Flame
-  // Plate does nothing to Blaine). It makes the shop where you invest in the
-  // NEXT map rather than where you tool up for this one, reads as a regional
-  // speciality, and keeps plates from competing with the Max Heal for the same
-  // urgent money. If this reads as broken rather than as flavour in
-  // play-testing, counter-typing is a one-line change to this table.
+  // `shopGeneric` is offered at EVERY map's shop; `shopPools[i]` is map i's
+  // curated list. Only the heal is universal: a run that cannot buy a heal is
+  // decided by map layout rather than by play. Everything else is curated, so
+  // each shop reads as THAT TOWN's shop.
+  shopGeneric: ['max_heal'],
+
+  // One type-boost plate per map, matched to that map's GYM TYPE (verified
+  // against each leader's lead Pokémon in kanto.teams.js). Thematic, NOT
+  // counter-typed: the plate sold on a map is the one that helps least against
+  // that map's gym, which makes the shop where you invest in the NEXT map.
+  //
+  // The other two items per shelf come from what the TOWN is. Each shelf keeps
+  // the price ladder — roughly $150 heal / $200-300 mid / $400+ ceiling — so a
+  // player who does not know Kanto still has a legible spread.
   shopPools: [
-    ['plate_rock'],       // Map 1 — Pewter, Brock (rock)
-    ['plate_water'],      // Map 2 — Cerulean, Misty (water)
-    ['plate_electric'],   // Map 3 — Vermilion, Lt. Surge (electric)
-    ['plate_grass'],      // Map 4 — Celadon, Erika (grass)
-    ['plate_poison'],     // Map 5 — Fuchsia, Koga (poison)
-    ['plate_psychic'],    // Map 6 — Saffron, Sabrina (psychic)
-    ['plate_fire'],       // Map 7 — Cinnabar, Blaine (fire)
-    ['plate_ground'],     // Map 8 — Viridian, Giovanni (ground)
+    // Map 1 — Pewter: museum town, stone and fossils, defensive
+    ['plate_rock', 'light_clay', 'eviolite'],
+    // Map 2 — Cerulean: seaside and cape. Sitrus + Big Root is a recovery
+    // build bought in one stop (Big Root multiplies the berry's heal).
+    ['plate_water', 'sitrus_berry', 'big_root'],
+    // Map 3 — Vermilion: working port. Freight is heavy and slow — Iron Ball
+    // trades Speed for power, Muscle Band is the dock-labour stat stick.
+    ['plate_electric', 'muscle_band', 'iron_ball'],
+    // Map 4 — Celadon: THE DEPARTMENT STORE. The only Mega Revive vendor in
+    // the run, and the only shop that restocks the heal to three. At the
+    // midpoint this makes "save for Celadon" a strategy rather than a habit,
+    // and gives the $900 ceiling purchase a location instead of being
+    // perpetually available and perpetually declined.
+    ['plate_grass', 'mega_revive', { id: 'max_heal', stock: 3 }],
+    // Map 5 — Fuchsia: Safari Zone, poison and wardens. Bright Powder is the
+    // Zone's evasion; Black Sludge is Koga's own passive.
+    ['plate_poison', 'black_sludge', 'bright_powder'],
+    // Map 6 — Saffron: Silph Co. Wise Glasses is corporate special attack;
+    // Assault Vest is the defensive answer to Saffron's own specialty, sold
+    // in the same building.
+    ['plate_psychic', 'wise_glasses', 'assault_vest'],
+    // Map 7 — Cinnabar: the volcanic research lab. Type Prism is the only item
+    // that permanently rewrites what a Pokémon is, sold by the lab that does
+    // exactly that. Fiction and mechanic are the same sentence.
+    ['plate_fire', 'life_orb', 'type_prism'],
+    // Map 8 — Viridian: Giovanni's turf, the last shop before the League. You
+    // buy your second life here or you do not get one.
+    ['plate_ground', 'kings_rock', 'focus_sash'],
   ],
   badges: BADGES,
   // Battle data (see kanto.teams.js) — read by the generic loop via config.
