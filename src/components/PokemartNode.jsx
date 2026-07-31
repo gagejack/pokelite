@@ -100,8 +100,11 @@ export default function PokemartNode({ inventory, speedCash, onBuy, onClose, ini
             Pokémart
           </span>
           {/* cash(dark), not a flat #facc15: this sits on the themed panel,
-              where the yellow measures 1.11:1 in light mode. */}
-          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '20px' : '17px', color: cash(dark) }}>
+              where the yellow measures 1.11:1 in light mode.
+              Sized to match the "Pokémart" title rather than sit under it —
+              the balance is the number every price below is measured against,
+              so it earns equal billing with the header it shares a line with. */}
+          <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '28px' : '23px', color: cash(dark) }}>
             ${speedCash}
           </span>
           <button
