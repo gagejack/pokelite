@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { cash } from '../lib/colors'
+import { cash, muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -1131,32 +1131,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} showTutorial>
-      {/* Speed Cash balance — DESKTOP ONLY. Fixed top-left, clearing the nav
-          bar; zIndex sits below the battle overlay (100) so a battle covers it.
-          Mobile shows the balance at the right end of the bag bar instead: a
-          floating pill there would either overlay the map art or push the map
-          in, and the bag bar is already full-width so it costs nothing. */}
-      {isDesktop && (
-        <div
-          // Tutorial marker for the "fights pay Speed Cash" step. The mobile
-          // balance in the bag bar carries the same key — only one of the two
-          // is mounted at a time, so the query resolves on either platform.
-          data-tutorial="cash"
-          style={{
-            position: 'fixed', top: '8px', left: '8px', zIndex: 50,
-            display: 'flex', alignItems: 'center', gap: '4px',
-            backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
-            pointerEvents: 'none',
-          }}
-        >
-          {/* cash(true) unconditionally: this pill's backdrop is a fixed
-              rgba(0,0,0,0.55) in BOTH themes, so it always wants the
-              dark-surface green (12:1 on black) regardless of the app theme. */}
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
-            ${speedCash}
-          </span>
-        </div>
-      )}
+      {/* Desktop's Speed Cash balance lives under the badges column (see the
+          right column below), not in a fixed corner pill. The pill sat at
+          top-left at zIndex 50, under the nav bar's 150 — it was never actually
+          visible on desktop. Mobile keeps its balance at the right end of the
+          bag bar, which is already full-width and costs the map nothing. */}
       {isDesktop ? (
         <div className="flex flex-col items-center gap-2 w-full" style={{ flex: 1, minHeight: 0, visibility: pendingBattle ? 'hidden' : 'visible' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '12px', flex: 1, minHeight: 0, padding: `${MAP_PAD_Y}px 0` }}>
@@ -1239,8 +1218,36 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             }}>
               <MapSvg {...mapSvgProps} />
             </div>
-            {/* Right column: gym badges earned this run. */}
-            <BadgeList badges={config.badges ?? []} earned={mapIndex} layout="vertical" />
+            {/* Right column: gym badges earned this run, with the Speed Cash
+                balance beneath them.
+
+                The balance used to be a fixed pill at top-left, which put it
+                under the desktop nav bar (zIndex 150 vs the pill's 50) — it was
+                invisible on every desktop run, and the tutorial's spotlight
+                measured its hidden rect and appeared to point at Home. Here it
+                is in the flow, in the one column that already exists to report
+                run progress. */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <BadgeList badges={config.badges ?? []} earned={mapIndex} layout="vertical" />
+              <div
+                data-tutorial="cash"
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                  padding: '6px 10px',
+                  backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                  border: borderStyle,
+                }}
+              >
+                {/* 12px, not the 9px the old nav-adjacent labels used: Upheaval
+                    stops resolving below ~12px (docs/UI_TOUCHUPS.md). */}
+                <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: muted(dark), letterSpacing: '0.5px' }}>
+                  CASH
+                </span>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: cash(dark) }}>
+                  ${speedCash}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       ) : (

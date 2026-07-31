@@ -34,9 +34,20 @@ const STEPS = [
   { key: 'settings', text: 'Settings — theme, battle speed, and log out.' },
 ]
 
+// A target's rect, or null if it isn't usefully on screen.
+//
+// getBoundingClientRect() happily returns an all-zeros rect for an element that
+// is present but not rendered (display:none, or an ancestor collapsed), and a
+// zero rect is truthy — so callers that only null-check would spotlight the
+// top-left corner of the screen and appear to point at whatever lives there.
+// Requiring real dimensions turns "present but invisible" into a skipped step,
+// which is what the caller already does for a missing element.
 function rectFor(key) {
   const el = document.querySelector(`[data-tutorial="${key}"]`)
-  return el ? el.getBoundingClientRect() : null
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  if (r.width <= 0 || r.height <= 0) return null
+  return r
 }
 
 export default function TutorialOverlay() {
@@ -101,9 +112,15 @@ export default function TutorialOverlay() {
   const boxTop = flipUp ? undefined : rect.bottom + 18
   const boxBottom = flipUp ? window.innerHeight - (rect.top - 18) : undefined
   const targetCx = rect.left + rect.width / 2
-  const boxLeft = Math.min(
-    Math.max(8, targetCx - BOX_W / 2),
-    window.innerWidth - BOX_W - 8,
+  // Clamp right edge FIRST, then floor at 8 — order matters. The reverse
+  // (max-then-min) lets the right-edge term win outright, and on a viewport
+  // narrower than BOX_W + 16 that term is NEGATIVE, so the box was positioned
+  // off the left edge of the screen. Flooring last means the box can overhang
+  // the right on a very narrow screen, which is the survivable direction: the
+  // text still starts on-screen and reads left-to-right.
+  const boxLeft = Math.max(
+    8,
+    Math.min(targetCx - BOX_W / 2, window.innerWidth - BOX_W - 8),
   )
   // Arrow x relative to the box, clamped so it stays over the box.
   const arrowLeft = Math.min(Math.max(14, targetCx - boxLeft), BOX_W - 14)
