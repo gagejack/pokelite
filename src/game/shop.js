@@ -11,25 +11,46 @@
 import { ITEMS } from './items.js'
 import { BALANCE } from './balance.js'
 
-// Resolve one item id into a shop entry, or null if the id is unknown or the
+// Normalise a pool entry to { id, stock }. An entry is either a bare item id
+// (use the global stock table) or an object carrying an explicit per-map stock.
+function toRef(entry) {
+  return typeof entry === 'string' ? { id: entry, stock: undefined } : { id: entry?.id, stock: entry?.stock }
+}
+
+// Resolve one entry into a shop entry, or null if the id is unknown or the
 // item has no price (an unpriced item is simply not for sale).
-function toEntry(id) {
+//
+// Stock precedence: an explicit per-map `stock` beats BALANCE.economy.shopStock,
+// which beats the default of 1. The per-map override is what lets one town
+// stock three Max Heals while every other town stocks two.
+function toEntry(entry) {
+  const { id, stock } = toRef(entry)
   const item = ITEMS.find(i => i.id === id)
   if (!item) return null
   const price = BALANCE.economy.prices[id]
   if (price == null) return null
-  return { item, price, stock: BALANCE.economy.shopStock[id] ?? 1 }
+  return { item, price, stock: stock ?? BALANCE.economy.shopStock[id] ?? 1 }
 }
 
 // The shop shelf for `mapIndex` in `config`. Generic entries first, then the
-// map's curated entries. Duplicate ids collapse to the first occurrence, so a
-// curated list can name a generic item without doubling the shelf.
+// map's curated entries. Duplicate ids collapse to ONE entry — and the curated
+// one wins, so a pool can restock or re-stock an item the generic list already
+// offers (Celadon selling three Max Heals) rather than being silently ignored.
 export function getShopInventory(config, mapIndex) {
   const generic = config?.shopGeneric ?? []
   const curated = config?.shopPools?.[mapIndex] ?? []
+  // Curated first so it claims the id, then generic fills the rest; the final
+  // sort restores generic-before-curated display order.
   const seen = new Set()
-  return [...generic, ...curated]
-    .filter(id => (seen.has(id) ? false : (seen.add(id), true)))
-    .map(toEntry)
+  const picked = []
+  for (const entry of [...curated, ...generic]) {
+    const { id } = toRef(entry)
+    if (id == null || seen.has(id)) continue
+    seen.add(id)
+    picked.push({ entry, fromGeneric: !curated.includes(entry) })
+  }
+  return picked
+    .sort((a, b) => (a.fromGeneric === b.fromGeneric ? 0 : a.fromGeneric ? -1 : 1))
+    .map(p => toEntry(p.entry))
     .filter(Boolean)
 }
