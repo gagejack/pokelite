@@ -612,6 +612,34 @@ export function retypeMove(pokemon, on) {
   return { ...pokemon, move: getTypeMove(type, tier) }
 }
 
+// Swap `incoming` into a full roster at `index`, carrying the outgoing
+// Pokémon's held item across.
+//
+// The item is the player's property, not the Pokémon's: it was bought or found,
+// and releasing a Pokémon to make room should not destroy it. Without this the
+// item left the run silently along with its holder.
+//
+// The move must be REBUILT, not copied. A Polarity Band retypes the holder's
+// move to its alternate type, and the incoming Pokémon is a different species
+// with different types — a band that made a Pidgey attack as Flying has to make
+// its replacement attack as ITS OWN alternate, or the band would grant ×1.25
+// while pointing at a type the new holder does not have. currentMoveType is the
+// single place that folds heldItem into that answer (see its comment: every
+// rebuild must go through it), and the incoming Pokémon's own move tier is
+// preserved, since tier is a property of the Pokémon, not of the item.
+export function swapIntoRoster(roster, index, incoming) {
+  const outgoing = roster[index]
+  if (!outgoing) return roster
+  const item = outgoing.heldItem ?? null
+  return roster.map((p, i) => {
+    if (i !== index) return p
+    if (!item) return incoming
+    const withItem = { ...incoming, heldItem: item }
+    const tier = withItem.move?.tier ?? tierForLevel(withItem.level)
+    return { ...withItem, move: getTypeMove(currentMoveType(withItem), tier) }
+  })
+}
+
 // The type a Pokémon's move should have RIGHT NOW, held items included.
 //
 // Every site that rebuilds a move must ask this rather than attackTypeFor

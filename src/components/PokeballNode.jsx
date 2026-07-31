@@ -3,6 +3,7 @@ import { useTheme } from '../lib/theme'
 import { muted } from '../lib/colors'
 import PokemonCard from './PokemonCard'
 import { TYPE_COLORS } from '../game/types.js'
+import { itemIconUrl } from '../game/items.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
@@ -86,8 +87,8 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
         {/* Swap section — only shown when roster is full and a Pokémon is selected */}
         {isFull && selected !== null && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: mutedColor }}>
-              Team is full — choose who to swap out:
+            <span style={{ fontFamily: 'Upheaval', fontSize: '10px', color: mutedColor, textAlign: 'center' }}>
+              Team is full — choose who to swap out. Held items carry over.
             </span>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
               {roster.map((p, i) => {
@@ -107,11 +108,29 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
                       opacity: p.fainted ? 0.5 : 1,
                     }}
                   >
-                    <img
-                      src={p.sprite}
-                      alt={p.name}
-                      style={{ width: '44px', height: '44px', objectFit: 'contain', imageRendering: 'pixelated' }}
-                    />
+                    {/* Held item, corner-pinned on the sprite. Shown because
+                        the item TRANSFERS to the newcomer on a swap — without
+                        the badge the player is choosing blind and has to assume
+                        the item is lost with its holder. */}
+                    <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                      <img
+                        src={p.sprite}
+                        alt={p.name}
+                        style={{ width: '44px', height: '44px', objectFit: 'contain', imageRendering: 'pixelated' }}
+                      />
+                      {p.heldItem && (
+                        <img
+                          src={itemIconUrl(p.heldItem)}
+                          alt={`Holding ${p.heldItem.name} — transfers on swap`}
+                          title={`${p.heldItem.name} — transfers to the new Pokémon`}
+                          style={{
+                            position: 'absolute', right: '-3px', bottom: '-3px',
+                            width: '18px', height: '18px', imageRendering: 'pixelated',
+                            backgroundColor: innerBg, border: borderStyle,
+                          }}
+                        />
+                      )}
+                    </div>
                     <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: textColor, textTransform: 'capitalize' }}>
                       {p.name}
                     </span>

@@ -18,7 +18,7 @@ import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, currentMoveType, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
@@ -880,7 +880,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!pendingPokeball) return
     const node = pendingPokeball.node
     if (swapIndex !== null) {
-      setRoster(prev => prev.map((p, i) => i === swapIndex ? pokemon : p))
+      // swapIntoRoster, not a bare replace: the outgoing Pokémon's held item
+      // transfers to the newcomer (and its move is rebuilt if that item is a
+      // Polarity Band, whose retype depends on the holder's species).
+      setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
     } else {
       setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
     }
@@ -897,7 +900,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!pendingLegendary) return
     const node = pendingLegendary.node
     if (swapIndex !== null) {
-      setRoster(prev => prev.map((p, i) => i === swapIndex ? pokemon : p))
+      // Same item transfer as handlePokeballPick — see the note there.
+      setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
     } else {
       setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
     }
