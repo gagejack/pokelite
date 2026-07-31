@@ -252,11 +252,14 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       )}
 
       {pendingBattle && (
-        // zIndex 160: must clear FloatingNav's 150. BattleCard's own root is a
-        // positioned zIndex:100 element, which creates a fresh stacking context —
-        // its DefeatScreen/VictoryScreen children (zIndex 120) are confined
-        // inside that context and can never escape it to outrank a root-level
-        // sibling like FloatingNav, no matter how high their own z-index goes.
+        // zIndex 160 clears the map and its node overlays. It does NOT clear
+        // FloatingNav (170) — the mobile nav deliberately floats over battle so
+        // Home and Settings stay reachable mid-fight.
+        //
+        // This wrapper exists because BattleCard's own root is a positioned
+        // zIndex:100 element, which creates a fresh stacking context: its
+        // DefeatScreen/VictoryScreen children (zIndex 120) are confined inside
+        // that context and can never outrank a root-level sibling on their own.
         // Raising this outer wrapper is what actually lifts the whole subtree.
         <div style={{ position: 'fixed', inset: 0, zIndex: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <BattleCard

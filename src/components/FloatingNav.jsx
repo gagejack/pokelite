@@ -6,10 +6,17 @@ import settingsIcon from '../assets/Icons/graySettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
 
 // Mobile-only floating nav — replaces the top nav bar so the map can use its
-// height. A translucent grey pill fixed to the top-right, above the map and
-// battle layers (zIndex 150, the bar's old slot: battle overlay is 100,
-// modals are 200). Each icon carries a drop shadow so it stays legible over
-// light map art and dark battle backgrounds alike.
+// height. A translucent grey pill fixed to the top-left, above the map AND the
+// battle layers. Each icon carries a drop shadow so it stays legible over light
+// map art and dark battle backgrounds alike.
+//
+// zIndex 170 puts it over the battle wrappers (NodeMap / EliteFour, both 160)
+// so the player can always reach Home and Settings, including mid-battle. Those
+// wrappers were themselves raised to 160 to cover this pill; that call is now
+// reversed, so if either drops back to 100 this can drop back to 150.
+// Modals (Pokédex / Stats / Settings, 200) still cover it — they are opened
+// FROM these buttons, so a nav pill floating over them would be pointing at
+// screens the player is already in.
 //
 // data-tutorial markers match the old nav bar buttons so TutorialOverlay's
 // tour still finds its targets; the "auto" step has no target on mobile and
@@ -65,7 +72,7 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
       display: 'flex', flexDirection: 'column', gap: '2px',
       backgroundColor: 'rgba(46, 46, 46, 0.55)',
       padding: '4px 2px',
-      zIndex: 150,
+      zIndex: 170,
     }}>
       {buttons.map(b => (
         <div key={b.key} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
