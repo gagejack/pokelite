@@ -108,6 +108,13 @@ function MapSvg({
   const firstReachableNodeId = Object.values(nodePositions)
     .find(({ node }) => !clearedNodes.has(node.id) && isReachable(node.id))?.node.id
 
+  // The first Pokémart on the map, for the tutorial's "spend it here" step.
+  // Not filtered by reachability: the step explains what the shop IS, and a
+  // mart three rows up is still the thing being pointed at. Undefined when the
+  // map rolled no mart, which TutorialOverlay treats as a skipped step.
+  const firstMartNodeId = Object.values(nodePositions)
+    .find(({ node }) => node.type === NODE_TYPES.POKEMART)?.node.id
+
   return (
     <div
       ref={mapContainerRef}
@@ -295,6 +302,12 @@ function MapSvg({
         // Tag the first reachable node so the first-run tutorial can spotlight it
         // ("click here to begin"). Only one node carries the marker.
         const isTutorialTarget = reachable && node.id === firstReachableNodeId
+        // Likewise for the first Pokémart anywhere on the map, so the tutorial
+        // can point at where Speed Cash gets spent. Unlike firstNode this one
+        // need not be reachable — the player has to SEE the shop, not walk to
+        // it — and a map may have no mart at all, which TutorialOverlay handles
+        // by skipping the step.
+        const isMartTutorialTarget = node.id === firstMartNodeId
         const { px, py } = toPixel(x, y)
         const size = NODE_SIZE * mapScale * NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
         const isHovered = hoveredNode?.id === node.id
@@ -305,7 +318,7 @@ function MapSvg({
         return (
           <button
             key={node.id}
-            data-tutorial={isTutorialTarget ? 'firstNode' : undefined}
+            data-tutorial={isTutorialTarget ? 'firstNode' : isMartTutorialTarget ? 'mart' : undefined}
             onClick={(e) => {
               if (holdActivatedRef.current) { holdActivatedRef.current = false; return }
               handleNodeClick(node)
@@ -1124,12 +1137,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           floating pill there would either overlay the map art or push the map
           in, and the bag bar is already full-width so it costs nothing. */}
       {isDesktop && (
-        <div style={{
-          position: 'fixed', top: '8px', left: '8px', zIndex: 50,
-          display: 'flex', alignItems: 'center', gap: '4px',
-          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
-          pointerEvents: 'none',
-        }}>
+        <div
+          // Tutorial marker for the "fights pay Speed Cash" step. The mobile
+          // balance in the bag bar carries the same key — only one of the two
+          // is mounted at a time, so the query resolves on either platform.
+          data-tutorial="cash"
+          style={{
+            position: 'fixed', top: '8px', left: '8px', zIndex: 50,
+            display: 'flex', alignItems: 'center', gap: '4px',
+            backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+            pointerEvents: 'none',
+          }}
+        >
           {/* cash(true) unconditionally: this pill's backdrop is a fixed
               rgba(0,0,0,0.55) in BOTH themes, so it always wants the
               dark-surface green (12:1 on black) regardless of the app theme. */}
@@ -1307,13 +1326,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                   `position: sticky` keeps it visible when a full bag scrolls
                   this row; without it the balance would scroll out of reach.
                   marginLeft:auto pushes it right when the bag is short. */}
-              <span style={{
-                marginLeft: 'auto', flexShrink: 0,
-                position: 'sticky', right: 0,
-                paddingLeft: '8px',
-                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-                fontFamily: 'Upheaval', fontSize: '12px', color: cash(dark),
-              }}>
+              <span
+                // Mobile half of the tutorial's cash marker — see the desktop
+                // pill above. Exactly one of the two renders.
+                data-tutorial="cash"
+                style={{
+                  marginLeft: 'auto', flexShrink: 0,
+                  position: 'sticky', right: 0,
+                  paddingLeft: '8px',
+                  backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                  fontFamily: 'Upheaval', fontSize: '12px', color: cash(dark),
+                }}
+              >
                 ${speedCash}
               </span>
             </div>

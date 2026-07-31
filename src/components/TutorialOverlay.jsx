@@ -3,18 +3,30 @@ import { useTheme } from '../lib/theme'
 
 // One-time first-run coachmark tour (spec: first-time-tutorial-design.md).
 //
-// Steps through the five top-nav icons — found by their data-tutorial markers
-// and measured with getBoundingClientRect(), so positions are correct on both
-// mobile and desktop and survive resizes. A dimmed backdrop + spotlight focus
-// each icon; an arrow + text box explain it. Shown once per browser: the
-// localStorage flag is set on Done or Skip, and the overlay self-suppresses if
-// it's already set. A missing target is skipped rather than crashing.
+// Steps through the map's first node, the Speed Cash economy, and the top-nav
+// icons — each found by its data-tutorial marker and measured with
+// getBoundingClientRect(), so positions are correct on both mobile and desktop
+// and survive resizes. A dimmed backdrop + spotlight focus each target; an
+// arrow + text box explain it. Shown once per browser: the localStorage flag is
+// set on Done or Skip, and the overlay self-suppresses if it's already set.
+// A missing target is skipped rather than crashing — which is load-bearing for
+// the Pokémart step, since not every map rolls a mart.
 
 const SEEN_KEY = 'speedmon.tutorialSeen'
 const BOX_W = 240
 
+// Earning and spending are two steps, not one: they point at different things
+// on screen. The cash step also names the grass/trainer fork, because that fork
+// is the actual decision the economy asks the player to make — trainers hand
+// out more levels, so grass pays more to compensate (BALANCE.economy.payouts).
+// Without that sentence the balance is a number with no strategy attached.
+//
+// The mart step's target is optional: a map can roll no Pokémart, and
+// TutorialOverlay skips a step whose target never appears.
 const STEPS = [
   { key: 'firstNode', text: 'Tap a glowing node to travel there and start your next battle. Reachable nodes glow gold.' },
+  { key: 'cash',     text: 'Speed Cash. Every fight pays — wild grass pays the most, since trainers already hand you more levels.' },
+  { key: 'mart',     text: 'Pokémart — spend that cash on items. Every map stocks its own shelf, and taking one path past a mart means missing it.' },
   { key: 'home',     text: 'Home — return to the main menu anytime. Your run auto-saves.' },
   { key: 'pokedex',  text: 'Pokédex — every species you’ve caught or seen.' },
   { key: 'stats',    text: 'Stats — your run history, catches, and badges.' },
