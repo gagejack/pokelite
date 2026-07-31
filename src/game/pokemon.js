@@ -448,7 +448,14 @@ function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     // The evolved form re-picks its attacking type: an evolution can change
     // typing entirely (Charmeleon fire → Charizard fire/flying), so the
     // pre-evolution's choice may no longer apply.
-    move: getTypeMove(attackTypeFor(evolvedBase.pokeId, evolvedBase.types), preservedTier),
+    //
+    // Asked of the EVOLVED species but with the carried held item, so a
+    // Polarity Band survives the evolution. Reading attackTypeFor alone here
+    // reverted the band's retype while the band stayed equipped.
+    move: getTypeMove(
+      currentMoveType({ pokeId: evolvedBase.pokeId, types: evolvedBase.types, heldItem: instance.heldItem ?? null }),
+      preservedTier,
+    ),
     // Carry the held item through evolution (buildPokemonInstance omits it).
     heldItem: instance.heldItem ?? null,
     fainted: instance.fainted,
@@ -603,6 +610,26 @@ export function retypeMove(pokemon, on) {
   if (on && !alt) return pokemon
   const type = on ? alt : attackTypeFor(pokemon.pokeId, pokemon.types)
   return { ...pokemon, move: getTypeMove(type, tier) }
+}
+
+// The type a Pokémon's move should have RIGHT NOW, held items included.
+//
+// Every site that rebuilds a move must ask this rather than attackTypeFor
+// directly. Equipping is not the only thing that rebuilds a move — evolution
+// re-picks it (typing can change) and the TM node re-picks it (tier changes) —
+// and both of those used to read the table alone. A band-wearing Pidgey that
+// evolved, or a band-wearing Swampert given a TM, silently reverted to its
+// natural type while the band stayed equipped and kept granting its ×1.25.
+//
+// `heldItem` is the whole difference. Anything that rebuilds `move` without
+// consulting it will reintroduce that bug.
+export function currentMoveType(pokemon) {
+  if (!pokemon) return 'normal'
+  if (pokemon.heldItem?.retype === 'move') {
+    const alt = alternateTypeFor(pokemon.pokeId, pokemon.types)
+    if (alt) return alt
+  }
+  return attackTypeFor(pokemon.pokeId, pokemon.types)
 }
 
 // Type Prism — collapse a dual-type Pokémon onto its alternate type, for good.

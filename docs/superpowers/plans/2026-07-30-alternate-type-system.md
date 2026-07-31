@@ -611,6 +611,14 @@ State these plainly if asked; do not "fix" them without a new decision.
 1. **8 authoring decisions unresolved.** 61 table rows carry a tradeoff comment; 8 of those are genuinely debatable (e.g. Nidoqueen → Ground, Lapras → Ice). They are left at the canonical type with the comment as a prompt.
 2. **No validation step on `build:dex`.** A new region's dual-type species have no table entries and attack as `types[0]` until authored. The build script does not check this.
 3. **Prism'd Pokémon have no visible history.** Nothing marks a Swampert as "was once Water." The type change is silent — stats, sprite, and name are unchanged.
-4. **Band equip paths are a closed set.** `moveItem` and `handleItemAssign` both retype. A third equip path added later would miss this.
+4. **Every move REBUILD must call `currentMoveType(pokemon)`, not `attackTypeFor`.**
+   This gap originally read "band equip paths are a closed set", which named the
+   wrong category and let a real bug ship: equipping is not the only thing that
+   rebuilds a move. Evolution re-picks it (typing can change) and the TM node
+   re-picks it (tier changes), and both read the table alone — so a band-wearing
+   Pidgey that evolved, or a band-wearing Swampert given a TM, silently reverted
+   to its natural type while the band stayed equipped and kept granting ×1.25.
+   Fixed by routing both through `currentMoveType`, which folds `heldItem` into
+   the answer. A fourth rebuild site that skips it reintroduces the bug.
 5. **Single-type short-circuit masks table bugs.** If a row names a type the species doesn't have, nobody notices until someone equips a Band and the move doesn't change.
 6. **Existing saves keep their baked-in moves.** The table only applies to newly spawned Pokémon. A saved run's Pidgeot still attacks as Normal.

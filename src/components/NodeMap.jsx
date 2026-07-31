@@ -18,11 +18,10 @@ import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, currentMoveType, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
-import { attackTypeFor } from '../game/attackTypes.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { BALANCE } from '../game/balance.js'
@@ -1495,9 +1494,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setRoster(prev => prev.map((p, i) => {
               if (i !== pokemonIndex) return p
               const nextTier = Math.min(4, (p.move?.tier ?? 1) + 1)
-              // Same attacking-type choice the Pokémon spawned with — a TM
-              // raises the move's tier, it does not re-type the Pokémon.
-              return { ...p, move: getTypeMove(attackTypeFor(p.pokeId, p.types), nextTier) }
+              // A TM raises the move's tier; it does not re-type the Pokémon.
+              // currentMoveType, not attackTypeFor: this is a REBUILD, and a
+              // rebuild that ignores the held item reverts an equipped Polarity
+              // Band while the band stays on and keeps granting its ×1.25.
+              return { ...p, move: getTypeMove(currentMoveType(p), nextTier) }
             }))
             setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
             setCurrentNode(pendingPower.node.id)
