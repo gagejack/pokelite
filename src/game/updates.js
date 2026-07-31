@@ -16,7 +16,7 @@ import { VERSION } from './version.js'
 //      `items`   — item IDs from game/items.js. The icon, name, rarity and
 //                  description are read from there, so an item is described in
 //                  ONE place and the notice can't drift from the real item.
-//      `systems` — rules and screens, which have no icon and no rarity. Each
+//      `features` — rules and screens, which have no icon and no rarity. Each
 //                  entry is { name, summary, facts[] }, where a fact is a
 //                  { label, value } pair. Numbers come from BALANCE, for the
 //                  same reason item text comes from ITEMS: a rebalance must not
@@ -34,8 +34,8 @@ export const UPDATE = {
   version: VERSION,
   sections: [
     {
-      title: 'New Systems:',
-      systems: [
+      title: 'New Features:',
+      features: [
         {
           name: 'Speed Cash',
           // The inversion IS the feature. "Battles now pay money" would be a

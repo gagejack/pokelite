@@ -92,41 +92,41 @@ export default function UpdateNotice({ onClose }) {
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {UPDATE.sections.map(section => {
             const items = updateItems(section)
-            const systems = section.systems ?? []
-            if (items.length === 0 && systems.length === 0) return null
+            const features = section.features ?? []
+            if (items.length === 0 && features.length === 0) return null
             return (
               <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, letterSpacing: '1px' }}>
                   {section.title}
                 </span>
 
-                {/* A system has no icon and no tier, so it gets neither — an
+                {/* A feature has no icon and no tier, so it gets neither — an
                     invented icon and a fake rarity chip would only be costume.
-                    What a system does have is numbers, and the game already
+                    What a feature does have is numbers, and the game already
                     presents numbers one way: the Pokémart's price list. So the
                     figures are set as that same label/value table, which is
                     also the honest structure — these ARE rows of a price list. */}
-                {systems.map(system => (
+                {features.map(feature => (
                   <div
-                    key={system.name}
+                    key={feature.name}
                     style={{
                       display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px',
                       backgroundColor: rowBg,
                       border,
                       // Neutral edge: the item rows spend their left edge on
-                      // rarity, and a system has no tier to declare. Keeping the
-                      // edge (rather than dropping it) holds both row kinds on
-                      // one left margin.
+                      // rarity, and a feature has no tier to declare. Keeping
+                      // the edge (rather than dropping it) holds both row kinds
+                      // on one left margin.
                       borderLeft: `6px solid ${mutedColor}`,
                     }}
                   >
-                    <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: textColor }}>{system.name}</span>
+                    <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: textColor }}>{feature.name}</span>
                     <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: textColor, lineHeight: 1.35 }}>
-                      {system.summary}
+                      {feature.summary}
                     </span>
-                    {system.facts?.length > 0 && (
+                    {feature.facts?.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                        {system.facts.map(fact => (
+                        {feature.facts.map(fact => (
                           <div key={fact.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
                             <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor }}>{fact.label}</span>
                             {/* Color on the money column only, so the figure
