@@ -1251,12 +1251,29 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, backgroundColor: dark ? '#1a1a1a' : '#c8c8c8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '8px 5px' }}>
-          {/* Map slot — fills the height above the Bag + Roster rows and centers
-              the card. The card is sized (in JS) to the image's aspect ratio, fit
-              to whichever slot axis binds, so the whole map shows centered with no
-              distortion (mirrors desktop). */}
-          <div ref={mobileSlotRef} style={{ flex: 1, minHeight: 0, marginBottom: '6px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{
+          flex: 1, minHeight: 0,
+          backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'flex-start',
+          // No TOP padding: the map card butts against the nav row. The 8px
+          // that used to sit here read as a gap, since the nav is top-aligned
+          // and the card starts immediately below it. Bottom padding stays.
+          padding: '0 5px 8px',
+        }}>
+          {/* Map slot — measures the space above the Roster/Bag/badge stack so
+              mobileCard can fit the card to whichever axis binds.
+
+              The slot GROWS to fill (flex: 1) but the card inside is pinned to
+              its TOP, not centered. The card is width-constrained on a narrow
+              phone (min(w, h * ratio)), so it is usually SHORTER than the slot;
+              centering split that leftover evenly above and below, which put a
+              gap under the nav and a matching one above the roster. Pinning top
+              moves the whole surplus to one place — below the map — and
+              `marginTop: auto` on the bars below drops the roster onto the
+              bottom edge, so the surplus lands between them instead of being
+              split into two visible seams. */}
+          <div ref={mobileSlotRef} style={{ flex: 1, minHeight: 0, marginBottom: '6px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
             <div style={{
               width: mobileCard ? `${mobileCard.width}px` : '100%',
               height: mobileCard ? `${mobileCard.height}px` : '100%',
@@ -1267,8 +1284,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           </div>
           {/* Bottom bars (constrained to the map width): roster, then bag, then a
               horizontal gym-badge bar — all full-width, stacked. */}
+          {/* marginTop: auto pins this stack to the bottom of the column. The
+              map slot above pins its card to the top, so all surplus height
+              collects in the middle rather than appearing as two gaps. */}
           <div style={{
             width: mobileCard ? `${mobileCard.width}px` : '100%', maxWidth: '100%',
+            marginTop: 'auto',
             display: 'flex', flexDirection: 'column', gap: '6px',
           }}>
             <Roster
