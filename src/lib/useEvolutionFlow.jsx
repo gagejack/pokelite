@@ -80,7 +80,11 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (result?.evolved) {
       setRoster(prev => prev.map((p, i) => i === pokeIndex && p.pokeId === target.pokeId ? result.evolved : p))
       onSpeciesOwned?.(result.evolved.pokeId, !!result.evolved.shiny)
-      setEvolutionNotices(prev => [...prev, { from: target.name, to: result.evolved.name, pokeId: result.evolved.pokeId }])
+      setEvolutionNotices(prev => [...prev, {
+        from: target.name, to: result.evolved.name,
+        fromSprite: target.sprite, toSprite: result.evolved.sprite,
+        pokeId: result.evolved.pokeId,
+      }])
       return true
     }
     return false
@@ -97,7 +101,13 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (evolved) {
       setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
       onSpeciesOwned?.(evolved.pokeId, !!evolved.shiny)
-      setEvolutionNotices(prev => [...prev, { from: choice.fromName, to: evolved.name, pokeId: evolved.pokeId }])
+      setEvolutionNotices(prev => [...prev, {
+        from: choice.fromName, to: evolved.name,
+        // The choice popup already carries the pre-evolution sprite, so the
+        // notice reuses it rather than re-deriving the old form.
+        fromSprite: choice.sprite, toSprite: evolved.sprite,
+        pokeId: evolved.pokeId,
+      }])
     }
     setEvolutionChoices(prev => prev.slice(1))
   }

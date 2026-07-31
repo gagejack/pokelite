@@ -120,7 +120,10 @@ export const ITEMS = [
   { id: 'kings_rock',     name: "King's Rock",    description: 'Critical hits deal 100% more damage',      tier: 'epic',     icon: 'kings-rock' },
 
   // --- Legendary ---
-  { id: 'focus_sash',     name: 'Focus Sash',     description: 'Survive any KO hit at full HP',            tier: 'legendary',     icon: 'focus-sash' },
+  // HELD, and destroyed the moment it triggers — the only held item consumed by
+  // battle logic rather than by the player. battle.js clears `heldItem` on the
+  // battle clone, which the post-battle roster sync then adopts.
+  { id: 'focus_sash',     name: 'Focus Sash',     description: 'Survive a devastating blow and regain half HP', tier: 'legendary',     icon: 'focus-sash' },
   // The mirror of Resist Charm below: one makes type weaknesses hurt more, the
   // other makes them hurt less, and between them the legendary tier is about
   // type matchups.

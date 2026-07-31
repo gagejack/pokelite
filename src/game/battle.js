@@ -180,13 +180,26 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
       const effectiveness = getEffectiveness(attacker.move?.type ?? 'normal', defender.types)
 
       const events = []
-      const defWasFull = defender.stats.hp >= defender.stats.maxHp
       defender.stats.hp = Math.max(0, defender.stats.hp - damage)
 
-      // Focus Sash — survive a lethal hit from full HP at 1 HP (every time)
-      if (defender.stats.hp === 0 && defWasFull && itemId(defender) === 'focus_sash') {
-        defender.stats.hp = 1
-        events.push({ kind: 'focus', side: dSide, index: dIdx, hpAfter: 1, label: 'Hung on!' })
+      // Focus Sash — survive a hit that would faint the holder, and come back at
+      // half HP. The sash is DESTROYED on trigger (heldItem cleared), so it
+      // saves a Pokémon once and then it's gone.
+      //
+      // Was "survive at 1 HP, from full HP only, every time": the full-HP gate
+      // meant it did nothing in the situation you actually want it for (already
+      // damaged, about to die), and surviving at 1 HP usually just meant dying
+      // to the next hit instead. Half HP is a real second life, and consuming
+      // the sash is what keeps that from being permanent.
+      if (defender.stats.hp === 0 && itemId(defender) === 'focus_sash') {
+        const revived = Math.max(1, Math.floor(defender.stats.maxHp * HI.focusSashHeal))
+        defender.stats.hp = revived
+        // Clear the held item on the battle clone. `finalPlayerTeam` is spread
+        // back into the roster after the battle (win path via
+        // applyBattleVictory, loss path via setRoster), so the sash is gone for
+        // the rest of the run rather than only for this fight.
+        defender.heldItem = null
+        events.push({ kind: 'focus', side: dSide, index: dIdx, hpAfter: revived, label: 'Hung on!' })
       }
       if (defender.stats.hp === 0) defender.fainted = true
 

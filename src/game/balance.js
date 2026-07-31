@@ -238,6 +238,10 @@ export const BALANCE = deepFreeze({
       rockyHelmetRecoil: 1 / 3, // attacker loses this fraction of max HP on contact
       sitrusThreshold: 0.5,     // triggers below this fraction of max HP
       sitrusHeal: 0.5,          // heals this fraction of max HP (50%)
+      // Focus Sash: HP the holder is left on after surviving a KO hit, as a
+      // fraction of max HP. The sash is destroyed on trigger, so this is a
+      // once-per-run effect, not a once-per-battle one.
+      focusSashHeal: 0.5,
     },
   },
 })

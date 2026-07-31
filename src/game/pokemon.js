@@ -549,7 +549,14 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
       evolutionChoices.push({ index: i, fromId: p.pokeId, fromName: p.name, sprite: p.sprite, options: result.options })
       nextRoster.push(p)
     } else if (result?.evolved) {
-      evolutionNotices.push({ from: p.name, to: result.evolved.name, pokeId: result.evolved.pokeId, shiny: !!result.evolved.shiny })
+      // fromSprite is captured BEFORE the roster slot is replaced — it is the
+      // only surviving reference to the pre-evolution form, which the notice
+      // shows beside the new one.
+      evolutionNotices.push({
+        from: p.name, to: result.evolved.name,
+        fromSprite: p.sprite, toSprite: result.evolved.sprite,
+        pokeId: result.evolved.pokeId, shiny: !!result.evolved.shiny,
+      })
       nextRoster.push(result.evolved)
     } else {
       nextRoster.push(p)
@@ -723,6 +730,8 @@ export async function applyRareCandy(roster, index, levels, { maxSpeciesId = Inf
     evolutionNotices.push({
       from: leveled.name,
       to: result.evolved.name,
+      fromSprite: leveled.sprite,
+      toSprite: result.evolved.sprite,
       pokeId: result.evolved.pokeId,
       shiny: !!result.evolved.shiny,
     })
