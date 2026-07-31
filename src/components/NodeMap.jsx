@@ -982,6 +982,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     return { width, height: width / ratio }
   })()
 
+  // Slot height the card does NOT use. On a narrow phone the card is
+  // width-bound (min(w, h * ratio)), so it is shorter than the slot and the
+  // remainder would otherwise push the Roster/Bag/badge bars far down the
+  // screen. The bars cancel it with a negative margin — see the slot's
+  // marginBottom, and the comment there for why the slot itself can't shrink.
+  const mobileSurplus = mobileCard
+    ? Math.max(0, mobileSlot.h - mobileCard.height)
+    : 0
+
   const mapSvgProps = {
     dark, borderStyle,
     // Mobile drops the offset drop shadow: at near-full width it pushes the
@@ -1261,19 +1270,29 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           // and the card starts immediately below it. Bottom padding stays.
           padding: '0 5px 8px',
         }}>
-          {/* Map slot — measures the space above the Roster/Bag/badge stack so
-              mobileCard can fit the card to whichever axis binds.
+          {/* Map slot — measures the space available above the Roster/Bag/badge
+              stack so mobileCard can fit the card to whichever axis binds.
 
-              The slot GROWS to fill (flex: 1) but the card inside is pinned to
-              its TOP, not centered. The card is width-constrained on a narrow
-              phone (min(w, h * ratio)), so it is usually SHORTER than the slot;
-              centering split that leftover evenly above and below, which put a
-              gap under the nav and a matching one above the roster. Pinning top
-              moves the whole surplus to one place — below the map — and
-              `marginTop: auto` on the bars below drops the roster onto the
-              bottom edge, so the surplus lands between them instead of being
-              split into two visible seams. */}
-          <div ref={mobileSlotRef} style={{ flex: 1, minHeight: 0, marginBottom: '6px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+              `flex: 1` is load-bearing for that MEASUREMENT and must stay, and
+              this element must NOT be clamped by anything derived from
+              mobileCard: the ResizeObserver reads this exact node's
+              contentRect, so a maxHeight computed from mobileCard.height would
+              feed the measurement its own output and collapse it to zero on
+              successive passes.
+
+              So the slot keeps reporting the full available height, and the
+              surplus is cancelled with a NEGATIVE bottom margin instead. Margin
+              does not affect contentRect, so the measurement stays honest while
+              the bars below slide up to sit 2px under the card. */}
+          <div
+            ref={mobileSlotRef}
+            style={{
+              flex: 1, minHeight: 0,
+              marginBottom: mobileSurplus ? `${2 - mobileSurplus}px` : '2px',
+              width: '100%', display: 'flex',
+              justifyContent: 'center', alignItems: 'flex-start',
+            }}
+          >
             <div style={{
               width: mobileCard ? `${mobileCard.width}px` : '100%',
               height: mobileCard ? `${mobileCard.height}px` : '100%',
@@ -1284,12 +1303,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           </div>
           {/* Bottom bars (constrained to the map width): roster, then bag, then a
               horizontal gym-badge bar — all full-width, stacked. */}
-          {/* marginTop: auto pins this stack to the bottom of the column. The
-              map slot above pins its card to the top, so all surplus height
-              collects in the middle rather than appearing as two gaps. */}
+          {/* No marginTop:auto — that pinned the stack to the bottom of the
+              column, which WIDENED the gap it was meant to close. The slot's
+              negative bottom margin pulls these bars up under the map instead. */}
           <div style={{
             width: mobileCard ? `${mobileCard.width}px` : '100%', maxWidth: '100%',
-            marginTop: 'auto',
             display: 'flex', flexDirection: 'column', gap: '6px',
           }}>
             <Roster
