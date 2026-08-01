@@ -329,21 +329,21 @@ export default function EliteFour({ region, character, starter, roster, setRoste
           {memberColumn}
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 8px 16px', visibility: pendingBattle ? 'hidden' : 'visible' }}>
+        /* The member list scrolls in the flex space; the bars sit flush at the
+           bottom, exactly as on the maps. */
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '0 5px 0', visibility: pendingBattle ? 'hidden' : 'visible' }}>
+          {/* Scrolling gauntlet. `flex: 1` + `minHeight: 0` is what keeps the
+              bars below pinned: this pane absorbs all the leftover height and
+              scrolls internally rather than pushing them off-screen. */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 3px 8px' }}>
+            {memberColumn}
+          </div>
           {/* Roster / Bag / badges — the same three stacked full-width bars, in
-              the same order and with the same 6px rhythm, as NodeMap's mobile
-              bottom stack. The gauntlet is still a place you re-equip between
-              fights, so it should not ask the player to relearn the controls.
-              The only difference is position: the maps pin these under the map
-              art, and here they lead the screen because the member list below
-              scrolls. */}
-          {/* marginLeft clears the FloatingNav — a fixed ~48px column pinned to
-              the top-left (zIndex 170). NodeMap's bars never need it because
-              they sit at the BOTTOM of the map, below the pill; these lead the
-              screen and would otherwise run underneath it. It's on the bars
-              alone, not the whole column, so the member list below stays
-              centred on the screen rather than shunted right. */}
-          <div style={{ width: 'calc(100% - 48px)', maxWidth: '420px', marginLeft: '48px', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+              the same order and with the same 6px rhythm, in the same place at
+              the bottom of the screen, as NodeMap's mobile stack. The gauntlet
+              is still where you re-equip between fights, so nothing about the
+              controls should have to be relearned. */}
+          <div style={{ width: '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <Roster roster={roster} horizontal fullWidth onSwap={swapRoster} {...rosterItemProps} />
             {/* Bag — drag an item onto a Pokémon to equip, or tap to open its
                 card. Drop here to stow it back. */}
@@ -404,7 +404,6 @@ export default function EliteFour({ region, character, starter, roster, setRoste
                 pass the running `mapIndex`. */}
             <BadgeList badges={config?.badges ?? []} earned={(config?.badges ?? []).length} layout="horizontal" />
           </div>
-          {memberColumn}
         </div>
       )}
 
