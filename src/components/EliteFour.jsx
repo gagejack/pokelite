@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
+import BadgeList from './BadgeList'
+import ItemInfoCard from './ItemInfoCard'
 import BattleCard from './BattleCard'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
@@ -19,7 +21,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -181,37 +183,119 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   const swapRoster = swapInRoster(setRoster)
 
-  // Held-item moving: clicking a held item in a Pokémon's stat popup starts a
-  // move; the next roster slot clicked receives it. Mirrors NodeMap's flow but
-  // there's no bag here, so the only source/target is a roster Pokémon.
+  // Held-item moving. The bag bar, the touch-drag flow, and the item-info popup
+  // below are ported from NodeMap so the two screens behave identically — the
+  // Elite Four is still a place where you re-equip between fights, and the
+  // player should not have to learn a second set of gestures for it.
   const [movingItem, setMovingItem] = useState(null)
+  const [infoItem, setInfoItem] = useState(null)
   const isMovingItem = !!movingItem
-  async function resolveItemMove(to) {
-    if (!movingItem) return
-    const { item, from } = movingItem
-    setMovingItem(null)
-    // Healing consumables: apply + consume, but KEEP the item on a no-op
-    // (target already at full HP). Mirrors NodeMap's handler.
-    if (isRosterConsumable(item) && to.kind === 'pokemon') {
-      const used = onApplyConsumable?.(item, to.pokeIndex)
+
+  // Short message when an action does nothing (e.g. Max Heal at full HP).
+  // Without it a kept item reads as a broken tap.
+  const [notice, setNotice] = useState(null)
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 2200)
+    return () => clearTimeout(t)
+  }, [notice])
+
+  // Drop an item onto roster slot `pokeIndex`. Consumables are USED (and spent
+  // only if they did something); everything else is equipped.
+  //
+  // Both drop paths route through here — the click path via resolveItemMove and
+  // the touch path via bagTouchEnd. Keeping the decision in one function is what
+  // stops them drifting, exactly as in NodeMap.
+  async function applyConsumableTo(item, from, pokeIndex) {
+    if (isRosterConsumable(item)) {
+      const used = onApplyConsumable?.(item, pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      else {
+        const target = roster[pokeIndex]
+        setNotice(
+          item.consumable === 'heal' && target?.fainted
+            ? `${target.name} has fainted — use a revive`
+            : `${item.name} would do nothing here`
+        )
+      }
       return
     }
-    // Evolve Stone on a Pokémon: evolve + consume rather than equip (kept if the
-    // target can't evolve, so it isn't wasted).
-    if (item?.consumable === 'evolve' && to.kind === 'pokemon') {
-      const used = await evo.evolveWithStone(to.pokeIndex)
+    // Evolve Stone: evolve + consume rather than equip (kept if the target has
+    // no evolution at all, so it isn't wasted).
+    if (item?.consumable === 'evolve') {
+      const used = await evo.evolveWithStone(pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       return
     }
     // Rare Candy: levels the target and may evolve it. Kept only at MAX_LEVEL.
-    if (item?.consumable === 'level' && to.kind === 'pokemon') {
-      const used = await evo.useRareCandy(to.pokeIndex)
+    if (item?.consumable === 'level') {
+      const used = await evo.useRareCandy(pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      else setNotice(`${roster[pokeIndex]?.name ?? 'That Pokémon'} is already max level`)
+      return
+    }
+    onMoveItem?.({ item, from, to: { kind: 'pokemon', pokeIndex } })
+  }
+
+  async function resolveItemMove(to) {
+    if (!movingItem) return
+    const { item, from } = movingItem
+    setMovingItem(null)
+    if (to.kind === 'pokemon') {
+      await applyConsumableTo(item, from, to.pokeIndex)
       return
     }
     onMoveItem?.({ item, from, to })
   }
+
+  // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
+  // A tap opens the info popup; movement past the threshold promotes to a drag,
+  // and on release the roster slot under the finger (data-slot-index) receives
+  // the item.
+  const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
+  const [dragGhost, setDragGhost] = useState(null) // { x, y, item } | null
+  const DRAG_THRESHOLD = 8
+
+  function slotIndexAt(x, y) {
+    const el = document.elementFromPoint(x, y)
+    const slotEl = el?.closest('[data-slot-index]')
+    return slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
+  }
+
+  function bagTouchStart(item, from) {
+    return (e) => {
+      const t = e.touches[0]
+      bagTouch.current = { item, from, startX: t.clientX, startY: t.clientY, dragging: false }
+    }
+  }
+  function bagTouchMove(e) {
+    const st = bagTouch.current
+    if (!st) return
+    const t = e.touches[0]
+    if (!st.dragging) {
+      if (Math.hypot(t.clientX - st.startX, t.clientY - st.startY) < DRAG_THRESHOLD) return
+      st.dragging = true
+      setMovingItem({ item: st.item, from: st.from })
+    }
+    e.preventDefault() // stop the page scrolling while dragging
+    setDragGhost({ x: t.clientX, y: t.clientY, item: st.item })
+  }
+  function bagTouchEnd(e) {
+    const st = bagTouch.current
+    bagTouch.current = null
+    setDragGhost(null)
+    if (!st?.dragging) return // a plain tap — let onClick open the info popup
+    const t = e.changedTouches[0]
+    const idx = slotIndexAt(t.clientX, t.clientY)
+    if (idx != null) applyConsumableTo(st.item, st.from, idx)
+    setMovingItem(null)
+  }
+  const bagTouchProps = (item, from) => ({
+    onTouchStart: bagTouchStart(item, from),
+    onTouchMove: bagTouchMove,
+    onTouchEnd: bagTouchEnd,
+  })
+
   const rosterItemProps = {
     itemTargeting: isMovingItem,
     onPickTarget: pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex }),
@@ -220,32 +304,105 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
-      {/* Speed Cash balance. Sits on the side OPPOSITE the mobile FloatingNav
-          pill, which is top-left (zIndex 150). Unlike NodeMap this shows on
-          both platforms — the Elite Four has no bag bar to host the balance,
-          so a floating readout is the only place it can live. zIndex sits
-          below the battle overlay (100) so a battle covers it. */}
-      <div style={{
-        position: 'fixed', top: '8px', right: '8px', zIndex: 50,
-        display: 'flex', alignItems: 'center', gap: '4px',
-        backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
-        pointerEvents: 'none',
-      }}>
-        {/* cash(true) unconditionally — this pill's backdrop is a fixed
-            rgba(0,0,0,0.55) in both themes. See NodeMap's matching HUD. */}
-        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
-          ${speedCash}
-        </span>
-      </div>
+      {/* Speed Cash — DESKTOP ONLY, as a floating readout. Mobile now carries
+          the balance at the right end of the bag bar, exactly as the maps do,
+          so the pill would state it twice. Sits opposite the mobile
+          FloatingNav (top-left, zIndex 150); zIndex 50 keeps it under the
+          battle overlay (100) so a fight covers it. */}
+      {isDesktop && (
+        <div style={{
+          position: 'fixed', top: '8px', right: '8px', zIndex: 50,
+          display: 'flex', alignItems: 'center', gap: '4px',
+          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
+          pointerEvents: 'none',
+        }}>
+          {/* cash(true) unconditionally — this pill's backdrop is a fixed
+              rgba(0,0,0,0.55) in both themes. See NodeMap's matching HUD. */}
+          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
+            ${speedCash}
+          </span>
+        </div>
+      )}
       {isDesktop ? (
         <div className="flex w-full py-4" style={{ alignItems: 'flex-start', justifyContent: 'center', gap: '16px', visibility: pendingBattle ? 'hidden' : 'visible', overflowY: 'auto', minHeight: 0 }}>
           <Roster roster={roster} onSwap={swapRoster} {...rosterItemProps} />
           {memberColumn}
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', visibility: pendingBattle ? 'hidden' : 'visible' }}>
-          <div style={{ marginBottom: '10px' }}>
-            <Roster roster={roster} horizontal onSwap={swapRoster} {...rosterItemProps} />
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 8px 16px', visibility: pendingBattle ? 'hidden' : 'visible' }}>
+          {/* Roster / Bag / badges — the same three stacked full-width bars, in
+              the same order and with the same 6px rhythm, as NodeMap's mobile
+              bottom stack. The gauntlet is still a place you re-equip between
+              fights, so it should not ask the player to relearn the controls.
+              The only difference is position: the maps pin these under the map
+              art, and here they lead the screen because the member list below
+              scrolls. */}
+          {/* marginLeft clears the FloatingNav — a fixed ~48px column pinned to
+              the top-left (zIndex 170). NodeMap's bars never need it because
+              they sit at the BOTTOM of the map, below the pill; these lead the
+              screen and would otherwise run underneath it. It's on the bars
+              alone, not the whole column, so the member list below stays
+              centred on the screen rather than shunted right. */}
+          <div style={{ width: 'calc(100% - 48px)', maxWidth: '420px', marginLeft: '48px', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+            <Roster roster={roster} horizontal fullWidth onSwap={swapRoster} {...rosterItemProps} />
+            {/* Bag — drag an item onto a Pokémon to equip, or tap to open its
+                card. Drop here to stow it back. */}
+            <div
+              onClick={() => { if (isMovingItem) resolveItemMove({ kind: 'bag' }) }}
+              onDragOver={e => { if (isMovingItem) e.preventDefault() }}
+              onDrop={e => { if (isMovingItem) { e.preventDefault(); resolveItemMove({ kind: 'bag' }) } }}
+              style={{
+                flexShrink: 0,
+                border: isMovingItem ? '2px solid #facc15' : borderStyle,
+                boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : (dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e'),
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                display: 'flex', flexDirection: 'row', alignItems: 'center',
+                padding: '4px 8px', gap: '6px', overflowX: 'auto',
+                cursor: isMovingItem ? 'pointer' : 'default',
+              }}
+            >
+              <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#1a1a1a', backgroundColor: '#facc15', padding: '2px 6px', flexShrink: 0 }}>BAG</span>
+              {bag && bag.length > 0 ? bag.map((item, i) => {
+                const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+                return (
+                  <img
+                    key={i}
+                    src={itemIconUrl(item)}
+                    alt={item.name}
+                    title={item.name}
+                    draggable
+                    onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
+                    onDragEnd={() => setMovingItem(null)}
+                    onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
+                    {...bagTouchProps(item, { kind: 'bag', index: i })}
+                    style={{
+                      width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'grab',
+                      outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,
+                      // Override the global `img { pointer-events: none }` so this
+                      // bag item receives taps + touch-drag.
+                      touchAction: 'none', pointerEvents: 'auto',
+                    }}
+                  />
+                )
+              }) : (
+                <span style={{ fontFamily: 'Upheaval', fontSize: '8px', color: dark ? '#555' : '#aaa' }}>— empty —</span>
+              )}
+              {/* Speed Cash rides the right end of the bag bar, as on the maps.
+                  `position: sticky` keeps it visible when a full bag scrolls. */}
+              <span style={{
+                marginLeft: 'auto', flexShrink: 0,
+                position: 'sticky', right: 0,
+                paddingLeft: '8px',
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                fontFamily: 'Upheaval', fontSize: '12px', color: cash(dark),
+              }}>
+                ${speedCash}
+              </span>
+            </div>
+            {/* Gym badges. Reaching the gauntlet means every gym is cleared, so
+                all of them show earned — `config.badges.length`, where the maps
+                pass the running `mapIndex`. */}
+            <BadgeList badges={config?.badges ?? []} earned={(config?.badges ?? []).length} layout="horizontal" />
           </div>
           {memberColumn}
         </div>
@@ -313,8 +470,38 @@ export default function EliteFour({ region, character, starter, roster, setRoste
         </div>
       )}
 
+      {/* Finger-following icon while touch-dragging a bag item. */}
+      {dragGhost && (
+        <img
+          src={itemIconUrl(dragGhost.item)}
+          alt=""
+          style={{
+            position: 'fixed', left: dragGhost.x, top: dragGhost.y,
+            transform: 'translate(-50%, -50%)',
+            width: '34px', height: '34px', imageRendering: 'pixelated',
+            pointerEvents: 'none', zIndex: 300,
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+          }}
+        />
+      )}
+
+      {/* No-op notice — an item that couldn't be used is KEPT, and this says
+          why. Same placement as the targeting banner below. */}
+      {notice && (
+        <div style={{
+          position: 'fixed', top: '48px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 95, backgroundColor: 'rgba(0,0,0,0.85)', border: '2px solid #ef4444',
+          padding: '8px 14px', pointerEvents: 'none', maxWidth: '90vw',
+        }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: '#fff' }}>
+            {notice}
+          </span>
+        </div>
+      )}
+
       {/* Item-move banner — shown after a held item is clicked, until a target
-          Pokémon is picked (or the move is cancelled). */}
+          is picked (or the move is cancelled). The Bag is a target here now, so
+          the copy names it, matching NodeMap's wording exactly. */}
       {isMovingItem && (
         <div style={{
           position: 'fixed', top: '48px', left: '50%', transform: 'translateX(-50%)',
@@ -324,7 +511,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
         }}>
           <img src={itemIconUrl(movingItem.item)} alt="" style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }} />
           <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#fff' }}>
-            Choose a Pokémon for {movingItem.item.name}
+            Choose a Pokémon or the Bag for {movingItem.item.name}
           </span>
           <button
             onClick={() => setMovingItem(null)}
@@ -333,6 +520,19 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             Cancel
           </button>
         </div>
+      )}
+
+      {/* Item info popup — opened by tapping a bag item or a Pokémon's held
+          item. Equip enters the move-targeting flow from that same source. */}
+      {infoItem && (
+        <ItemInfoCard
+          item={infoItem.item}
+          onEquip={() => {
+            setMovingItem({ item: infoItem.item, from: infoItem.from })
+            setInfoItem(null)
+          }}
+          onClose={() => setInfoItem(null)}
+        />
       )}
     </Layout>
   )
