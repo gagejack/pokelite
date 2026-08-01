@@ -77,11 +77,18 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     return () => subscription.unsubscribe()
   }, [])
 
+  // Start a run. Desktop's region picker is a column swapped in place inside
+  // this menu; mobile's is the standalone RegionSelect screen that `onPlay`
+  // routes to. EVERY path into region selection must go through here — PLAY and
+  // the login card both do. Calling `onPlay` directly used to be how signing in
+  // on desktop dumped the player onto mobile's screen.
+  const startRun = () => (isDesktop ? changeMode('region') : onPlay())
+
   // Single source of truth for the menu bars. Both layouts map over this, so
   // adding a mode or changing a size happens in exactly one place.
   const buttonDefs = [
     { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
-      color: '#fff', fontSize: '26px', onClick: () => (isDesktop ? changeMode('region') : onPlay()), visible: true },
+      color: '#fff', fontSize: '26px', onClick: startRun, visible: true },
     { id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)',
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
@@ -139,7 +146,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       {/* Auth card — hidden once logged in. Above the version tag: it is a
           control, and the version is a footnote, so burying the only way to
           sign in under the footnote read as an afterthought. */}
-      {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
+      {!loggedIn && <LoginForm onAuthSuccess={startRun} />}
 
       {/* Version tag — closes the column, with the patch-notes badge beside it. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -264,7 +271,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
             <CallingCard dark={dark} />
-            {!loggedIn && <LoginForm onAuthSuccess={onPlay} />}
+            {!loggedIn && <LoginForm onAuthSuccess={startRun} />}
           </div>
         </div>
       </div>
