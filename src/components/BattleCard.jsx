@@ -28,7 +28,14 @@ const FAINT_DRAIN_MS = 650
 // Natural (unscaled) size of the mobile battle card. The card is rendered at
 // this fixed size then transform-scaled to fit the viewport below the navbar.
 const MOBILE_CARD_W = 380
-const MOBILE_CARD_H = 640
+// 740, not 640: a full six-Pokémon roster needs it. Measured at 1x, the prep
+// screen's content comes to 718px — 6 slots × 90 + 2px gaps + an 88px trainer
+// header + the 80px prep bar — plus the column's 12px of padding. At 640 the
+// sixth slot was clipped entirely on every phone size, so a full team could
+// never be reviewed before committing to a battle, which is this screen's only
+// job. The card is authored to fit its worst case and then scaled to the
+// device, rather than authored to a size that happens to fit five.
+const MOBILE_CARD_H = 740
 
 // Natural (unscaled) size of the desktop battle card — a 16:9 stage. Like the
 // mobile card it is authored at this fixed size and then transform-scaled to
@@ -138,7 +145,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       const pad = 12 // breathing room around the card
       const availW = window.innerWidth - pad * 2
       const availH = window.innerHeight - h - pad * 2
-      const s = Math.min(availW / MOBILE_CARD_W, availH / MOBILE_CARD_H, 1)
+      // No upper clamp. The old `Math.min(…, 1)` pinned the card to its
+      // authored size, so a 932px-tall phone rendered it at 640px and left
+      // ~280px of dead space above and below while still clipping the sixth
+      // roster slot. The card is one fixed layout scaled to the device — on a
+      // large phone that means scaling UP, which is the whole point.
+      const s = Math.min(availW / MOBILE_CARD_W, availH / MOBILE_CARD_H)
       setNavH(h)
       setFitScale(s > 0 ? s : 1)
     }
