@@ -11,6 +11,7 @@
 // silent effect should never take a battle screen down with it.
 
 import levelup from '../assets/sounds/levelup.wav'
+import { getMoveSound } from '../game/moveSounds.js'
 
 const SOUNDS = {
   levelup,
@@ -51,6 +52,31 @@ export function playSound(name, { volume = 0.6 } = {}) {
     audio.currentTime = 0
     // play() returns a promise that rejects on autoplay policy or an
     // interrupted load. Both are expected; neither should reach the console.
+    audio.play?.().catch(() => {})
+  } catch {
+    /* Audio unavailable (SSR, locked-down browser) — stay silent. */
+  }
+}
+
+/**
+ * Play a move sound effect by move name (PokéAPI kebab-case).
+ * @param {string|null|undefined} moveName
+ * @param {{ volume?: number }} [opts] volume 0–1, default 0.6
+ */
+export function playMoveSound(moveName, { volume = 0.6 } = {}) {
+  const src = getMoveSound(moveName)
+  if (!src || isMuted()) return
+
+  try {
+    const key = `move_${moveName}`
+    let audio = cache.get(key)
+    if (!audio) {
+      audio = new Audio(src)
+      audio.preload = 'auto'
+      cache.set(key, audio)
+    }
+    audio.volume = Math.min(1, Math.max(0, volume))
+    audio.currentTime = 0
     audio.play?.().catch(() => {})
   } catch {
     /* Audio unavailable (SSR, locked-down browser) — stay silent. */
