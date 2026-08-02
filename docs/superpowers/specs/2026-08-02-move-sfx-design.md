@@ -115,18 +115,34 @@ bundle.
 
 Three pieces, each with one job.
 
-### 1. `src/game/moveSounds.js` (new)
+### 1. The mapping — two modules, not one
 
-Owns the mapping. Mirrors `moveAnimations.js` in shape so the two read alike.
+> **Revised during planning.** This section originally specified a single
+> `moveSounds.js` that imported the assets, held the table, and consulted
+> `MOVE_ANIMATION_ALIASES` at runtime. That is not testable: `npm test` runs
+> `node --test`, and Node throws `ERR_UNKNOWN_FILE_EXTENSION` on any module that
+> statically imports `.m4a` — or that imports `moveAnimations.js`, which pulls in
+> 79 PNGs. A single module would have made the spec's own coverage test
+> impossible to write. The mapping is therefore split.
+
+**`src/game/moveSounds.data.js`** — pure data, no imports of any kind.
+
+- `MOVE_SOUND_FILES` — all 72 kebab-case move names → PascalCase file stems.
+  The 18 alias-resolved moves are **inlined as already-resolved stems** rather
+  than looked up at runtime, since `moveAnimations.js` cannot be imported here.
+  The alias table remains the source of those 18 judgements; they are copied,
+  not re-derived.
+- `soundFileFor(moveName)` — returns a stem or `undefined`.
+
+Because this module is plain JS, `node --test` can import it, which is what
+makes the coverage test in the Testing section possible.
+
+**`src/game/moveSounds.js`** — asset binding, Vite-only.
 
 - Static imports of the 53 `.m4a` files (Vite resolves each to a hashed URL).
-- `MOVE_SOUNDS` — kebab-case move name → imported URL, for the 31 exact and 23
-  authored entries.
-- `getMoveSound(moveName)` — returns a URL or `undefined`. Resolution order:
-  1. `MOVE_SOUNDS[moveName]`
-  2. `MOVE_SOUNDS[MOVE_ANIMATION_ALIASES[moveName]]` — imported from
-     `moveAnimations.js`
-  3. `undefined`
+- `SFX_URLS` — file stem → imported URL.
+- `getMoveSound(moveName)` — `soundFileFor(name)`, then `SFX_URLS[stem]`.
+  Returns `undefined` when the move has no sound.
 
 Returning `undefined` rather than throwing keeps an unmapped move silent instead
 of breaking a battle. With the current move table every name resolves, but the
@@ -177,9 +193,15 @@ so gauntlet battles are included.
 
 ## Testing
 
+Tests run on **`node --test`** via `npm test` (vitest is not installed), using
+`node:test` and `node:assert/strict`, beside their source as `*.test.js` —
+matching `src/game/shop.test.js`.
+
 - **Unit** — a test over `typeMoves.js` asserting every one of the 72 move slots
-  resolves through `getMoveSound()` to a defined URL. This is the guard that
-  matters: it fails when someone adds a move to the type table without a sound.
+  resolves through `soundFileFor()` to a defined file stem. This is the guard
+  that matters: it fails when someone adds a move to the type table without a
+  sound. It targets `moveSounds.data.js` rather than `moveSounds.js` because
+  only the former is importable under Node.
 - **Unit** — `getMoveSound` returns `undefined` rather than throwing for an
   unknown name, for `'(no move)'`, and for `undefined`/`null` input.
 - **Manual** — play a battle at 1× and at 4×, confirming sounds fire on attack
