@@ -77,6 +77,7 @@ import thunderWavePng from '../assets/Move Animations/Gen 3 Move Animation Pack 
 import toxicPng from '../assets/Move Animations/Gen 3 Move Animation Pack V1/Graphics/Animations/Toxic.png'
 import vineWhipPng from '../assets/Move Animations/Gen 3 Move Animation Pack V1/Graphics/Animations/Vine Whip.png'
 import viseGripPng from '../assets/Move Animations/Gen 3 Move Animation Pack V1/Graphics/Animations/Vise Grip.png'
+import { MOVE_ANIMATION_ALIASES } from './moveAliases.data.js'
 
 // OGG sound effects
 
@@ -162,42 +163,9 @@ export const MOVE_ANIMATIONS = {
   'vise-grip':       { sheet: viseGripPng,     frameCount: 4 },
 }
 
-// The Gen 3 pack only covers Gen-1/2-era moves, so most Tier 2–4 moves from
-// TYPE_MOVES have no dedicated sheet. Map each to the nearest-visual animation
-// that does exist so higher tiers still get a sheet + sound instead of the orb.
-// No plausible assets exist for the water, ice, dragon, and psychic attack
-// lines (or flash-cannon / metal-sound) — those intentionally stay on the
-// type-colored orb fallback.
-export const MOVE_ANIMATION_ALIASES = {
-  // fire
-  'flamethrower': 'ember', 'fire-blast': 'ember', 'blast-burn': 'ember',
-  // electric
-  'spark': 'thunder-punch', 'thunderbolt': 'thunder-shock', 'thunder': 'thunder-shock',
-  // grass
-  'razor-leaf': 'cut', 'solar-beam': 'vine-whip', 'frenzy-plant': 'vine-whip',
-  // normal
-  'body-slam': 'stomp', 'hyper-beam': 'slash',
-  // fighting
-  'brick-break': 'rock-smash', 'cross-chop': 'karate-chop', 'close-combat': 'double-kick',
-  // rock
-  'rock-slide': 'rock-throw', 'rock-blast': 'rock-throw', 'stone-edge': 'rock-throw',
-  // ground
-  'mud-shot': 'dig', 'bulldoze': 'dig', 'earthquake': 'dig', 'earth-power': 'dig',
-  // flying
-  'wing-attack': 'peck', 'air-slash': 'air-cutter', 'brave-bird': 'bounce',
-  // poison
-  'acid': 'toxic', 'sludge': 'toxic', 'sludge-bomb': 'toxic', 'gunk-shot': 'toxic',
-  // ghost
-  'shadow-punch': 'shadow-ball', 'shadow-force': 'shadow-ball',
-  // dark
-  'feint-attack': 'bite', 'crunch': 'bite', 'dark-pulse': 'bite',
-  // steel
-  'iron-head': 'metal-claw',
-  // bug
-  'bug-bite': 'fury-swipes', 'struggle-bug': 'fury-swipes', 'x-scissor': 'slash', 'megahorn': 'needle-arm',
-  // fairy
-  'draining-kiss': 'sweet-kiss', 'fairy-wind': 'charm', 'dazzling-gleam': 'charm', 'moonblast': 'charm',
-}
+// Re-exported from its own module so tests can import the table without
+// pulling in this file's 79 PNG imports.
+export { MOVE_ANIMATION_ALIASES } from './moveAliases.data.js'
 
 // Resolve a PokéAPI kebab-case move name to its animation entry: exact match
 // first, then the alias table. Returns undefined when a move has no animation

@@ -56,3 +56,32 @@ export function playSound(name, { volume = 0.6 } = {}) {
     /* Audio unavailable (SSR, locked-down browser) — stay silent. */
   }
 }
+
+/**
+ * Play a sound by resolved URL. For callers that already hold a bundled asset
+ * URL (move SFX) rather than a key in the SOUNDS registry.
+ *
+ * Shares the same cache as playSound, keyed by URL, so a sound retriggering
+ * before it finished rewinds instead of layering. That is deliberate: one
+ * attack should make one audible sound even at 3x battle speed.
+ *
+ * @param {string} url
+ * @param {{ volume?: number }} [opts] volume 0–1, default 0.6
+ */
+export function playSoundUrl(url, { volume = 0.6 } = {}) {
+  if (!url || isMuted()) return
+
+  try {
+    let audio = cache.get(url)
+    if (!audio) {
+      audio = new Audio(url)
+      audio.preload = 'auto'
+      cache.set(url, audio)
+    }
+    audio.volume = Math.min(1, Math.max(0, volume))
+    audio.currentTime = 0
+    audio.play?.().catch(() => {})
+  } catch {
+    /* Audio unavailable (SSR, locked-down browser) — stay silent. */
+  }
+}

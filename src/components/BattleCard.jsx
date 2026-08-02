@@ -12,7 +12,8 @@ import { itemIconUrl } from '../game/items.js'
 import MoveAnimation from './MoveAnimation.jsx'
 import SeedCodeChip from './SeedCodeChip.jsx'
 import { getBattleSkin } from './battleSkins/index.js'
-import { playSound } from '../lib/sound.js'
+import { playSound, playSoundUrl } from '../lib/sound.js'
+import { getMoveSound } from '../game/moveSounds.js'
 import battleGrass from '../assets/battleGrass.png'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 import { TYPE_COLORS } from '../game/types.js'
@@ -210,6 +211,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       }, PAUSE_AFTER_HIT / battleSpeed)
       return () => clearTimeout(timerRef.current)
     }
+
+    // Move SFX fires at LAUNCH, alongside the projectile and the attacker's
+    // animation — not at impact. Quieter than the level-up cue (0.6): attacks
+    // fire many times per battle, the level-up fires once and sits on top.
+    const moveSfx = getMoveSound(entry.moveName)
+    if (moveSfx) playSoundUrl(moveSfx, { volume: 0.45 })
 
     setProjectile({ fromSide: entry.side, type: entry.moveType })
     setAttackingSide(entry.side)
