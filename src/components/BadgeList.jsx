@@ -25,7 +25,7 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
           // Vertical (desktop): fixed 26px, no shrinking.
           ...(isHorizontal
             ? { flex: '1 1 0', minWidth: 0, maxWidth: '26px', height: 'auto', aspectRatio: '1' }
-            : { width: '26px', height: '26px', flexShrink: 0 }),
+            : { width: '34px', height: '34px', flexShrink: 0 }),
           objectFit: 'contain', imageRendering: 'pixelated',
           // Unearned: blacked out. Earned: full color.
           filter: has ? 'none' : 'brightness(0) opacity(0.45)',
@@ -52,18 +52,25 @@ export default function BadgeList({ badges = [], earned = 0, layout = 'vertical'
     )
   }
 
-  // Desktop: titled vertical column.
+  // Desktop: titled vertical column. Fills the rail's width (rather than
+  // hugging its icons) so it lines up with the Cash and Bag panels beneath it.
   return (
     <div style={{
       border: borderStyle, boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e',
       backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      flexShrink: 0, alignSelf: 'flex-start',
+      // Two columns of four. A single 34px column of eight ran taller than the
+      // Cash and Bag panels combined and pushed them off the fold; paired, the
+      // badge block stays a compact object next to the map.
+      flexShrink: 0, width: '100%', boxSizing: 'border-box',
     }}>
       <div style={{ backgroundColor: labelBg, padding: '3px 10px', width: '100%', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#fff' }}>Badges</span>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#fff', letterSpacing: '0.5px' }}>Badges</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px' }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2, auto)',
+        justifyContent: 'center', gap: '8px', padding: '9px 6px',
+      }}>
         {badgeIcons}
       </div>
     </div>

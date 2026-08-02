@@ -21,6 +21,11 @@
   src: url('./assets/upheavtt.ttf') format('truetype');
 }
 
+@font-face {
+  font-family: 'Nebal';
+  src: url('./assets/Nebal.ttf') format('truetype');
+}
+
 * {
   font-family: 'Orange Kid', sans-serif;
   -webkit-user-select: none;

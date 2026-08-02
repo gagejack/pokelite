@@ -306,11 +306,12 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
         <div
           key={`empty-${i}`}
           style={{
-            width: '74px',
-            height: '80px',
+            width: '100%',
+            height: '92px',
             border: dark ? '2px dashed #333' : '2px dashed #bbb',
             backgroundColor: 'transparent',
             flexShrink: 0,
+            boxSizing: 'border-box',
           }}
         />
       ))}
@@ -346,10 +347,12 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           ))}
         </div>
       ) : (
-        // Desktop: vertical sidebar
+        // Desktop: vertical sidebar. 132px, not 90 — the extra width is what
+        // buys the slot's name and level a legible size. At 116px an 11px
+        // "Bulbasaur" still ellipsed, and the starters are the short names.
         <div style={{
           position: 'relative',
-          width: '90px',
+          width: '132px',
           border: borderStyle,
           boxShadow: shadowStyle,
           backgroundColor: cardBg,
@@ -357,7 +360,9 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           flexDirection: 'column',
           alignItems: 'center',
           gap: '6px',
-          flexShrink: 0,
+          // Hug the slots. Stretching left six empty placeholders as a tall
+          // dead column beside the map.
+          flexShrink: 0, alignSelf: 'flex-start',
         }}>
           <div style={{
             backgroundColor: '#6890F0',
@@ -367,9 +372,9 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
             justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#fff' }}>ROSTER</span>
+            <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#fff', letterSpacing: '0.5px' }}>ROSTER</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '0 4px 8px', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '0 6px 8px', width: '100%', boxSizing: 'border-box' }}>
             {desktopSlots}
           </div>
           {hoveredIndex != null && roster[hoveredIndex] && (
@@ -430,9 +435,10 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   onTouchStart, onTouchMove, onTouchEnd, 'data-slot-index': slotIndex, onStartHeldItemDrag,
   onMouseEnter, onMouseLeave }) {
   const isFainted = pokemon.fainted
-  const spriteSize = horizontal ? '34px' : '40px'
-  const barW = '50px'
-  
+  // Desktop slots grew with the rail (90 → 132px) so the name and level can sit
+  // at a size that actually resolves. Mobile is untouched.
+  const spriteSize = horizontal ? '34px' : '48px'
+
   return (
     <div
       data-slot-index={slotIndex}
@@ -450,7 +456,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       onMouseLeave={onMouseLeave}
       style={{
         flex: horizontal ? 1 : undefined,
-        width: horizontal ? undefined : '74px',
+        width: horizontal ? undefined : '100%',
         flexShrink: 0,
         borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #2e2e2e') : undefined,
         border: isDropTarget
@@ -461,8 +467,12 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '4px 2px 3px',
-        gap: '2px',
+        // No bottom padding on desktop: the HP bar is a foot rule flush to the
+        // slot's bottom edge, so six stacked slots read as six parallel gauges
+        // you can scan in one vertical pass.
+        padding: horizontal ? '4px 2px 3px' : '5px 4px 0',
+        gap: horizontal ? '2px' : '3px',
+        boxSizing: 'border-box',
         opacity: isDragging ? 0.35 : isFainted ? 0.4 : 1,
         position: 'relative',
         cursor: draggable ? 'grab' : 'pointer',
@@ -475,21 +485,26 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         alt={pokemon.name}
         style={{ width: spriteSize, height: spriteSize, imageRendering: 'pixelated', filter: isFainted ? 'grayscale(1)' : 'none', flexShrink: 0, pointerEvents: 'none' }}
       />
+      {/* 7px and 6px sat at half the ~12px floor this project already documents
+          for its pixel faces (docs/UI_TOUCHUPS.md) — the rail's name and level
+          were shapes, not words. Pokemon Classic is a true bitmap face and
+          resolves cleanly from 10px up.
+          10px, not 11: measured against the loaded font, "Charmander" runs 110px
+          at 11px in a 104px slot. A starter must not ellipse. */}
       <span style={{
-        fontFamily: 'Pokemon Classic', fontSize: '7px', color: textColor,
-        textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.1,
+        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '7px' : '10px', color: textColor,
+        textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.15,
         width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
         pointerEvents: 'none',
       }}>
         {pokemon.name}
       </span>
       <span style={{
-        fontFamily: 'Pokemon Classic', fontSize: '6px', color: '#facc15', pointerEvents: 'none',
+        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : '10px', color: '#facc15', pointerEvents: 'none',
         textShadow: '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
       }}>
         LVL {pokemon.level}
       </span>
-      <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width={barW} height="3px" />
       {pokemon.heldItem && (
         <div
           draggable
@@ -512,14 +527,31 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
           <img
             src={itemIconUrl(pokemon.heldItem)}
             alt={pokemon.heldItem.name}
-            style={{ width: '14px', height: '14px', imageRendering: 'pixelated', pointerEvents: 'none' }}
+            style={{
+              width: horizontal ? '14px' : '18px', height: horizontal ? '14px' : '18px',
+              imageRendering: 'pixelated', pointerEvents: 'none',
+            }}
           />
         </div>
       )}
       {isFainted && (
-        <span style={{ fontFamily: 'Upheaval', fontSize: '6px', color: '#ef4444', position: 'absolute', top: '2px', right: '2px', pointerEvents: 'none' }}>
+        <span style={{
+          fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : '9px', color: '#ef4444',
+          position: 'absolute', top: '3px', right: '3px', pointerEvents: 'none',
+          textShadow: '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000',
+        }}>
           FNT
         </span>
+      )}
+      {/* HP as a foot rule — full-bleed to the slot's bottom edge on desktop, so
+          the stacked slots line up into one readable column of gauges. Mobile
+          keeps its original centered 50px bar. */}
+      {horizontal ? (
+        <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width="50px" height="3px" />
+      ) : (
+        <div style={{ width: '100%', marginTop: 'auto', paddingTop: '4px', pointerEvents: 'none' }}>
+          <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width="100%" height="5px" />
+        </div>
       )}
     </div>
   )

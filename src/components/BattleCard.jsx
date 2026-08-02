@@ -11,6 +11,8 @@ import { BALANCE } from '../game/balance.js'
 import { itemIconUrl } from '../game/items.js'
 import MoveAnimation from './MoveAnimation.jsx'
 import SeedCodeChip from './SeedCodeChip.jsx'
+import { getBattleSkin } from './battleSkins/index.js'
+import { playSound } from '../lib/sound.js'
 import battleGrass from '../assets/battleGrass.png'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
 import { TYPE_COLORS } from '../game/types.js'
@@ -26,6 +28,17 @@ const FAINT_DRAIN_MS = 650
 // this fixed size then transform-scaled to fit the viewport below the navbar.
 const MOBILE_CARD_W = 380
 const MOBILE_CARD_H = 640
+
+// Natural (unscaled) size of the desktop battle card — a 16:9 stage. Like the
+// mobile card it is authored at this fixed size and then transform-scaled to
+// fill the window, so the pixel-positioned arenas, 213px sprites, and info
+// plates keep their exact proportions at any window size. Reflowing to
+// percentages instead would break the arena composition and soften the pixel
+// art; scaling keeps it crisp.
+const DESKTOP_CARD_W = 960
+const DESKTOP_CARD_H = 540
+// Breathing room left around the scaled card, per side.
+const DESKTOP_CARD_GAP = 50
 
 // 1px black outline for yellow "LV" text (8-direction text-shadow — crisper on
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
@@ -132,6 +145,34 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     window.addEventListener('resize', compute)
     return () => window.removeEventListener('resize', compute)
   }, [isDesktop])
+
+  // Desktop: scale the 960×540 stage to fill the window, leaving DESKTOP_CARD_GAP
+  // per side. Whichever axis is tighter decides, so the card grows to the
+  // window's height OR width and never crops.
+  //
+  // The win state stacks a "Victory!" heading and seed chip ABOVE the card, so
+  // their measured height is subtracted too — otherwise the card sizes to the
+  // full window and those siblings push it off the bottom edge.
+  const desktopHeaderRef = useRef(null)
+  const [desktopScale, setDesktopScale] = useState(1)
+  useEffect(() => {
+    if (!isDesktop) return
+    const compute = () => {
+      const headerH = desktopHeaderRef.current?.getBoundingClientRect().height ?? 0
+      const availW = window.innerWidth - DESKTOP_CARD_GAP * 2
+      const availH = window.innerHeight - DESKTOP_CARD_GAP * 2 - headerH
+      const s = Math.min(availW / DESKTOP_CARD_W, availH / DESKTOP_CARD_H)
+      setDesktopScale(s > 0 ? s : 1)
+    }
+    compute()
+    // The victory heading mounts in the same commit that sets battleResult, so
+    // a second pass on the next frame measures it once it has real layout.
+    const raf = requestAnimationFrame(compute)
+    window.addEventListener('resize', compute)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', compute) }
+    // battleResult is a dependency because the victory heading appears with it,
+    // changing the header height the card has to fit under.
+  }, [isDesktop, battleResult])
 
   useEffect(() => {
     if (phase !== 'battle') return
@@ -277,6 +318,14 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     if (!battleResult) return
     if (battleResult === 'win') {
       setCelebrate(true)
+      // One cue for the whole roster, fired with the same flag that reveals the
+      // "+N LVL" popups — every surviving Pokémon levels at once, so a sound per
+      // Pokémon would just be the same clip stacked six times.
+      //
+      // Desktop only, because the popups are: `celebrate` is handed to
+      // RosterColumn, which the mobile layout does not render. Playing it there
+      // would be a sound with nothing on screen to explain it.
+      if (isDesktop) playSound('levelup')
       setPlayerHp(prev => prev.map((hp, i) =>
         playerFainted[i] ? hp
           : Math.min(battleRoster[i].stats.maxHp, hp + Math.round(battleRoster[i].stats.maxHp * 0.05))
@@ -318,6 +367,20 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     flashText: flashText?.side === 'enemy' ? flashText.text : null,
     activeSpriteRef: enemyActiveRef,
   }
+
+  // The active battle readout. Skins are interchangeable — see
+  // components/battleSkins/index.js for the shared prop contract.
+  const InfoCard = getBattleSkin()
+
+  // Party state for a skin's ball tray: which slot is out, which have fainted,
+  // which are still waiting. Team order, so the tray reads left-to-right as the
+  // order they'll be sent out in.
+  const partyState = (team, faintedArr, activeIndex) =>
+    team.map((_, i) =>
+      faintedArr[i] ? 'fainted' : i === activeIndex ? 'active' : 'alive'
+    )
+  const playerParty = partyState(battleRoster, playerFainted, activePlayer)
+  const enemyParty = partyState(enemyTeam, enemyFainted, activeEnemy)
 
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
@@ -457,21 +520,36 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
       {defeatOverlay}
 
-      {/* Victory text above the card (defeat now shows the DefeatScreen overlay) */}
+      {/* Victory text above the card (defeat now shows the DefeatScreen
+          overlay). Measured, so the scaled card below can fit under it.
+          Rendered only when there IS a heading — an always-present empty
+          wrapper still draws the column's 10px gap, which pushed the card
+          off-centre by that much during every ordinary battle. */}
       {battleResult === 'win' && (
-        <span style={{
-          fontFamily: 'Upheaval', fontSize: '32px',
-          color: '#22c55e',
-          textShadow: '2px 2px 0 #000',
-        }}>
-          Victory!
-        </span>
+        <div ref={desktopHeaderRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <span style={{
+            fontFamily: 'Upheaval', fontSize: '32px',
+            color: '#22c55e',
+            textShadow: '2px 2px 0 #000',
+          }}>
+            Victory!
+          </span>
+          <SeedCodeChip code={seedCode} dark={dark} />
+        </div>
       )}
-      {battleResult === 'win' && <SeedCodeChip code={seedCode} dark={dark} />}
 
-      {/* 960×540 battle card */}
+      {/* The 960×540 stage, scaled to fill the window. The wrapper takes the
+          card's SCALED footprint so the flex column lays out against the size
+          the card actually occupies — a bare transform leaves the original
+          960×540 in flow and the centering goes wrong. */}
       <div style={{
-        width: '960px', height: '540px',
+        width: `${DESKTOP_CARD_W * desktopScale}px`,
+        height: `${DESKTOP_CARD_H * desktopScale}px`,
+        flexShrink: 0,
+      }}>
+      <div style={{
+        width: `${DESKTOP_CARD_W}px`, height: `${DESKTOP_CARD_H}px`,
+        transform: `scale(${desktopScale})`, transformOrigin: 'top left',
         position: 'relative',
         border: borderStyle, boxShadow: shadowStyle,
         overflow: 'hidden', flexShrink: 0,
@@ -513,9 +591,41 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             phase={phase}
           />
 
+          {/* Enemy readout — upper LEFT, diagonally opposite its own sprite.
+              Each plate sits across the arena from the mon it describes, so the
+              two readouts occupy opposing corners instead of stacking over
+              their sprites. */}
+          {/* 196px clears the 188px roster rail, so the plate sits on the arena
+              rather than over the team column. */}
+          <div style={{ position: 'absolute', top: '6%', left: '196px', zIndex: 4 }}>
+            <InfoCard
+              name={enemyTeam[activeEnemy]?.name} level={enemyTeam[activeEnemy]?.level}
+              hp={enemyHp[activeEnemy]} maxHp={enemyTeam[activeEnemy]?.stats.maxHp}
+              fainted={enemyFainted[activeEnemy]}
+              resetKey={activeEnemy}
+              side="enemy"
+              party={enemyParty}
+            />
+          </div>
+
+          {/* Player readout — lower RIGHT, opposite its own sprite. */}
+          <div style={{ position: 'absolute', bottom: '7%', right: '196px', zIndex: 4 }}>
+            <InfoCard
+              name={battleRoster[activePlayer]?.name} level={battleRoster[activePlayer]?.level}
+              hp={playerHp[activePlayer]} maxHp={battleRoster[activePlayer]?.stats.maxHp}
+              fainted={playerFainted[activePlayer]}
+              resetKey={activePlayer}
+              side="player"
+              party={playerParty}
+            />
+          </div>
+
           {/* TOP-RIGHT: enemy arena */}
           <div style={{
-            position: 'absolute', top: '57%', right: '22%',
+            // translateY(-100%) makes this `top` the block's BOTTOM edge, so a
+            // smaller number sits the enemy higher up the field. Pushed up from
+            // 57% to widen the gap between the two combatants.
+            position: 'absolute', top: '50%', right: '22%',
             transform: 'translateY(-100%)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
           }}>
@@ -565,6 +675,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 />
               </motion.div>
               <img src={battleGrass} alt="" style={{ width: '265px', imageRendering: 'pixelated', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} />
+              <LaunchOrb projectile={projectile} side="enemy" battleSpeed={battleSpeed} />
               {activeAnimation?.defenderSide === 'enemy' && (
                 <MoveAnimation
                   key={`${activeAnimation.id}-${activeAnimation.moveName}-enemy`}
@@ -573,25 +684,15 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 />
               )}
             </div>
-            <DesktopInfoCard
-              name={enemyTeam[activeEnemy]?.name} level={enemyTeam[activeEnemy]?.level}
-              hp={enemyHp[activeEnemy]} maxHp={enemyTeam[activeEnemy]?.stats.maxHp}
-              fainted={enemyFainted[activeEnemy]}
-              resetKey={activeEnemy}
-            />
           </div>
 
           {/* BOTTOM-LEFT: player arena */}
           <div style={{
-            position: 'absolute', top: '43%', left: '22%',
+            // Player's block is top-anchored, so a larger number drops it down
+            // the field. The two moves together open up the middle ground.
+            position: 'absolute', top: '52%', left: '22%',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
           }}>
-            <DesktopInfoCard
-              name={battleRoster[activePlayer]?.name} level={battleRoster[activePlayer]?.level}
-              hp={playerHp[activePlayer]} maxHp={battleRoster[activePlayer]?.stats.maxHp}
-              fainted={playerFainted[activePlayer]}
-              resetKey={activePlayer}
-            />
             <div style={{ position: 'relative', width: '265px', height: '140px' }}>
               <AnimatePresence>
                 {flashText?.side === 'player' && (
@@ -640,6 +741,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
                 />
               </motion.div>
               <img src={battleGrass} alt="" style={{ width: '265px', imageRendering: 'pixelated', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} />
+              <LaunchOrb projectile={projectile} side="player" battleSpeed={battleSpeed} />
               {activeAnimation?.defenderSide === 'player' && (
                 <MoveAnimation
                   key={`${activeAnimation.id}-${activeAnimation.moveName}-player`}
@@ -650,28 +752,43 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
             </div>
           </div>
 
-          {/* Diagonal attack projectile */}
+          {/* Diagonal attack projectile.
+
+              Endpoints are the two sprites' actual centres, not the corners of
+              the card: each arena is 265px wide, inset 22% from its own edge of
+              the 960px stage, which puts the player's centre near 35% and the
+              enemy's near 65%. The old 15%/75% pair started the orb out beside
+              the attacker rather than on it.
+
+              The orb is rendered TWICE — once here above the sprites for the
+              flight, and once inside the attacking arena (see `launchOrb`)
+              underneath its sprite for the launch. A single element cannot do
+              both: the sprite sits at zIndex 2 INSIDE the arena's own stacking
+              context, so no z-index on a sibling of that arena can ever slot
+              between the arena's grass and its sprite. This pair is what makes
+              the orb appear to emerge from behind the attacker and then travel
+              over the field. */}
           <AnimatePresence>
             {projectile && (
               <motion.div
                 key="orb"
                 initial={projectile.fromSide === 'player'
-                  ? { left: '15%', top: '75%', opacity: 1, scale: 1 }
-                  : { left: '75%', top: '15%', opacity: 1, scale: 1 }
+                  ? { left: '35%', top: '72%', opacity: 0, scale: 1 }
+                  : { left: '65%', top: '28%', opacity: 0, scale: 1 }
                 }
                 animate={projectile.fromSide === 'player'
-                  ? { left: '75%', top: '15%', opacity: 0, scale: 0.4 }
-                  : { left: '15%', top: '75%', opacity: 0, scale: 0.4 }
+                  ? { left: '65%', top: '28%', opacity: [0, 1, 0], scale: 0.4 }
+                  : { left: '35%', top: '72%', opacity: [0, 1, 0], scale: 0.4 }
                 }
                 exit={{}}
-                transition={{ duration: PROJECTILE_DURATION / battleSpeed, ease: 'easeIn' }}
+                transition={{ duration: PROJECTILE_DURATION / battleSpeed, ease: 'easeIn', times: [0, 0.22, 1] }}
                 style={{
                   position: 'absolute',
                   width: '10px', height: '10px', borderRadius: '50%',
                   backgroundColor: TYPE_COLORS[projectile.type] ?? '#fff',
                   boxShadow: `0 0 8px 3px ${TYPE_COLORS[projectile.type] ?? '#fff'}`,
                   transform: 'translate(-50%, -50%)',
-                  zIndex: 10, pointerEvents: 'none',
+                  zIndex: 3, pointerEvents: 'none',
                 }}
               />
             )}
@@ -733,6 +850,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
           )}
 
         </div>
+      </div>
       </div>
     </div>
   )
@@ -953,6 +1071,36 @@ function VictoryScreen({ dark, onContinue, seedCode }) {
   )
 }
 
+// The launch half of the attack projectile: a short bloom at the attacker's
+// own centre, rendered INSIDE that arena at zIndex 1 — above the grass, below
+// the sprite (zIndex 2). The travelling orb in the stage above handles the
+// flight; this is what makes the shot look like it comes out from behind the
+// attacker instead of appearing on top of it.
+function LaunchOrb({ projectile, side, battleSpeed }) {
+  const active = projectile?.fromSide === side
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.div
+          key="launch"
+          initial={{ opacity: 0, scale: 0.3 }}
+          animate={{ opacity: [0.9, 0], scale: [0.6, 1.9] }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: (PROJECTILE_MS * 0.5) / 1000 / battleSpeed, ease: 'easeOut' }}
+          style={{
+            position: 'absolute', left: '50%', bottom: '55px',
+            width: '22px', height: '22px', borderRadius: '50%',
+            backgroundColor: TYPE_COLORS[projectile.type] ?? '#fff',
+            boxShadow: `0 0 12px 5px ${TYPE_COLORS[projectile.type] ?? '#fff'}`,
+            transform: 'translate(-50%, 50%)',
+            zIndex: 1, pointerEvents: 'none',
+          }}
+        />
+      )}
+    </AnimatePresence>
+  )
+}
+
 // Floating held-item effect popup (heal/recoil/survive) over an arena sprite.
 function ItemFxPopup({ fx, side }) {
   return (
@@ -978,7 +1126,7 @@ function ItemFxPopup({ fx, side }) {
   )
 }
 
-function TwoToneHpBar({ hp, maxHp, width = 140, resetKey }) {
+function TwoToneHpBar({ hp, maxHp, width = 140, resetKey, height = 10 }) {
   const [displayed, setDisplayed] = useState(hp)
   const prevHp = useRef(hp)
   const prevMaxHp = useRef(maxHp)
@@ -1004,38 +1152,21 @@ function TwoToneHpBar({ hp, maxHp, width = 140, resetKey }) {
   }, [hp])
 
   const pct = Math.max(0, (displayed / maxHp) * 100)
+  // Two-tone fill derived from the same green/yellow/red band the number uses,
+  // so the bar and the HP figure always agree. The top half is the lit face,
+  // the bottom half the shaded one — the tone split is what keeps a 6px bar
+  // readable at a glance instead of reading as a flat stripe.
+  const tone = hpColor(displayed, maxHp)
   return (
-    <div style={{ width, height: '10px', border: '1px solid #000', borderRadius: '1px', overflow: 'hidden', backgroundColor: '#1a1a1a' }}>
+    // #3a3a3a track, not near-black: on the dark info plate an empty bar has to
+    // still read as an empty gauge rather than a hole punched in the card.
+    <div style={{ width, height: `${height}px`, border: '1px solid #000', borderRadius: '1px', overflow: 'hidden', backgroundColor: '#3a3a3a' }}>
       <div style={{
         height: '100%', width: `${pct}%`,
-        transition: snap ? 'none' : 'width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        background: 'linear-gradient(to bottom, #4ade80 50%, #16a34a 50%)',
+        transition: snap ? 'none' : 'width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.6s ease',
+        backgroundColor: tone,
+        backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.28) 50%, rgba(0,0,0,0.28) 50%)',
       }} />
-    </div>
-  )
-}
-
-function DesktopInfoCard({ name, level, hp, maxHp, fainted, resetKey }) {
-  return (
-    <div style={{
-      backgroundColor: '#d4d4d4',
-      border: '1px solid #000',
-      padding: '5px 8px 2px',
-      width: '150px',
-      display: 'flex', flexDirection: 'column', gap: '2px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#1a1a1a', textTransform: 'capitalize', fontWeight: 'bold', lineHeight: 1 }}>
-          {name}
-        </span>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#444', lineHeight: 1 }}>
-          Lv{level} 
-        </span>
-      </div>
-      <TwoToneHpBar hp={hp} maxHp={maxHp} width={134} resetKey={resetKey} />
-      <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#333', textAlign: 'center', lineHeight: 1 }}>
-        {fainted ? 'FNT' : `${hp} / ${maxHp}`}
-      </span>
     </div>
   )
 }
@@ -1061,7 +1192,12 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
       display: 'flex', flexDirection: mirrored ? 'row-reverse' : 'row',
       alignItems: 'center', gap: '6px',
       padding: '3px 5px',
-      backgroundColor: active ? '#d8d8d8' : 'transparent',
+      // Active slot: a lifted plate. That alone carries the state now that the
+      // text keeps one palette — a yellow edge rule was tried here and cut, it
+      // competed with the yellow level figure for the same glance.
+      // Translucent, so it lifts off the frosted rail instead of punching an
+      // opaque hole through it.
+      backgroundColor: active ? 'rgba(255, 255, 255, 0.13)' : 'transparent',
       opacity: fainted ? 0.45 : 1,
     }}>
       {/* Sprite (outer edge) — pops + shows a level popup on victory */}
@@ -1097,18 +1233,34 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
           )}
         </AnimatePresence>
       </div>
-      {/* Name / level / HP */}
+      {/* Name / level / HP. One color system for both states — the active row is
+          marked by its lighter backing plate and left rule, not by inverting the
+          text to a second palette. */}
       <div style={{
-        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px',
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px',
         alignItems: mirrored ? 'flex-end' : 'flex-start',
       }}>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '16px', color: active ? '#1a1a1a' : '#fff', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: 1 }}>
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '17px', color: '#f2f2f2', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: 1 }}>
           {pokemon.name}
         </span>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: active ? '#444' : '#aaa', lineHeight: 1 }}>
-          Lv {pokemon.level}
-        </span>
-        <TwoToneHpBar hp={hp} maxHp={pokemon.stats.maxHp} width={90} />
+        {/* Level then HP, in that order in BOTH columns — mirroring the row
+            flips sprite and text to the correct edges, but the level/HP pair
+            must keep one reading order or the two columns disagree. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: '#facc15', lineHeight: 1, textShadow: LV_OUTLINE }}>
+            Lv{pokemon.level}
+          </span>
+          {/* The roster used to show a bare bar with no figure, while the mobile
+              slot showed both. Same reading on both layouts now. */}
+          <span style={{
+            fontFamily: 'Pokemon Classic', fontSize: '8px', lineHeight: 1,
+            color: fainted ? '#ef4444' : hpColor(hp, pokemon.stats.maxHp),
+            whiteSpace: 'nowrap', letterSpacing: '0.06em',
+          }}>
+            {fainted ? 'FNT' : `${hp}/${pokemon.stats.maxHp}`}
+          </span>
+        </div>
+        <TwoToneHpBar hp={hp} maxHp={pokemon.stats.maxHp} width={92} height={7} />
       </div>
       {/* Held item (inner edge) */}
       {itemSlot}
@@ -1119,7 +1271,26 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
 // A vertical edge column: trainer/character card on top, roster panel below.
 function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, faintedArr, activeIndex, phase, celebrate = false, levelsGained = 0, onSwap }) {
   const mirrored = side === 'right'
-  const cardSurface = '#212121'
+  // Frosted glass, not a solid panel: the battle background now runs edge to
+  // edge beneath both rails, and the rails fog it rather than cover it.
+  //
+  // The wash is a vertical gradient, not one flat alpha, and that is a
+  // legibility fix rather than a flourish. The background's bright mid-field
+  // band sits right where the roster rows are densest; measured against the
+  // rows' #f2f2f2 names, a uniform 0.72 wash left that band at 2.4:1 — under
+  // the 4.5:1 floor — while the dark sky above sat near 9:1. Weighting the
+  // wash heavier through the middle evens the panel out and holds every row
+  // above the floor without flattening the glass back into a solid slab.
+  const cardSurface = `linear-gradient(to bottom,
+    rgba(24, 24, 24, 0.74) 0%,
+    rgba(24, 24, 24, 0.86) 42%,
+    rgba(24, 24, 24, 0.86) 72%,
+    rgba(24, 24, 24, 0.78) 100%)`
+  const frost = 'blur(7px) saturate(0.7)'
+  // The trainer card is only 74px tall, so it takes the gradient's mid value as
+  // a flat wash — a full-height ramp would render as just its top slice and
+  // read lighter than the roster panel directly beneath it.
+  const trainerSurface = 'rgba(24, 24, 24, 0.8)'
   // The player's roster can be drag-reordered during the prep phase.
   const reorderable = !!onSwap && phase === 'prep'
   const [dragFrom, setDragFrom] = useState(null)
@@ -1157,9 +1328,10 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
     }}>
       {/* Trainer card */}
       <div style={{
-        backgroundColor: cardSurface,
+        background: trainerSurface,
+        backdropFilter: frost, WebkitBackdropFilter: frost,
         borderBottom: '1px solid #000',
-        [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid #000',
+        [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid rgba(0, 0, 0, 0.55)',
         height: '74px', flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
@@ -1172,8 +1344,9 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
       </div>
       {/* Roster panel — one bordered box, rows stacked */}
       <div style={{
-        backgroundColor: cardSurface,
-        [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid #000',
+        background: cardSurface,
+        backdropFilter: frost, WebkitBackdropFilter: frost,
+        [side === 'left' ? 'borderRight' : 'borderLeft']: '1px solid rgba(0, 0, 0, 0.55)',
         flex: 1, minHeight: 0,
         display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: '4px',
         padding: '4px',

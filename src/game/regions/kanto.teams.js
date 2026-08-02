@@ -29,10 +29,10 @@ export const TRAINER_SPECIES_POOLS = [
 // Fixed boss teams — indexed by boss trainer name. Last mon +2 levels (ace).
 export const BOSS_TEAMS = {
   // Map 1 — Pewter City Gym (Rock) — starter-assigned (all → Brock)
-  'Brock':     [{ id: 74, level: 8 }, { id: 95, level: 10 }],                       // Geodude, Onix
+  'Brock':     [{ id: 74, level: 6 }, { id: 95, level: 8 }],                        // Geodude, Onix
 
   // Map 2 — Cerulean City Gym (Water)
-  'Misty':     [{ id: 120, level: 17 }, { id: 121, level: 19 }],                    // Staryu, Starmie
+  'Misty':     [{ id: 120, level: 15 }, { id: 121, level: 17 }],                    // Staryu, Starmie
 
   // Map 3 — Vermilion City Gym (Electric)
   'Lt. Surge': [{ id: 100, level: 26 }, { id: 25, level: 26 }, { id: 26, level: 28 }], // Voltorb, Pikachu, Raichu
@@ -56,23 +56,23 @@ export const BOSS_TEAMS = {
 // Elite Four + Champion — fought in order after the 8th gym, authored above
 // Giovanni's 71–73 band (player gains +2 levels per battle along the way).
 export const ELITE_FOUR_TEAMS = {
-  'Lorelei': [{ id: 87, level: 74 }, { id: 91, level: 73 }, { id: 80, level: 74 }, { id: 124, level: 74 }, { id: 131, level: 76 }], // Dewgong, Cloyster, Slowbro, Jynx, Lapras (ace)
-  'Bruno':   [{ id: 95, level: 73 }, { id: 107, level: 75 }, { id: 106, level: 75 }, { id: 95, level: 76 }, { id: 68, level: 78 }], // Onix, Hitmonchan, Hitmonlee, Onix, Machamp (ace)
-  'Agatha':  [{ id: 94, level: 76 }, { id: 42, level: 76 }, { id: 93, level: 75 }, { id: 24, level: 78 }, { id: 94, level: 80 }],  // Gengar, Golbat, Haunter, Arbok, Gengar (ace)
-  'Lance':   [{ id: 130, level: 76 }, { id: 148, level: 74 }, { id: 148, level: 74 }, { id: 142, level: 78 }, { id: 149, level: 80 }], // Gyarados, Dragonair, Dragonair, Aerodactyl, Dragonite (ace)
+  'Lorelei': [{ id: 87, level: 70 }, { id: 91, level: 69 }, { id: 80, level: 70 }, { id: 124, level: 70 }, { id: 131, level: 72 }], // Dewgong, Cloyster, Slowbro, Jynx, Lapras (ace)
+  'Bruno':   [{ id: 95, level: 69 }, { id: 107, level: 71 }, { id: 106, level: 71 }, { id: 95, level: 72 }, { id: 68, level: 74 }], // Onix, Hitmonchan, Hitmonlee, Onix, Machamp (ace)
+  'Agatha':  [{ id: 94, level: 72 }, { id: 42, level: 72 }, { id: 93, level: 71 }, { id: 24, level: 74 }, { id: 94, level: 76 }],  // Gengar, Golbat, Haunter, Arbok, Gengar (ace)
+  'Lance':   [{ id: 130, level: 72 }, { id: 148, level: 70 }, { id: 148, level: 70 }, { id: 142, level: 74 }, { id: 149, level: 76 }], // Gyarados, Dragonair, Dragonair, Aerodactyl, Dragonite (ace)
   // Blue's 6th mon (the ace) is a starter-counter picked at battle time from
   // BLUE_STARTER_COUNTER below — the fully-evolved starter that beats the
   // player's pick (FR/LG behaviour). EliteFour splices it in as the ace.
-  'Blue':    [{ id: 18, level: 73 }, { id: 65, level: 77 }, { id: 112, level: 75 }, { id: 103, level: 75 }, { id: 130, level: 76 }], // Pidgeot, Alakazam, Rhydon, Exeggutor, Gyarados
+  'Blue':    [{ id: 18, level: 69 }, { id: 65, level: 73 }, { id: 112, level: 71 }, { id: 103, level: 71 }, { id: 130, level: 72 }], // Pidgeot, Alakazam, Rhydon, Exeggutor, Gyarados
 }
 
 // Blue's ace, chosen to counter the player's starter (id → { id, level }).
 // Bulbasaur(1)→Charizard, Charmander(4)→Blastoise, Squirtle(7)→Venusaur.
 // The 6th slot; falls back to Charizard if the starter is unknown.
 export const BLUE_STARTER_COUNTER = {
-  1: { id: 6,  level: 78 }, // vs Bulbasaur → Charizard
-  4: { id: 9,  level: 78 }, // vs Charmander → Blastoise
-  7: { id: 3,  level: 78 }, // vs Squirtle → Venusaur
+  1: { id: 6,  level: 74 }, // vs Bulbasaur → Charizard
+  4: { id: 9,  level: 74 }, // vs Charmander → Blastoise
+  7: { id: 3,  level: 74 }, // vs Squirtle → Venusaur
 }
 
 // Blue's early-game starter, same counter rule as BLUE_STARTER_COUNTER but at
@@ -109,5 +109,5 @@ export const RIVAL_STARTER_COUNTERS = {
 
 // Per-map level ranges (indexed by mapIndex). Same pacing as Unova.
 export const MAP_LEVEL_RANGES = [
-  [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
+  [1, 8], [8, 17], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
 ]
