@@ -11,7 +11,8 @@ being used. Today battles are silent apart from the level-up cue added in
 
 ## Source material
 
-`src/assets/sounds/GEN 1 SFX - Attack Moves - RBY/` holds 328 WAV files ripped
+`src/assets/sounds/GEN 1 SFX - Attack Moves - RBY/` holds 328 WAV files (plus a
+README, so 329 directory entries — the README is not a sound) ripped
 from Red/Blue/Yellow, named in PascalCase after their move (`Tackle.wav`,
 `HyperBeam.wav`).
 
@@ -47,10 +48,23 @@ sounds, so those types carry most of the substitutions.
 `MOVE_ANIMATION_ALIASES` table maps uncovered moves onto similar covered ones,
 and `getMoveAnimation()` resolves exact-match-then-alias.
 
-Sound reuses that table rather than duplicating its judgements. When a move has
-no sound of its own but its animation alias does, the alias's sound is used.
-This keeps one mental model: a move that *looks* like Bite also *sounds* like
-Bite, and a future edit to the alias table moves both together.
+Sound reuses that table rather than duplicating its judgements, with this
+precedence:
+
+1. **A move's own sound wins when the pack has one.** 13 of the 72 moves have
+   both an animation alias and an exact sound file — `earthquake` animates as
+   `dig` but sounds like `Earthquake`; `thunderbolt` animates as `thunder-shock`
+   but sounds like `Thunderbolt`. A real sound beats alias consistency.
+2. **Otherwise the alias's sound is the fallback** — `crunch` has no sound of
+   its own, aliases to `bite`, and so sounds like `Bite`.
+
+To keep that fallback honest, `MOVE_ANIMATION_ALIASES` is **extracted into its
+own pure module**, `src/game/moveAliases.data.js`, with no asset imports.
+`moveAnimations.js` re-exports it so nothing downstream changes. The sound test
+then imports the alias table directly and asserts that every alias-resolved
+move's stem still equals its alias target's stem — so editing an alias either
+updates both or fails the build. Without that extraction the 18 fallback entries
+are unguarded copies that go stale silently.
 
 ## The mapping
 
@@ -94,12 +108,18 @@ The source WAVs are **stereo 44.1 kHz 16-bit** — heavily oversampled for Game
 Boy source material. The 53 referenced files total **18.7 MB** raw, against a
 current app bundle of roughly 1 MB. Shipping them as-is is not viable.
 
-They are re-encoded to **AAC in an `.m4a` container at 64 kbps mono**, using
+They are re-encoded to **AAC in an `.m4a` container at 48 kbps mono**, using
 `afconvert` (ships with macOS):
 
 ```
-afconvert -f m4af -d aac -b 64000 --mix <in>.wav <out>.m4a
+afconvert -f m4af -d aac -c 1 -b 48000 --mix <in>.wav <out>.m4a
 ```
+
+`-c 1` is what forces mono. `--mix` alone does **not** downmix: measured with
+`afinfo`, `-b 64000 --mix` emits 2-channel AAC that the encoder drops to 32 kHz.
+Genuine mono at 64 kbps is *larger* than that stereo output (79 KB vs 63 KB over
+a five-file sample), so the bitrate drops to 48 kbps, which lands at 64 KB for
+the same five — parity with the stereo encode, with an honest channel count.
 
 Measured on a sample: `HyperBeam` 726 KB → 19 KB, `Tackle` 142 KB → 6 KB,
 `Explosion` 591 KB → 16 KB — roughly **25× smaller**, bringing the full set
@@ -128,11 +148,14 @@ Three pieces, each with one job.
 **`src/game/moveSounds.data.js`** — pure data, no imports of any kind.
 
 - `MOVE_SOUND_FILES` — all 72 kebab-case move names → PascalCase file stems.
-  The 18 alias-resolved moves are **inlined as already-resolved stems** rather
-  than looked up at runtime, since `moveAnimations.js` cannot be imported here.
-  The alias table remains the source of those 18 judgements; they are copied,
-  not re-derived.
+  The 18 alias-resolved moves are **inlined as already-resolved stems** so this
+  module stays import-free. A test (see Testing) asserts each of those still
+  agrees with `moveAliases.data.js`, so the copies cannot go stale unnoticed.
 - `soundFileFor(moveName)` — returns a stem or `undefined`.
+
+**`src/game/moveAliases.data.js`** — `MOVE_ANIMATION_ALIASES`, moved out of
+`moveAnimations.js` verbatim so it can be imported without pulling in 79 PNGs.
+`moveAnimations.js` re-exports it; no consumer changes.
 
 Because this module is plain JS, `node --test` can import it, which is what
 makes the coverage test in the Testing section possible.
@@ -175,7 +198,10 @@ so gauntlet battles are included.
 ## Behaviour details
 
 - **Volume** — move SFX at `0.45`, below the level-up cue's `0.6`. Attacks fire
-  many times per battle; the level-up fires once and should sit on top.
+  many times per battle; the level-up fires once and should sit on top. Note the
+  level-up cue is desktop-only (`BattleCard.jsx` gates it on `isDesktop`, since
+  the `+N LVL` popups only render there), so that comparison is unobservable on
+  mobile. 0.45 stands on its own regardless.
 - **Battle speed** — the app has a `battleSpeed` multiplier (1×–3×, in 0.5
   steps; see `SettingsPanel.jsx`). Sounds play at natural rate and are **not**
   pitch-shifted. At 3× a long sound may still be playing when the next attack
@@ -204,7 +230,8 @@ matching `src/game/shop.test.js`.
   only the former is importable under Node.
 - **Unit** — `getMoveSound` returns `undefined` rather than throwing for an
   unknown name, for `'(no move)'`, and for `undefined`/`null` input.
-- **Manual** — play a battle at 1× and at 4×, confirming sounds fire on attack
+- **Manual** — play a battle at 1× and at 3× (the maximum; `SettingsPanel.jsx`
+  sets `SPEEDS = [1, 1.5, 2, 2.5, 3]`), confirming sounds fire on attack
   and that rapid attacks cut cleanly rather than overlapping into noise.
 
 ## Known rough edges
