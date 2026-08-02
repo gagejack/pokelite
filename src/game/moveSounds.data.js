@@ -12,7 +12,7 @@
 //
 // Three kinds of entry, all flattened to a stem here:
 //   1. exact       — the pack has a file of the same name (`tackle` → Tackle)
-//   2. alias       — resolved through MOVE_ANIMATION_ALIASES in moveAnimations.js
+//   2. alias       — resolved through MOVE_ANIMATION_ALIASES in moveAliases.data.js
 //                    and inlined (`crunch` → bite → Bite), so a move that LOOKS
 //                    like Bite also SOUNDS like Bite
 //   3. substitution — authored by ear for moves Gen 1 never had (`dragon-pulse`
