@@ -1110,7 +1110,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // the finger (data-slot-index) receives the item. `dragGhost` is a
   // finger-following icon so the drag reads visually.
   const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
-  const [dragGhost, setDragGhost] = useState(null) // { x, y, item } | null
+  // Ghost VISIBILITY is state — it changes twice per drag. Ghost POSITION is a
+  // ref written straight to the node: it changes 60-120x/sec, and routing that
+  // through React re-rendered the whole map SVG on every finger move.
+  const [dragGhost, setDragGhost] = useState(null) // { item } | null
+  const ghostRef = useRef(null)
   // Short message when an action does nothing (e.g. Max Heal on a fainted
   // Pokémon). Without it a kept item reads as a broken tap.
   const [notice, setNotice] = useState(null)
@@ -1152,9 +1156,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       st.dragging = true // promote to a drag
       // Enter item-placing mode so the roster highlights as drop targets.
       setMovingItem({ item: st.item, from: st.from })
+      // One state write per drag, to mount the ghost. Position follows below.
+      setDragGhost({ item: st.item })
     }
     e.preventDefault() // stop the page scrolling while dragging
-    setDragGhost({ x: t.clientX, y: t.clientY, item: st.item })
+    // Position bypasses React entirely — see the ghostRef declaration above.
+    if (ghostRef.current) {
+      ghostRef.current.style.transform =
+        `translate(${t.clientX}px, ${t.clientY}px) translate(-50%, -50%)`
+    }
   }
   function bagTouchEnd(e) {
     const st = bagTouch.current
@@ -1491,11 +1501,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       {/* Finger-following icon while touch-dragging a bag item. */}
       {dragGhost && (
         <img
+          ref={ghostRef}
           src={itemIconUrl(dragGhost.item)}
           alt=""
           style={{
-            position: 'fixed', left: dragGhost.x, top: dragGhost.y,
-            transform: 'translate(-50%, -50%)',
+            // left/top stay at 0 and the transform does all the moving, so
+            // bagTouchMove can update position with one style write and no
+            // React render. See the ghostRef declaration.
+            position: 'fixed', left: 0, top: 0,
             width: '34px', height: '34px', imageRendering: 'pixelated',
             pointerEvents: 'none', zIndex: 300,
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
