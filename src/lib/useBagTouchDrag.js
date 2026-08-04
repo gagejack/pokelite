@@ -98,13 +98,18 @@ export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd, 
     const t = Array.from(e.touches).find(touch => touch.identifier === st.identifier)
     if (!t) return
 
+    // Unconditional, and BEFORE the threshold check: this hook must not depend
+    // on its consumers remembering `touchAction: 'none'`. Once a touch is being
+    // tracked, the browser does not get to turn it into a scroll — including
+    // during the first few px, before it has promoted to a drag.
+    e.preventDefault()
+
     if (!st.dragging) {
       if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
       st.dragging = true
       onDragStart?.(st.item, st.from)
       setGhostItem(st.item)
     }
-    e.preventDefault() // stop the page scrolling mid-drag
     // Recorded unconditionally: on the promoting frame the ghost has not
     // mounted, and the useLayoutEffect above reads this to place it correctly.
     ghostPos.current = { x: t.clientX, y: t.clientY }

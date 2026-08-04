@@ -1,16 +1,20 @@
 import { test, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useBagTouchDrag } from './useBagTouchDrag.js'
 import { makeTouch } from '../test/touch.js'
 
 // Mirrors the real consumers: the ghost is mounted only while a drag is
 // active, which is precisely what makes its first frame hard to position.
-function Harness({ callbacks = {} }) {
+function Harness({ callbacks = {}, onTouchMoveBubble } = {}) {
   const { bagTouchProps, ghostRef, ghostItem } = useBagTouchDrag(callbacks)
   const props = bagTouchProps({ name: 'Potion' }, { kind: 'bag', index: 0 })
+  const wrappedOnTouchMove = (e) => {
+    props.onTouchMove(e)
+    onTouchMoveBubble?.(e)
+  }
   return (
     <>
-      <div data-testid="item" {...props}>item</div>
+      <div data-testid="item" {...props} onTouchMove={wrappedOnTouchMove}>item</div>
       {ghostItem && (
         <img
           data-testid="ghost"
@@ -63,4 +67,38 @@ test('no ghost appears for movement under the drag threshold', () => {
   // 2px — under the 4px threshold, so this stays a tap.
   pressAndMove(item, { from: { x: 100, y: 100 }, to: { x: 102, y: 100 } })
   expect(screen.queryByTestId('ghost')).toBeNull()
+})
+
+test('scrolling is suppressed from the first tracked move, before the threshold', () => {
+  let capturedEvent = null
+  const onBubble = (e) => { capturedEvent = e }
+  render(<Harness onTouchMoveBubble={onBubble} />)
+  const item = screen.getByTestId('item')
+
+  const start = makeTouch({ identifier: 0, clientX: 100, clientY: 100 })
+  act(() => { fireEvent.touchStart(item, { touches: [start], changedTouches: [start] }) })
+
+  // 2px — deliberately UNDER the 4px threshold, so no drag starts. The
+  // browser must still be told not to turn this into a page scroll.
+  const tiny = makeTouch({ identifier: 0, clientX: 102, clientY: 100 })
+  act(() => { fireEvent.touchMove(item, { touches: [tiny], changedTouches: [tiny] }) })
+
+  expect(capturedEvent?.defaultPrevented).toBe(true)
+})
+
+test('an untracked finger does not suppress scrolling', () => {
+  let capturedEvent = null
+  const onBubble = (e) => { capturedEvent = e }
+  render(<Harness onTouchMoveBubble={onBubble} />)
+  const item = screen.getByTestId('item')
+
+  const start = makeTouch({ identifier: 0, clientX: 100, clientY: 100 })
+  act(() => { fireEvent.touchStart(item, { touches: [start], changedTouches: [start] }) })
+
+  // A different finger entirely — the hook is not tracking it, so it must
+  // not claim the gesture.
+  const other = makeTouch({ identifier: 9, clientX: 300, clientY: 300 })
+  act(() => { fireEvent.touchMove(item, { touches: [other], changedTouches: [other] }) })
+
+  expect(capturedEvent?.defaultPrevented).toBe(false)
 })
