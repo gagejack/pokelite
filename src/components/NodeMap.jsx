@@ -1116,11 +1116,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
   // The gesture itself lives in the hook; this screen only says what a drop
   // MEANS. EliteFour wires the same hook the same way.
-  //
-  // onDragEnd fires on every end AND on cancel, but only cancel should clear
-  // placing mode. This flag records that a drop path already decided what
-  // movingItem should be, so onDragEnd leaves that decision alone.
-  const settledRef = useRef(false)
   const { bagTouchProps, ghostRef, ghostItem } = useBagTouchDrag({
     // Enter item-placing mode so the roster highlights as drop targets.
     onDragStart: (item, from) => setMovingItem({ item, from }),
@@ -1129,26 +1124,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // touch-dragging a Max Revive onto a Pokémon would silently equip it as a
     // dead held item and displace whatever it was holding.
     onDrop: (item, from, slotIndex) => {
-      settledRef.current = true
       applyConsumableTo(item, from, slotIndex)
       setMovingItem(null)
     },
     // A missed drop STAYS in placing mode, so the drag degrades into
     // tap-to-place instead of silently dying. `movingItem` is deliberately left
     // set — the banner already on screen tells the player what to do next.
-    onMissedDrop: () => {
-      settledRef.current = true
-      setNotice('Dropped nowhere — tap a Pokémon to give it')
-    },
-    // Fires on end AND cancel. Only an unsettled end is a cancel: an OS
-    // interruption (notification pull-down, system gesture, incoming call)
-    // fires touchcancel and NO touchend, and without clearing here it would
-    // leave the targeting banner up and the roster highlighted indefinitely.
-    // A landed drop and a missed drop both settle above — the miss deliberately
-    // stays in placing mode, so it must not be cleared here.
-    onDragEnd: () => {
-      if (!settledRef.current) setMovingItem(null)
-      settledRef.current = false
+    onMissedDrop: () => setNotice('Dropped nowhere — tap a Pokémon to give it'),
+    // A cancel is the only unsettled ending: the OS interrupted the gesture,
+    // so placing mode must not be left up. A settled ending already decided
+    // what happens to movingItem — a landed drop cleared it, a miss keeps it
+    // so the drag can degrade into tap-to-place.
+    onDragEnd: (settled) => {
+      if (!settled) setMovingItem(null)
     },
   })
 

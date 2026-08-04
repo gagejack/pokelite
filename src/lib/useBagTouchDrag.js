@@ -13,11 +13,22 @@ import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 // The caller owns what a drop MEANS (equip vs. use vs. refuse); this hook only
 // decides that a drop happened and where.
 //
+// Every promoted drag ends with exactly one onDragEnd(settled). `settled` says
+// what KIND of ending it was, so the caller never has to mirror that bookkeeping
+// itself:
+//   true  — the gesture resolved: onDrop or onMissedDrop ran just before it and
+//           already decided what happens to any held/placing state.
+//   false — the gesture was interrupted: an OS touchcancel, or a touchend that
+//           belonged to a different finger. Nothing decided anything, so the
+//           caller must tear its own placing state down.
+// A tap that never passed the drag threshold fires NO callbacks at all —
+// nothing started, so nothing ended.
+//
 // @param {object} cb
 // @param {(item: any, from: any, slotIndex: number) => void} cb.onDrop
 // @param {(item: any, from: any) => void} cb.onMissedDrop
 // @param {(item: any, from: any) => void} cb.onDragStart
-// @param {() => void} cb.onDragEnd
+// @param {(settled: boolean) => void} cb.onDragEnd
 export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }) {
   // { item, from, identifier, startX, startY, dragging }
   const drag = useRef(null)
@@ -78,18 +89,26 @@ export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }
     reset()
     if (!st?.dragging) return // a plain tap — the element's onClick handles it
     const t = Array.from(e.changedTouches).find(touch => touch.identifier === st.identifier)
-    if (!t) { onDragEnd?.(); return }
+    // A different finger lifted; this drag never resolved anywhere.
+    if (!t) { onDragEnd?.(false); return }
     const idx = slotIndexAt(t.clientX, t.clientY)
     if (idx != null) onDrop?.(st.item, st.from, idx)
     else onMissedDrop?.(st.item, st.from)
-    onDragEnd?.()
+    onDragEnd?.(true)
   }
 
   // An OS interruption (notification, system gesture, call) fires touchcancel
   // and NO touchend. Without this the caller stays in placing mode forever.
+  //
+  // The `drag.current` guard matters: some browsers fire touchcancel AFTER a
+  // normal touchend for the same touch. onTouchEnd already reset(), so a null
+  // drag means this gesture is over and was settled — firing onDragEnd(false)
+  // here would clear the caller's placing mode and destroy the tap-to-place
+  // recovery a missed drop deliberately left standing.
   function onTouchCancel() {
+    if (!drag.current) return
     reset()
-    onDragEnd?.()
+    onDragEnd?.(false)
   }
 
   const bagTouchProps = (item, from) => ({

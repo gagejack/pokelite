@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
@@ -205,8 +205,8 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // only if they did something); everything else is equipped.
   //
   // Both drop paths route through here — the click path via resolveItemMove and
-  // the touch path via useBagTouchDrag's onDrop. Keeping the decision in one is
-  // stops them drifting, exactly as in NodeMap.
+  // the touch path via useBagTouchDrag's onDrop. Keeping the decision in one
+  // function is what stops the two from drifting, exactly as in NodeMap.
   async function applyConsumableTo(item, from, pokeIndex) {
     if (isRosterConsumable(item)) {
       const used = onApplyConsumable?.(item, pokeIndex)
@@ -252,32 +252,23 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
   // The gesture itself lives in the hook; this screen only says what a drop
   // MEANS. NodeMap wires the same hook the same way.
-  //
-  // onDragEnd fires on every end AND on cancel, but only cancel should clear
-  // placing mode. This flag records that a drop path already decided what
-  // movingItem should be, so onDragEnd leaves that decision alone.
-  const settledRef = useRef(false)
   const { bagTouchProps, ghostRef, ghostItem } = useBagTouchDrag({
     onDragStart: (item, from) => setMovingItem({ item, from }),
     // Consumables must be USED, not equipped — applyConsumableTo makes that
     // call, the same one resolveItemMove makes on the tap path.
     onDrop: (item, from, slotIndex) => {
-      settledRef.current = true
       applyConsumableTo(item, from, slotIndex)
       setMovingItem(null)
     },
     // Dropped on nothing — stay in placing mode so the drag degrades into
     // tap-to-place rather than silently dying. Matches NodeMap.
-    onMissedDrop: () => {
-      settledRef.current = true
-      setNotice('Dropped nowhere — tap a Pokémon to give it')
-    },
-    // touchcancel fires on an OS interruption with no touchend — without this an
-    // interrupted drag leaves the screen stuck in targeting mode. A settled drop
-    // or miss already decided movingItem, so it is left alone. Matches NodeMap.
-    onDragEnd: () => {
-      if (!settledRef.current) setMovingItem(null)
-      settledRef.current = false
+    onMissedDrop: () => setNotice('Dropped nowhere — tap a Pokémon to give it'),
+    // A cancel is the only unsettled ending: the OS interrupted the gesture,
+    // so placing mode must not be left up. A settled ending already decided
+    // what happens to movingItem — a landed drop cleared it, a miss keeps it
+    // so the drag can degrade into tap-to-place. Matches NodeMap.
+    onDragEnd: (settled) => {
+      if (!settled) setMovingItem(null)
     },
   })
 
