@@ -60,6 +60,9 @@ export function hitTestRects(x, y, rects, margin = HIT_MARGIN) {
  *
  * Like hitTestRects, returns the INDEX FIELD, not the array position.
  *
+ * When two rects have identical distance to the point, the first in the array wins.
+ * This matches hitTestRects' first-match semantics and provides a stable, predictable contract.
+ *
  * @param {number} x
  * @param {number} y
  * @param {Array<{index: number, rect: {left:number,right:number,top:number,bottom:number}}>} rects
@@ -78,7 +81,7 @@ export function nearestRectAt(x, y, rects, margin = HIT_MARGIN) {
     const cy = (rect.top + rect.bottom) / 2
     // Squared distance: same ordering as the real distance, no sqrt.
     const dist = (x - cx) ** 2 + (y - cy) ** 2
-    if (dist <= bestDist) { bestDist = dist; best = index }
+    if (dist < bestDist) { bestDist = dist; best = index }
   }
   return best
 }

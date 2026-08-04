@@ -88,11 +88,26 @@ test('nearestRectAt honours a custom margin', () => {
 })
 
 test('nearestRectAt measures to rect centers, not edges', () => {
-  // A tall slot and a short one, both containing the point. The short one's
-  // center is nearer vertically even though the tall one is nearer in x.
+  // A tall slot and a short one, both containing the point. Distance is to
+  // the center, so even though the tall one's edge is nearer in x, the short
+  // one's center (vertically closer) wins.
   const mixed = [
     { index: 7, rect: { left: 0,  right: 40, top: 0,  bottom: 200 } },
     { index: 9, rect: { left: 30, right: 70, top: 90, bottom: 110 } },
   ]
-  expect(nearestRectAt(35, 100, mixed)).toBe(9)
+  // Rect 7 center: (20, 100), rect 9 center: (50, 100)
+  // Point (40, 100): distance to 7 is 20, distance to 9 is 10 — rect 9 wins.
+  expect(nearestRectAt(40, 100, mixed)).toBe(9)
+})
+
+test('an exact center tie resolves to the first rect in order', () => {
+  // When two rects' centers are equidistant from the point, the first rect wins.
+  // This matches hitTestRects' first-match semantics and provides a stable contract.
+  const tied = [
+    { index: 5, rect: { left: 0,  right: 40, top: 0,  bottom: 100 } },
+    { index: 8, rect: { left: 30, right: 70, top: 0,  bottom: 100 } },
+  ]
+  // Both centers at y=50, rect 5 center at x=20, rect 8 center at x=50.
+  // Point (35, 50) is equidistant from both: sqrt(225) = 15px each.
+  expect(nearestRectAt(35, 50, tied)).toBe(5)
 })
