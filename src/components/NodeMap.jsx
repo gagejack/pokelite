@@ -1359,7 +1359,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               }}
             />
             {/* Bag — drag an item onto a Pokémon to equip (as on desktop), or tap
-                to pick it up then tap a Pokémon. Drop here to stow back. */}
+                it for the info popup, which has an Equip action. A drag released
+                on no Pokémon KEEPS placing mode active, so the recovery is to tap
+                a Pokémon; tapping the item itself does not pick it up. Drop
+                here to stow back. */}
             <div
               onClick={() => { if (isMovingItem) resolveItemMove({ kind: 'bag' }) }}
               onDragOver={e => { if (isMovingItem) e.preventDefault() }}

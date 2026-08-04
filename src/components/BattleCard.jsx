@@ -9,6 +9,8 @@ import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { BALANCE } from '../game/balance.js'
 import { itemIconUrl } from '../game/items.js'
+import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
+import { nearestRectAt } from '../game/dragHit.js'
 import MoveAnimation from './MoveAnimation.jsx'
 import SeedCodeChip from './SeedCodeChip.jsx'
 import { getBattleSkin } from './battleSkins/index.js'
@@ -1320,28 +1322,60 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
   const reorderable = !!onSwap && phase === 'prep'
   const [dragFrom, setDragFrom] = useState(null)
   const [dragOver, setDragOver] = useState(null)
-  const touchFrom = useRef(null)
 
-  const slotFromPoint = (clientX, clientY) => {
-    const el = document.elementFromPoint(clientX, clientY)?.closest('[data-battle-slot]')
-    return el ? parseInt(el.dataset.battleSlot, 10) : null
-  }
-  const dragProps = i => reorderable ? {
-    'data-battle-slot': i,
-    draggable: true,
-    onDragStart: () => setDragFrom(i),
-    onDragEnter: () => setDragOver(i),
-    onDragOver: e => e.preventDefault(),
-    onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
-    onDragEnd: () => { setDragFrom(null); setDragOver(null) },
-    onTouchStart: () => { touchFrom.current = i; setDragFrom(i) },
-    onTouchMove: e => { e.preventDefault(); const t = e.touches[0]; setDragOver(slotFromPoint(t.clientX, t.clientY)) },
-    onTouchEnd: e => {
-      const t = e.changedTouches[0]; const to = slotFromPoint(t.clientX, t.clientY)
-      if (touchFrom.current !== null && to !== null && touchFrom.current !== to) onSwap(touchFrom.current, to)
-      touchFrom.current = null; setDragFrom(null); setDragOver(null)
+  // Touch reorder, sharing its gesture with the bag drag and the map roster's
+  // reorder: same 4px threshold, same rect hit testing over data-battle-slot,
+  // same touchcancel cleanup. Three hand-rolled copies of this used to drift
+  // independently; this is the one implementation.
+  //
+  // No ghost — the row's own isDragging styling shows what is being moved.
+  const { bagTouchProps: reorderTouchProps } = useBagTouchDrag({
+    slotAttr: 'data-battle-slot',
+    onDragStart: (_pokemon, fromIndex) => setDragFrom(fromIndex),
+    onDrop: (_pokemon, fromIndex, toIndex) => {
+      if (fromIndex !== toIndex) onSwap(fromIndex, toIndex)
+      setDragFrom(null)
+      setDragOver(null)
     },
-  } : {}
+    onMissedDrop: () => { setDragFrom(null); setDragOver(null) },
+    // OS interruption: no touchend ever arrives, so without this the row stays
+    // visually picked up for the rest of the prep phase.
+    onDragEnd: (settled) => {
+      if (!settled) { setDragFrom(null); setDragOver(null) }
+    },
+  })
+
+  // Highlight the row under the finger. State is written only when the target
+  // changes, not per touchmove — see the same note in Roster.jsx.
+  function handleReorderMove(e) {
+    if (dragFrom === null) return
+    const t = e.touches[0]
+    if (!t) return
+    const rects = Array.from(document.querySelectorAll('[data-battle-slot]')).map(el => ({
+      index: parseInt(el.dataset.battleSlot, 10),
+      rect: el.getBoundingClientRect(),
+    }))
+    const idx = nearestRectAt(t.clientX, t.clientY, rects)
+    setDragOver(prev => (prev === idx ? prev : idx))
+  }
+
+  const dragProps = i => {
+    if (!reorderable) return {}
+    const touch = reorderTouchProps(roster[i], i)
+    return {
+      'data-battle-slot': i,
+      draggable: true,
+      onDragStart: () => setDragFrom(i),
+      onDragEnter: () => setDragOver(i),
+      onDragOver: e => e.preventDefault(),
+      onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
+      onDragEnd: () => { setDragFrom(null); setDragOver(null) },
+      ...touch,
+      // Both move handlers run: the hook's first, so it can preventDefault and
+      // promote the drag, then the highlight tracker.
+      onTouchMove: (e) => { touch.onTouchMove(e); handleReorderMove(e) },
+    }
+  }
 
   return (
     <div style={{
@@ -1408,28 +1442,48 @@ function BattleColumn({ characterSprite, characterName, roster, hpArr, faintedAr
   const reorderable = !!onSwap && phase === 'prep'
   const [dragFrom, setDragFrom] = useState(null)
   const [dragOver, setDragOver] = useState(null)
-  const touchFrom = useRef(null)
 
-  const slotFromPoint = (clientX, clientY) => {
-    const el = document.elementFromPoint(clientX, clientY)?.closest('[data-battle-slot]')
-    return el ? parseInt(el.dataset.battleSlot, 10) : null
-  }
-  const dragProps = i => reorderable ? {
-    'data-battle-slot': i,
-    draggable: true,
-    onDragStart: () => setDragFrom(i),
-    onDragEnter: () => setDragOver(i),
-    onDragOver: e => e.preventDefault(),
-    onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
-    onDragEnd: () => { setDragFrom(null); setDragOver(null) },
-    onTouchStart: () => { touchFrom.current = i; setDragFrom(i) },
-    onTouchMove: e => { e.preventDefault(); const t = e.touches[0]; setDragOver(slotFromPoint(t.clientX, t.clientY)) },
-    onTouchEnd: e => {
-      const t = e.changedTouches[0]; const to = slotFromPoint(t.clientX, t.clientY)
-      if (touchFrom.current !== null && to !== null && touchFrom.current !== to) onSwap(touchFrom.current, to)
-      touchFrom.current = null; setDragFrom(null); setDragOver(null)
+  const { bagTouchProps: reorderTouchProps } = useBagTouchDrag({
+    slotAttr: 'data-battle-slot',
+    onDragStart: (_pokemon, fromIndex) => setDragFrom(fromIndex),
+    onDrop: (_pokemon, fromIndex, toIndex) => {
+      if (fromIndex !== toIndex) onSwap(fromIndex, toIndex)
+      setDragFrom(null)
+      setDragOver(null)
     },
-  } : {}
+    onMissedDrop: () => { setDragFrom(null); setDragOver(null) },
+    onDragEnd: (settled) => {
+      if (!settled) { setDragFrom(null); setDragOver(null) }
+    },
+  })
+
+  function handleReorderMove(e) {
+    if (dragFrom === null) return
+    const t = e.touches[0]
+    if (!t) return
+    const rects = Array.from(document.querySelectorAll('[data-battle-slot]')).map(el => ({
+      index: parseInt(el.dataset.battleSlot, 10),
+      rect: el.getBoundingClientRect(),
+    }))
+    const idx = nearestRectAt(t.clientX, t.clientY, rects)
+    setDragOver(prev => (prev === idx ? prev : idx))
+  }
+
+  const dragProps = i => {
+    if (!reorderable) return {}
+    const touch = reorderTouchProps(roster[i], i)
+    return {
+      'data-battle-slot': i,
+      draggable: true,
+      onDragStart: () => setDragFrom(i),
+      onDragEnter: () => setDragOver(i),
+      onDragOver: e => e.preventDefault(),
+      onDrop: () => { if (dragFrom !== null && dragFrom !== i) onSwap(dragFrom, i); setDragFrom(null); setDragOver(null) },
+      onDragEnd: () => { setDragFrom(null); setDragOver(null) },
+      ...touch,
+      onTouchMove: (e) => { touch.onTouchMove(e); handleReorderMove(e) },
+    }
+  }
 
   return (
     <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

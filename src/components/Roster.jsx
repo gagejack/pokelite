@@ -5,6 +5,8 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
+import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
+import { nearestRectAt } from '../game/dragHit.js'
 
 // Darker partner shades. HP uses the same green/yellow/red thresholds as
 // hpColor(); STAT_BAR is the stat bars' blue.
@@ -202,9 +204,6 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
   const openPopup = (pokemon, i) => { setSelected(pokemon); setSelectedIndex(i) }
   const closePopup = () => { setSelected(null); setSelectedIndex(null) }
 
-  // Touch drag state
-  const touchFrom = useRef(null)
-
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -223,40 +222,48 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
     setDragOver(null)
   }
 
-  // Touch: find slot index under a touch point
-  function slotIndexFromTouch(touch, containerRef) {
-    const el = document.elementFromPoint(touch.clientX, touch.clientY)
-    if (!el) return null
-    const slotEl = el.closest('[data-slot-index]')
-    if (!slotEl) return null
-    return parseInt(slotEl.dataset.slotIndex, 10)
-  }
+  // Touch reorder. Shares its gesture with the bag drag — same movement
+  // threshold, same rect hit testing, same interruption handling — so the two
+  // drags a player can start on this screen behave identically. The hook owns
+  // WHEN a drag happens; this component owns what a drop MEANS.
+  //
+  // No ghost here: the source slot's own isDragging styling already shows what
+  // is being moved, so ghostRef/ghostItem go unused.
+  const { bagTouchProps: reorderTouchProps } = useBagTouchDrag({
+    onDragStart: (_pokemon, fromIndex) => setDragFrom(fromIndex),
+    onDrop: (_pokemon, fromIndex, toIndex) => {
+      if (fromIndex !== toIndex) onSwap?.(fromIndex, toIndex)
+      setDragFrom(null)
+      setDragOver(null)
+    },
+    // Released off every slot: a reorder has nowhere to degrade to, so just
+    // put the slot back. Unlike a bag drop there is no notice — the player
+    // dropped a Pokémon on empty space and nothing happening is the expected
+    // outcome, not a failure worth interrupting them about.
+    onMissedDrop: () => { setDragFrom(null); setDragOver(null) },
+    // Fires on OS interruption (notification, system gesture, call), where no
+    // touchend arrives at all. Without it the source slot stays visually
+    // picked-up forever. `settled` endings already cleared state above.
+    onDragEnd: (settled) => {
+      if (!settled) { setDragFrom(null); setDragOver(null) }
+    },
+  })
 
-  function handleTouchStart(i) {
-    touchFrom.current = i
-    setDragFrom(i)
-  }
-
-  function handleTouchMove(e) {
-    e.preventDefault()
-    const touch = e.touches[0]
-    const el = document.elementFromPoint(touch.clientX, touch.clientY)
-    const slotEl = el?.closest('[data-slot-index]')
-    const idx = slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
-    setDragOver(idx)
-  }
-
-  function handleTouchEnd(e) {
-    const touch = e.changedTouches[0]
-    const el = document.elementFromPoint(touch.clientX, touch.clientY)
-    const slotEl = el?.closest('[data-slot-index]')
-    const toIdx = slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
-    if (touchFrom.current !== null && toIdx !== null && touchFrom.current !== toIdx && onSwap) {
-      onSwap(touchFrom.current, toIdx)
-    }
-    touchFrom.current = null
-    setDragFrom(null)
-    setDragOver(null)
+  // The hook does not surface per-move position on purpose — a setState per
+  // touchmove is what used to re-render the whole map. But reorder needs the
+  // "you are over this slot" highlight, so track it here and write state only
+  // when the target actually changes, which is a handful of times per drag
+  // rather than 60-120 times per second.
+  function handleReorderMove(e) {
+    if (dragFrom === null) return
+    const t = e.touches[0]
+    if (!t) return
+    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
+      index: parseInt(el.dataset.slotIndex, 10),
+      rect: el.getBoundingClientRect(),
+    }))
+    const idx = nearestRectAt(t.clientX, t.clientY, rects)
+    setDragOver(prev => (prev === idx ? prev : idx))
   }
 
   const slotProps = (i) => ({
@@ -270,9 +277,16 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
     onDragOver: (e) => { e.preventDefault() },
     onDrop: itemTargeting ? () => onPickTarget?.(i) : (onSwap ? () => handleDrop(i) : undefined),
     onDragEnd: (onSwap && !itemTargeting) ? handleDragEnd : undefined,
-    onTouchStart: (onSwap && !itemTargeting) ? () => handleTouchStart(i) : undefined,
-    onTouchMove: (onSwap && !itemTargeting) ? handleTouchMove : undefined,
-    onTouchEnd: (onSwap && !itemTargeting) ? handleTouchEnd : undefined,
+    // Spread the hook's handlers (start/move/end/cancel), then layer the
+    // highlight-tracking move on top of the hook's own move handler — both
+    // need to run, and the hook's must run first so it can preventDefault.
+    ...((onSwap && !itemTargeting) ? (() => {
+      const props = reorderTouchProps(roster[i], i)
+      return {
+        ...props,
+        onTouchMove: (e) => { props.onTouchMove(e); handleReorderMove(e) },
+      }
+    })() : {}),
     isDragging: dragFrom === i,
     // Highlight every slot as a drop target while placing an item.
     isDropTarget: itemTargeting || (dragOver === i && dragFrom !== i),
