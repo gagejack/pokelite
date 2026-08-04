@@ -49,6 +49,41 @@ export function hitTestRects(x, y, rects, margin = HIT_MARGIN) {
 }
 
 /**
+ * Index of the rect whose CENTER is nearest to (x, y), among those whose
+ * rect — expanded by `margin` — contains the point. Null if none contain it.
+ *
+ * Differs from hitTestRects only where margins overlap, which for adjacent
+ * slots is the whole gutter between them: an 8px margin on each side of a 6px
+ * gap means both slots claim every point in it. First-match resolves that by
+ * DOM order and so always yields the left slot; this resolves it by distance
+ * and yields the one the player was actually closer to.
+ *
+ * Like hitTestRects, returns the INDEX FIELD, not the array position.
+ *
+ * @param {number} x
+ * @param {number} y
+ * @param {Array<{index: number, rect: {left:number,right:number,top:number,bottom:number}}>} rects
+ * @param {number} [margin]
+ * @returns {number | null}
+ */
+export function nearestRectAt(x, y, rects, margin = HIT_MARGIN) {
+  let best = null
+  let bestDist = Infinity
+  for (const { index, rect } of rects) {
+    if (
+      x < rect.left - margin || x > rect.right + margin ||
+      y < rect.top - margin || y > rect.bottom + margin
+    ) continue
+    const cx = (rect.left + rect.right) / 2
+    const cy = (rect.top + rect.bottom) / 2
+    // Squared distance: same ordering as the real distance, no sqrt.
+    const dist = (x - cx) ** 2 + (y - cy) ** 2
+    if (dist <= bestDist) { bestDist = dist; best = index }
+  }
+  return best
+}
+
+/**
  * Has the finger moved far enough from its start point to count as a drag?
  * Straight-line distance, so a diagonal drag promotes as readily as an axial one.
  *

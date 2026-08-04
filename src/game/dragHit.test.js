@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { hitTestRects, passedThreshold, DRAG_THRESHOLD, HIT_MARGIN } from './dragHit.js'
+import { hitTestRects, nearestRectAt, passedThreshold, DRAG_THRESHOLD, HIT_MARGIN } from './dragHit.js'
 
 // Three 58px-wide slots in a row, 100px tall, like the mobile roster rail.
 const slots = [
@@ -55,4 +55,44 @@ test('passedThreshold measures diagonal distance, not per-axis', () => {
 test('exported constants are the documented values', () => {
   expect(DRAG_THRESHOLD).toBe(4)
   expect(HIT_MARGIN).toBe(8)
+})
+
+test('nearestRectAt picks the closer slot when margins overlap', () => {
+  // The 6px gutter between slots 0 and 1 is fully covered by both slots'
+  // 8px margins. 60px is 2px past slot 0's right edge and 4px short of
+  // slot 1's left edge, so slot 0 is nearer; 63px flips it to slot 1.
+  expect(nearestRectAt(60, 50, slots)).toBe(0)
+  expect(nearestRectAt(63, 50, slots)).toBe(1)
+})
+
+test('nearestRectAt agrees with hitTestRects well inside a slot', () => {
+  expect(nearestRectAt(30, 50, slots)).toBe(0)
+  expect(nearestRectAt(90, 50, slots)).toBe(1)
+  expect(nearestRectAt(150, 50, slots)).toBe(2)
+})
+
+test('nearestRectAt returns index 0, not a falsy miss', () => {
+  expect(nearestRectAt(30, 50, slots)).not.toBe(null)
+  expect(nearestRectAt(30, 50, slots)).toBe(0)
+})
+
+test('nearestRectAt misses beyond every margin', () => {
+  expect(nearestRectAt(30, -20, slots)).toBe(null)
+  expect(nearestRectAt(300, 50, slots)).toBe(null)
+  expect(nearestRectAt(30, 50, [])).toBe(null)
+})
+
+test('nearestRectAt honours a custom margin', () => {
+  // Zero margin: the gutter is a genuine miss for both slots.
+  expect(nearestRectAt(60, 50, slots, 0)).toBe(null)
+})
+
+test('nearestRectAt measures to rect centers, not edges', () => {
+  // A tall slot and a short one, both containing the point. The short one's
+  // center is nearer vertically even though the tall one is nearer in x.
+  const mixed = [
+    { index: 7, rect: { left: 0,  right: 40, top: 0,  bottom: 200 } },
+    { index: 9, rect: { left: 30, right: 70, top: 90, bottom: 110 } },
+  ]
+  expect(nearestRectAt(35, 100, mixed)).toBe(9)
 })

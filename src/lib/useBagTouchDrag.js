@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { hitTestRects, passedThreshold } from '../game/dragHit.js'
+import { nearestRectAt, passedThreshold } from '../game/dragHit.js'
 
 // Touch drag-and-drop for bag items. HTML5 draggable never fires on touch, so
 // mobile needs its own gesture: a tap falls through to the element's onClick
@@ -36,7 +36,7 @@ function ghostTransform(x, y) {
   return `translate(${x}px, ${y}px) translate(-50%, -50%)`
 }
 
-export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }) {
+export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd, slotAttr = 'data-slot-index' }) {
   // { item, from, identifier, startX, startY, dragging }
   const drag = useRef(null)
   // Ghost VISIBILITY is state (twice per drag). Ghost POSITION is a ref written
@@ -61,12 +61,19 @@ export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }
   // Rect geometry rather than document.elementFromPoint: index.css sets
   // `pointer-events: none` on every img, so the sprite the player aims at is
   // invisible to elementFromPoint. See game/dragHit.js.
+  //
+  // `slotAttr` names the data attribute that marks a drop target, and the
+  // camelCase dataset key is derived from it. The roster rail uses
+  // data-slot-index; BattleCard's prep-phase rows use data-battle-slot.
   function slotIndexAt(x, y) {
-    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
-      index: parseInt(el.dataset.slotIndex, 10),
+    const key = slotAttr
+      .replace(/^data-/, '')
+      .replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+    const rects = Array.from(document.querySelectorAll(`[${slotAttr}]`)).map(el => ({
+      index: parseInt(el.dataset[key], 10),
       rect: el.getBoundingClientRect(),
     }))
-    return hitTestRects(x, y, rects)
+    return nearestRectAt(x, y, rects)
   }
 
   function reset() {
