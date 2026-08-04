@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { cash, muted, accent } from '../lib/colors'
+import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -1118,12 +1119,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const t = setTimeout(() => setNotice(null), 2200)
     return () => clearTimeout(t)
   }, [notice])
-  const DRAG_THRESHOLD = 8
-
+  // Rect geometry, not elementFromPoint — see game/dragHit.js for why.
+  // Reads the live rects at drop time so a scrolled or resized rail is correct.
   function slotIndexAt(x, y) {
-    const el = document.elementFromPoint(x, y)
-    const slotEl = el?.closest('[data-slot-index]')
-    return slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
+    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
+      index: parseInt(el.dataset.slotIndex, 10),
+      rect: el.getBoundingClientRect(),
+    }))
+    return hitTestRects(x, y, rects)
   }
 
   function bagTouchStart(item, from) {
@@ -1137,7 +1140,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!st) return
     const t = e.touches[0]
     if (!st.dragging) {
-      if (Math.hypot(t.clientX - st.startX, t.clientY - st.startY) < DRAG_THRESHOLD) return
+      if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
       st.dragging = true // promote to a drag
       // Enter item-placing mode so the roster highlights as drop targets.
       setMovingItem({ item: st.item, from: st.from })
@@ -1158,8 +1161,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // this, touch-dragging a Max Revive onto a Pokémon would silently equip
       // it as a dead held item and displace whatever it was holding.
       applyConsumableTo(st.item, st.from, idx)
+      setMovingItem(null)
+      return
     }
-    setMovingItem(null) // clear placing mode whether or not it landed on a slot
+    // Dropped on nothing. Previously this cleared placing mode with no message,
+    // so a missed drop was indistinguishable from a broken one. Instead, STAY in
+    // placing mode: the drag degrades into tap-to-place, and the banner already
+    // on screen tells the player what to do next. `movingItem` is deliberately
+    // left set.
+    setNotice('Dropped nowhere — tap a Pokémon to give it')
   }
   const bagTouchProps = (item, from) => ({
     onTouchStart: bagTouchStart(item, from),
