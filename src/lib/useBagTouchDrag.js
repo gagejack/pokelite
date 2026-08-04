@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 
 // Touch drag-and-drop for bag items. HTML5 draggable never fires on touch, so
@@ -29,6 +29,13 @@ import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 // @param {(item: any, from: any) => void} cb.onMissedDrop
 // @param {(item: any, from: any) => void} cb.onDragStart
 // @param {(settled: boolean) => void} cb.onDragEnd
+
+// The ghost is positioned at left:0/top:0 and moved entirely by transform, so
+// one style write repositions it with no React render and no layout pass.
+function ghostTransform(x, y) {
+  return `translate(${x}px, ${y}px) translate(-50%, -50%)`
+}
+
 export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }) {
   // { item, from, identifier, startX, startY, dragging }
   const drag = useRef(null)
@@ -37,6 +44,19 @@ export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }
   // React re-rendered the entire map on every finger move.
   const [ghostItem, setGhostItem] = useState(null)
   const ghostRef = useRef(null)
+  // The last position the finger was at. The ghost <img> does not exist yet on
+  // the frame that starts a drag — setGhostItem only SCHEDULES its render — so
+  // that frame's position has to be parked here and applied once it mounts.
+  const ghostPos = useRef({ x: 0, y: 0 })
+
+  // Runs after the ghost mounts but BEFORE the browser paints, so the ghost's
+  // first painted frame is already under the finger. With a plain useEffect,
+  // or with no effect at all, it paints once at the screen's top-left corner.
+  useLayoutEffect(() => {
+    if (!ghostItem || !ghostRef.current) return
+    const { x, y } = ghostPos.current
+    ghostRef.current.style.transform = ghostTransform(x, y)
+  }, [ghostItem])
 
   // Rect geometry rather than document.elementFromPoint: index.css sets
   // `pointer-events: none` on every img, so the sprite the player aims at is
@@ -78,9 +98,11 @@ export function useBagTouchDrag({ onDrop, onMissedDrop, onDragStart, onDragEnd }
       setGhostItem(st.item)
     }
     e.preventDefault() // stop the page scrolling mid-drag
+    // Recorded unconditionally: on the promoting frame the ghost has not
+    // mounted, and the useLayoutEffect above reads this to place it correctly.
+    ghostPos.current = { x: t.clientX, y: t.clientY }
     if (ghostRef.current) {
-      ghostRef.current.style.transform =
-        `translate(${t.clientX}px, ${t.clientY}px) translate(-50%, -50%)`
+      ghostRef.current.style.transform = ghostTransform(t.clientX, t.clientY)
     }
   }
 
