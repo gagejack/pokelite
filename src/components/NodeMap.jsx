@@ -1171,10 +1171,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // left set.
     setNotice('Dropped nowhere — tap a Pokémon to give it')
   }
+  // An OS interruption (notification pull-down, system gesture, incoming call)
+  // fires touchcancel and NO touchend. Without this, an interrupted drag leaves
+  // movingItem set, the targeting banner up, and the roster highlighted —
+  // indefinitely, until the player stumbles into something that clears it.
+  // Cancel is a drop that never happened: clean up, place nothing, say nothing.
+  function bagTouchCancel() {
+    bagTouch.current = null
+    setDragGhost(null)
+    setMovingItem(null)
+  }
   const bagTouchProps = (item, from) => ({
     onTouchStart: bagTouchStart(item, from),
     onTouchMove: bagTouchMove,
     onTouchEnd: bagTouchEnd,
+    onTouchCancel: bagTouchCancel,
   })
 
   // Skip directly to the next map (mirrors the boss-clear advance). On the

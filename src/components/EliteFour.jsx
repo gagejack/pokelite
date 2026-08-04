@@ -299,10 +299,18 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     // tap-to-place rather than silently dying. Matches NodeMap.
     setNotice('Dropped nowhere — tap a Pokémon to give it')
   }
+  // touchcancel fires on an OS interruption with no touchend — without this an
+  // interrupted drag leaves the screen stuck in targeting mode. Matches NodeMap.
+  function bagTouchCancel() {
+    bagTouch.current = null
+    setDragGhost(null)
+    setMovingItem(null)
+  }
   const bagTouchProps = (item, from) => ({
     onTouchStart: bagTouchStart(item, from),
     onTouchMove: bagTouchMove,
     onTouchEnd: bagTouchEnd,
+    onTouchCancel: bagTouchCancel,
   })
 
   const rosterItemProps = {
