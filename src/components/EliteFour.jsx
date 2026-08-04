@@ -267,14 +267,19 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   function bagTouchStart(item, from) {
     return (e) => {
-      const t = e.touches[0]
-      bagTouch.current = { item, from, startX: t.clientX, startY: t.clientY, dragging: false }
+      const t = e.changedTouches[0]
+      // Track WHICH finger — a later touches[0] can be a different one.
+      bagTouch.current = {
+        item, from, identifier: t.identifier,
+        startX: t.clientX, startY: t.clientY, dragging: false,
+      }
     }
   }
   function bagTouchMove(e) {
     const st = bagTouch.current
     if (!st) return
-    const t = e.touches[0]
+    const t = Array.from(e.touches).find(touch => touch.identifier === st.identifier)
+    if (!t) return
     if (!st.dragging) {
       if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
       st.dragging = true
@@ -288,7 +293,8 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     bagTouch.current = null
     setDragGhost(null)
     if (!st?.dragging) return // a plain tap — let onClick open the info popup
-    const t = e.changedTouches[0]
+    const t = Array.from(e.changedTouches).find(touch => touch.identifier === st.identifier)
+    if (!t) return
     const idx = slotIndexAt(t.clientX, t.clientY)
     if (idx != null) {
       applyConsumableTo(st.item, st.from, idx)
