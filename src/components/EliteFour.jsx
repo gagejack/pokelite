@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
-import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import Layout from './Layout'
 import Roster from './Roster'
 import BadgeList from './BadgeList'
@@ -205,7 +205,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // only if they did something); everything else is equipped.
   //
   // Both drop paths route through here — the click path via resolveItemMove and
-  // the touch path via bagTouchEnd. Keeping the decision in one function is what
+  // the touch path via useBagTouchDrag's onDrop. Keeping the decision in one is
   // stops them drifting, exactly as in NodeMap.
   async function applyConsumableTo(item, from, pokeIndex) {
     if (isRosterConsumable(item)) {
@@ -250,83 +250,35 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   }
 
   // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
-  // A tap opens the info popup; movement past the threshold promotes to a drag,
-  // and on release the roster slot under the finger (data-slot-index) receives
-  // the item.
-  const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
-  // Ghost VISIBILITY is state — it changes twice per drag. Ghost POSITION is a
-  // ref written straight to the node: it changes 60-120x/sec, and routing that
-  // through React re-rendered the whole map SVG on every finger move.
-  const [dragGhost, setDragGhost] = useState(null) // { item } | null
-  const ghostRef = useRef(null)
-  // Rect geometry, not elementFromPoint — see game/dragHit.js for why.
-  // Reads the live rects at drop time so a scrolled or resized rail is correct.
-  function slotIndexAt(x, y) {
-    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
-      index: parseInt(el.dataset.slotIndex, 10),
-      rect: el.getBoundingClientRect(),
-    }))
-    return hitTestRects(x, y, rects)
-  }
-
-  function bagTouchStart(item, from) {
-    return (e) => {
-      const t = e.changedTouches[0]
-      // Track WHICH finger — a later touches[0] can be a different one.
-      bagTouch.current = {
-        item, from, identifier: t.identifier,
-        startX: t.clientX, startY: t.clientY, dragging: false,
-      }
-    }
-  }
-  function bagTouchMove(e) {
-    const st = bagTouch.current
-    if (!st) return
-    const t = Array.from(e.touches).find(touch => touch.identifier === st.identifier)
-    if (!t) return
-    if (!st.dragging) {
-      if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
-      st.dragging = true
-      setMovingItem({ item: st.item, from: st.from })
-      // One state write per drag, to mount the ghost. Position follows below.
-      setDragGhost({ item: st.item })
-    }
-    e.preventDefault() // stop the page scrolling while dragging
-    // Position bypasses React entirely — see the ghostRef declaration above.
-    if (ghostRef.current) {
-      ghostRef.current.style.transform =
-        `translate(${t.clientX}px, ${t.clientY}px) translate(-50%, -50%)`
-    }
-  }
-  function bagTouchEnd(e) {
-    const st = bagTouch.current
-    bagTouch.current = null
-    setDragGhost(null)
-    if (!st?.dragging) return // a plain tap — let onClick open the info popup
-    const t = Array.from(e.changedTouches).find(touch => touch.identifier === st.identifier)
-    if (!t) return
-    const idx = slotIndexAt(t.clientX, t.clientY)
-    if (idx != null) {
-      applyConsumableTo(st.item, st.from, idx)
+  // The gesture itself lives in the hook; this screen only says what a drop
+  // MEANS. NodeMap wires the same hook the same way.
+  //
+  // onDragEnd fires on every end AND on cancel, but only cancel should clear
+  // placing mode. This flag records that a drop path already decided what
+  // movingItem should be, so onDragEnd leaves that decision alone.
+  const settledRef = useRef(false)
+  const { bagTouchProps, ghostRef, ghostItem } = useBagTouchDrag({
+    onDragStart: (item, from) => setMovingItem({ item, from }),
+    // Consumables must be USED, not equipped — applyConsumableTo makes that
+    // call, the same one resolveItemMove makes on the tap path.
+    onDrop: (item, from, slotIndex) => {
+      settledRef.current = true
+      applyConsumableTo(item, from, slotIndex)
       setMovingItem(null)
-      return
-    }
+    },
     // Dropped on nothing — stay in placing mode so the drag degrades into
     // tap-to-place rather than silently dying. Matches NodeMap.
-    setNotice('Dropped nowhere — tap a Pokémon to give it')
-  }
-  // touchcancel fires on an OS interruption with no touchend — without this an
-  // interrupted drag leaves the screen stuck in targeting mode. Matches NodeMap.
-  function bagTouchCancel() {
-    bagTouch.current = null
-    setDragGhost(null)
-    setMovingItem(null)
-  }
-  const bagTouchProps = (item, from) => ({
-    onTouchStart: bagTouchStart(item, from),
-    onTouchMove: bagTouchMove,
-    onTouchEnd: bagTouchEnd,
-    onTouchCancel: bagTouchCancel,
+    onMissedDrop: () => {
+      settledRef.current = true
+      setNotice('Dropped nowhere — tap a Pokémon to give it')
+    },
+    // touchcancel fires on an OS interruption with no touchend — without this an
+    // interrupted drag leaves the screen stuck in targeting mode. A settled drop
+    // or miss already decided movingItem, so it is left alone. Matches NodeMap.
+    onDragEnd: () => {
+      if (!settledRef.current) setMovingItem(null)
+      settledRef.current = false
+    },
   })
 
   const rosterItemProps = {
@@ -503,15 +455,15 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       )}
 
       {/* Finger-following icon while touch-dragging a bag item. */}
-      {dragGhost && (
+      {ghostItem && (
         <img
           ref={ghostRef}
-          src={itemIconUrl(dragGhost.item)}
+          src={itemIconUrl(ghostItem)}
           alt=""
           style={{
-            // left/top stay at 0 and the transform does all the moving, so
-            // bagTouchMove can update position with one style write and no
-            // React render. See the ghostRef declaration.
+            // left/top stay at 0 and the transform does all the moving, so the
+            // hook can update position with one style write and no React
+            // render. See useBagTouchDrag.
             position: 'fixed', left: 0, top: 0,
             width: '34px', height: '34px', imageRendering: 'pixelated',
             pointerEvents: 'none', zIndex: 300,

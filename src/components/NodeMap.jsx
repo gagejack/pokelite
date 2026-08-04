@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { cash, muted, accent } from '../lib/colors'
-import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import Layout from './Layout'
 import Roster from './Roster'
 import BattleCard from './BattleCard'
@@ -1052,9 +1052,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // only if they did something); everything else is equipped.
   //
   // Both drop paths route through here — the mouse/click path via
-  // resolveItemMove, and the touch path via bagTouchEnd, which bypasses
-  // resolveItemMove entirely. Keeping the decision in one function is what
-  // stops the two from drifting: the touch path used to equip consumables as
+  // resolveItemMove, and the touch path via useBagTouchDrag's onDrop, which
+  // bypasses resolveItemMove entirely. Keeping the decision in one function is
+  // what stops the two from drifting: the touch path used to equip consumables as
   // dead held items because it only knew how to call onMoveItem.
   async function applyConsumableTo(item, from, pokeIndex) {
     // Healing consumables. A no-op (target already at full HP) KEEPS the item
@@ -1104,17 +1104,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
   const cancelItemMove = () => setMovingItem(null)
 
-  // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
-  // Distinguishes a tap (→ info popup) from a drag (→ equip): a drag begins once
-  // the finger moves past a small threshold; on release, the roster slot under
-  // the finger (data-slot-index) receives the item. `dragGhost` is a
-  // finger-following icon so the drag reads visually.
-  const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
-  // Ghost VISIBILITY is state — it changes twice per drag. Ghost POSITION is a
-  // ref written straight to the node: it changes 60-120x/sec, and routing that
-  // through React re-rendered the whole map SVG on every finger move.
-  const [dragGhost, setDragGhost] = useState(null) // { item } | null
-  const ghostRef = useRef(null)
   // Short message when an action does nothing (e.g. Max Heal on a fainted
   // Pokémon). Without it a kept item reads as a broken tap.
   const [notice, setNotice] = useState(null)
@@ -1123,90 +1112,44 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const t = setTimeout(() => setNotice(null), 2200)
     return () => clearTimeout(t)
   }, [notice])
-  // Rect geometry, not elementFromPoint — see game/dragHit.js for why.
-  // Reads the live rects at drop time so a scrolled or resized rail is correct.
-  function slotIndexAt(x, y) {
-    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
-      index: parseInt(el.dataset.slotIndex, 10),
-      rect: el.getBoundingClientRect(),
-    }))
-    return hitTestRects(x, y, rects)
-  }
 
-  function bagTouchStart(item, from) {
-    return (e) => {
-      const t = e.changedTouches[0]
-      // Track WHICH finger. A later touches[0] can be a different finger — a
-      // second one landing mid-drag, or this one lifting while another is held —
-      // which would teleport the ghost and drop the item under the wrong finger.
-      bagTouch.current = {
-        item, from, identifier: t.identifier,
-        startX: t.clientX, startY: t.clientY, dragging: false,
-      }
-    }
-  }
-  function bagTouchMove(e) {
-    const st = bagTouch.current
-    if (!st) return
-    // Only the finger that started this drag moves it.
-    const t = Array.from(e.touches).find(touch => touch.identifier === st.identifier)
-    if (!t) return
-    if (!st.dragging) {
-      if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
-      st.dragging = true // promote to a drag
-      // Enter item-placing mode so the roster highlights as drop targets.
-      setMovingItem({ item: st.item, from: st.from })
-      // One state write per drag, to mount the ghost. Position follows below.
-      setDragGhost({ item: st.item })
-    }
-    e.preventDefault() // stop the page scrolling while dragging
-    // Position bypasses React entirely — see the ghostRef declaration above.
-    if (ghostRef.current) {
-      ghostRef.current.style.transform =
-        `translate(${t.clientX}px, ${t.clientY}px) translate(-50%, -50%)`
-    }
-  }
-  function bagTouchEnd(e) {
-    const st = bagTouch.current
-    bagTouch.current = null
-    setDragGhost(null)
-    if (!st?.dragging) return // a plain tap — let onClick open the info popup
-    // The lifted finger must be the one that started the drag — another finger
-    // lifting mid-drag must not drop the item.
-    const t = Array.from(e.changedTouches).find(touch => touch.identifier === st.identifier)
-    if (!t) return
-    const idx = slotIndexAt(t.clientX, t.clientY)
-    if (idx != null) {
-      // Consumables must be USED, not equipped — this path bypasses
-      // resolveItemMove, so it has to make the same decision itself. Without
-      // this, touch-dragging a Max Revive onto a Pokémon would silently equip
-      // it as a dead held item and displace whatever it was holding.
-      applyConsumableTo(st.item, st.from, idx)
+  // Touch drag-and-drop for bag items (HTML5 draggable doesn't fire on touch).
+  // The gesture itself lives in the hook; this screen only says what a drop
+  // MEANS. EliteFour wires the same hook the same way.
+  //
+  // onDragEnd fires on every end AND on cancel, but only cancel should clear
+  // placing mode. This flag records that a drop path already decided what
+  // movingItem should be, so onDragEnd leaves that decision alone.
+  const settledRef = useRef(false)
+  const { bagTouchProps, ghostRef, ghostItem } = useBagTouchDrag({
+    // Enter item-placing mode so the roster highlights as drop targets.
+    onDragStart: (item, from) => setMovingItem({ item, from }),
+    // Consumables must be USED, not equipped — applyConsumableTo makes that
+    // call, the same one resolveItemMove makes on the tap path. Without it,
+    // touch-dragging a Max Revive onto a Pokémon would silently equip it as a
+    // dead held item and displace whatever it was holding.
+    onDrop: (item, from, slotIndex) => {
+      settledRef.current = true
+      applyConsumableTo(item, from, slotIndex)
       setMovingItem(null)
-      return
-    }
-    // Dropped on nothing. Previously this cleared placing mode with no message,
-    // so a missed drop was indistinguishable from a broken one. Instead, STAY in
-    // placing mode: the drag degrades into tap-to-place, and the banner already
-    // on screen tells the player what to do next. `movingItem` is deliberately
-    // left set.
-    setNotice('Dropped nowhere — tap a Pokémon to give it')
-  }
-  // An OS interruption (notification pull-down, system gesture, incoming call)
-  // fires touchcancel and NO touchend. Without this, an interrupted drag leaves
-  // movingItem set, the targeting banner up, and the roster highlighted —
-  // indefinitely, until the player stumbles into something that clears it.
-  // Cancel is a drop that never happened: clean up, place nothing, say nothing.
-  function bagTouchCancel() {
-    bagTouch.current = null
-    setDragGhost(null)
-    setMovingItem(null)
-  }
-  const bagTouchProps = (item, from) => ({
-    onTouchStart: bagTouchStart(item, from),
-    onTouchMove: bagTouchMove,
-    onTouchEnd: bagTouchEnd,
-    onTouchCancel: bagTouchCancel,
+    },
+    // A missed drop STAYS in placing mode, so the drag degrades into
+    // tap-to-place instead of silently dying. `movingItem` is deliberately left
+    // set — the banner already on screen tells the player what to do next.
+    onMissedDrop: () => {
+      settledRef.current = true
+      setNotice('Dropped nowhere — tap a Pokémon to give it')
+    },
+    // Fires on end AND cancel. Only an unsettled end is a cancel: an OS
+    // interruption (notification pull-down, system gesture, incoming call)
+    // fires touchcancel and NO touchend, and without clearing here it would
+    // leave the targeting banner up and the roster highlighted indefinitely.
+    // A landed drop and a missed drop both settle above — the miss deliberately
+    // stays in placing mode, so it must not be cleared here.
+    onDragEnd: () => {
+      if (!settledRef.current) setMovingItem(null)
+      settledRef.current = false
+    },
   })
 
   // Skip directly to the next map (mirrors the boss-clear advance). On the
@@ -1499,15 +1442,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       )}
 
       {/* Finger-following icon while touch-dragging a bag item. */}
-      {dragGhost && (
+      {ghostItem && (
         <img
           ref={ghostRef}
-          src={itemIconUrl(dragGhost.item)}
+          src={itemIconUrl(ghostItem)}
           alt=""
           style={{
-            // left/top stay at 0 and the transform does all the moving, so
-            // bagTouchMove can update position with one style write and no
-            // React render. See the ghostRef declaration.
+            // left/top stay at 0 and the transform does all the moving, so the
+            // hook can update position with one style write and no React
+            // render. See useBagTouchDrag.
             position: 'fixed', left: 0, top: 0,
             width: '34px', height: '34px', imageRendering: 'pixelated',
             pointerEvents: 'none', zIndex: 300,
