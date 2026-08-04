@@ -9,6 +9,7 @@ import BalanceDashboard from './BalanceDashboard'
 import LevelBar from './LevelBar'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 import { TYPE_COLORS } from '../game/types.js'
+import { itemByName, itemIconUrl } from '../game/items.js'
 import { REGION_STARTERS } from '../game/starters.js'
 
 // Every region's three starters, flattened. The top-caught list excludes them:
@@ -318,21 +319,22 @@ export default function Stats({ onClose, role = null }) {
                       gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
                       gap: '8px',
                     }}>
+                      {/* End-of-run HP is deliberately not shown here. This is a
+                          trophy case: every Pokémon on this grid was standing on
+                          the team that beat the Champion. Ranking them by who
+                          happened to be at 0 HP on the final turn sorts winners
+                          into winners and losers, which is the one thing this
+                          room should never do. Level is the honest label — it is
+                          what the Pokémon became over the run. */}
                       {roster.map((p, j) => {
-                        // Ending the run at 0 HP is the most commemorative fact
-                        // this screen can carry — you won the champion fight with
-                        // this one down — and it was previously invisible.
-                        const fainted = p.stats?.hp === 0
                         return (
                           <div
                             key={`${p.id}-${j}`}
                             style={{
                               backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
-                              // Shiny gets the epic-tier purple; fainted a muted
-                              // red. Otherwise the standard panel border.
-                              border: p.shiny ? '2px solid #a855f7'
-                                : fainted ? `2px solid ${dark ? '#7f1d1d' : '#b91c1c'}`
-                                : panelBorder,
+                              // Shiny is the only state that changes this border.
+                              // It is a fact about rarity, not about performance.
+                              border: p.shiny ? '2px solid #a855f7' : panelBorder,
                               padding: '8px 6px',
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
                               minWidth: 0,
@@ -350,10 +352,6 @@ export default function Stats({ onClose, role = null }) {
                                 width: isDesktop ? '72px' : '56px',
                                 height: isDesktop ? '72px' : '56px',
                                 imageRendering: 'pixelated',
-                                // Fainted reads at a glance without hiding the
-                                // sprite — it earned its place on this team.
-                                filter: fainted ? 'grayscale(0.7)' : 'none',
-                                opacity: fainted ? 0.75 : 1,
                               }}
                             />
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', maxWidth: '100%' }}>
@@ -385,23 +383,30 @@ export default function Stats({ onClose, role = null }) {
                                 </span>
                               ))}
                             </div>
-                            {/* A legibility halo, not a visible shadow. Yellow
-                                is thin on the light-theme panel, so it needs
-                                something behind it — but anything you can point
-                                at is decoration on a 12px label.
-                                Zero offset and 6px of blur puts the darkening
-                                evenly behind the glyph instead of beside it, and
-                                two stacked passes at low alpha build density at
-                                the edges without any one of them reading as an
-                                object. Net effect: the text is easier to read
-                                and nothing looks added. */}
-                            <span style={{
-                              fontFamily: 'Upheaval', fontSize: '12px',
-                              color: fainted ? (dark ? '#f87171' : '#b91c1c') : '#facc15',
-                              textShadow: '0 0 6px rgba(0,0,0,0.45), 0 0 3px rgba(0,0,0,0.35)',
-                            }}>
-                              {fainted ? 'FAINTED' : `LV ${p.level}`}
-                            </span>
+                            {/* Level, now the only state this line carries.
+                                accent(dark) rather than a flat #facc15: this card
+                                sits on the themed panel, where the raw yellow
+                                measures 1.11:1 in light mode. That also retires
+                                the blur halo the yellow needed to stay legible —
+                                a token that clears AA on both panels doesn't need
+                                propping up, and the halo was compensation for a
+                                color problem rather than a design choice.
+                                "LV" is set smaller and muted so the NUMBER is the
+                                thing the eye lands on; it is the only part that
+                                differs between one card and the next. */}
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                              <span style={{
+                                fontFamily: 'Upheaval', fontSize: '10px', color: mutedColor,
+                              }}>
+                                LV
+                              </span>
+                              <span style={{
+                                fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '14px',
+                                color: accent(dark),
+                              }}>
+                                {p.level}
+                              </span>
+                            </div>
                             {/* Move and held item. Stored on every winning
                                 roster since the feature shipped and never shown
                                 until now — they are what made this team beat the
@@ -416,15 +421,44 @@ export default function Stats({ onClose, role = null }) {
                                 {p.move.replace(/-/g, ' ')}
                               </span>
                             )}
-                            {p.item && (
-                              <span style={{
-                                fontFamily: 'Orange Kid', fontSize: '13px', color: cash(dark),
-                                textAlign: 'center', lineHeight: 1.2,
-                                overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
-                              }}>
-                                {p.item}
-                              </span>
-                            )}
+                            {/* Held item, with its icon. The move above is an
+                                ACTION and stays plain text; the item is an
+                                OBJECT the Pokémon carried, so it gets the object
+                                — which is also what separates the two lines at a
+                                glance instead of leaving three stacked strings.
+                                The sprite is the same 16px pixel art the bag and
+                                mart use, so an item looks here exactly as it did
+                                when it was bought.
+                                Rows saved before an item was renamed or removed
+                                resolve to no icon; the name still prints, since
+                                the stored name is the historical record. */}
+                            {p.item && (() => {
+                              const heldItem = itemByName(p.item)
+                              return (
+                                <div style={{
+                                  display: 'flex', alignItems: 'center', gap: '4px',
+                                  maxWidth: '100%', minWidth: 0,
+                                }}>
+                                  {heldItem && (
+                                    <img
+                                      src={itemIconUrl(heldItem)}
+                                      alt=""
+                                      style={{
+                                        width: '16px', height: '16px',
+                                        imageRendering: 'pixelated', flexShrink: 0,
+                                      }}
+                                    />
+                                  )}
+                                  <span style={{
+                                    fontFamily: 'Orange Kid', fontSize: '13px', color: cash(dark),
+                                    textAlign: 'center', lineHeight: 1.2,
+                                    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0,
+                                  }}>
+                                    {p.item}
+                                  </span>
+                                </div>
+                              )
+                            })()}
                           </div>
                         )
                       })}

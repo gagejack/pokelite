@@ -167,6 +167,23 @@ export function itemIconUrl(item) {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.icon}.png`
 }
 
+// Look an item up by its DISPLAY NAME.
+//
+// Saved winning rosters store `item` as a name string, not an id (see
+// App.jsx's winning_roster payload), so the Hall of Fame has no id to resolve
+// an icon from. Name is a safe key here: all 49 names are distinct, and this
+// reads the same ITEMS table the run itself drew from, so a row saved years ago
+// still resolves as long as the item still exists.
+//
+// Returns undefined for an item that has since been renamed or removed —
+// callers must treat the icon as optional and keep showing the stored name,
+// which is the historical record either way.
+const BY_NAME = new Map(ITEMS.map(i => [i.name, i]))
+
+export function itemByName(name) {
+  return name ? BY_NAME.get(name) : undefined
+}
+
 // Effective draw weight for an item: its tier's budget split equally among all
 // items in that tier. An item in an unknown/empty tier gets weight 0. The tier
 // budget can be overridden via `tierBudget` to bias rarity for special draws.
