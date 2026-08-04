@@ -1,5 +1,4 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { test, expect } from 'vitest'
 import { getShopInventory } from './shop.js'
 import { BALANCE } from './balance.js'
 
@@ -9,34 +8,34 @@ import { BALANCE } from './balance.js'
 
 test('string entry uses the global stock table', () => {
   const shelf = getShopInventory({ shopGeneric: ['max_heal'], shopPools: [[]] }, 0)
-  assert.equal(shelf.length, 1)
-  assert.equal(shelf[0].item.id, 'max_heal')
-  assert.equal(shelf[0].stock, 2)
+  expect(shelf.length).toBe(1)
+  expect(shelf[0].item.id).toBe('max_heal')
+  expect(shelf[0].stock).toBe(2)
 })
 
 test('string entry with no global stock defaults to 1', () => {
   const shelf = getShopInventory({ shopGeneric: [], shopPools: [['plate_rock']] }, 0)
-  assert.equal(shelf[0].stock, 1)
+  expect(shelf[0].stock).toBe(1)
 })
 
 test('object entry overrides the global stock table', () => {
   const shelf = getShopInventory(
     { shopGeneric: [], shopPools: [[{ id: 'max_heal', stock: 3 }]] }, 0)
-  assert.equal(shelf[0].item.id, 'max_heal')
-  assert.equal(shelf[0].stock, 3)
+  expect(shelf[0].item.id).toBe('max_heal')
+  expect(shelf[0].stock).toBe(3)
 })
 
 test('an unpriced id is skipped in either form', () => {
   // leftovers exists in ITEMS but has no BALANCE.economy.prices entry.
   const shelf = getShopInventory(
     { shopGeneric: ['leftovers'], shopPools: [[{ id: 'leftovers', stock: 5 }]] }, 0)
-  assert.deepEqual(shelf, [])
+  expect(shelf).toEqual([])
 })
 
 test('an unknown id is skipped in either form', () => {
   const shelf = getShopInventory(
     { shopGeneric: ['not_a_real_item'], shopPools: [[{ id: 'also_fake' }]] }, 0)
-  assert.deepEqual(shelf, [])
+  expect(shelf).toEqual([])
 })
 
 test('a curated object entry dedupes against the same generic string id', () => {
@@ -44,8 +43,8 @@ test('a curated object entry dedupes against the same generic string id', () => 
   // entry must win, because that is the whole point of the override.
   const shelf = getShopInventory(
     { shopGeneric: ['max_heal'], shopPools: [[{ id: 'max_heal', stock: 3 }]] }, 0)
-  assert.equal(shelf.length, 1)
-  assert.equal(shelf[0].stock, 3)
+  expect(shelf.length).toBe(1)
+  expect(shelf[0].stock).toBe(3)
 })
 
 test('every newly curated item is priced', () => {
@@ -55,16 +54,16 @@ test('every newly curated item is priced', () => {
     'type_prism', 'focus_sash',
   ]
   const missing = needed.filter(id => BALANCE.economy.prices[id] == null)
-  assert.deepEqual(missing, [], `unpriced: ${missing.join(', ')}`)
+  expect(missing).toEqual([])
 })
 
 test('the price ladder keeps its rungs', () => {
   const p = BALANCE.economy.prices
-  assert.equal(p.max_heal, 150)
-  assert.equal(p.muscle_band, 200)
-  assert.equal(p.wise_glasses, 200)   // Muscle Band's special-attack mirror
-  assert.equal(p.plate_rock, 300)
-  assert.equal(p.mega_revive, 900)    // the ceiling, unchanged
+  expect(p.max_heal).toBe(150)
+  expect(p.muscle_band).toBe(200)
+  expect(p.wise_glasses).toBe(200)   // Muscle Band's special-attack mirror
+  expect(p.plate_rock).toBe(300)
+  expect(p.mega_revive).toBe(900)    // the ceiling, unchanged
 })
 
 // Kanto region-level shelf tests (kantoConfig content: every map sells a
