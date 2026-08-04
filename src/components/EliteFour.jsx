@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
+import { hitTestRects, passedThreshold } from '../game/dragHit.js'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -254,12 +255,14 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // the item.
   const bagTouch = useRef(null) // { item, from, startX, startY, dragging }
   const [dragGhost, setDragGhost] = useState(null) // { x, y, item } | null
-  const DRAG_THRESHOLD = 8
-
+  // Rect geometry, not elementFromPoint — see game/dragHit.js for why.
+  // Reads the live rects at drop time so a scrolled or resized rail is correct.
   function slotIndexAt(x, y) {
-    const el = document.elementFromPoint(x, y)
-    const slotEl = el?.closest('[data-slot-index]')
-    return slotEl ? parseInt(slotEl.dataset.slotIndex, 10) : null
+    const rects = Array.from(document.querySelectorAll('[data-slot-index]')).map(el => ({
+      index: parseInt(el.dataset.slotIndex, 10),
+      rect: el.getBoundingClientRect(),
+    }))
+    return hitTestRects(x, y, rects)
   }
 
   function bagTouchStart(item, from) {
@@ -273,7 +276,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (!st) return
     const t = e.touches[0]
     if (!st.dragging) {
-      if (Math.hypot(t.clientX - st.startX, t.clientY - st.startY) < DRAG_THRESHOLD) return
+      if (!passedThreshold(st.startX, st.startY, t.clientX, t.clientY)) return
       st.dragging = true
       setMovingItem({ item: st.item, from: st.from })
     }
@@ -287,8 +290,14 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (!st?.dragging) return // a plain tap — let onClick open the info popup
     const t = e.changedTouches[0]
     const idx = slotIndexAt(t.clientX, t.clientY)
-    if (idx != null) applyConsumableTo(st.item, st.from, idx)
-    setMovingItem(null)
+    if (idx != null) {
+      applyConsumableTo(st.item, st.from, idx)
+      setMovingItem(null)
+      return
+    }
+    // Dropped on nothing — stay in placing mode so the drag degrades into
+    // tap-to-place rather than silently dying. Matches NodeMap.
+    setNotice('Dropped nowhere — tap a Pokémon to give it')
   }
   const bagTouchProps = (item, from) => ({
     onTouchStart: bagTouchStart(item, from),
