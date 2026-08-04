@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { cash, muted } from '../lib/colors'
+import { cash, muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -401,21 +401,22 @@ function MapSvg({
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', lineHeight: '1.5' }}>
                         {line.type && (
                           <span style={{
-                            fontFamily: 'Upheaval', fontSize: '10px', color: '#fff',
+                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '10px', color: '#1a1a1a',
                             backgroundColor: TYPE_COLORS[line.type] ?? '#888',
+                            border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                             padding: '2px 6px', textTransform: 'capitalize', flexShrink: 0,
                           }}>
                             {line.type}
                           </span>
                         )}
-                        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', textTransform: 'capitalize' }}>
+                        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: accent(dark), textTransform: 'capitalize' }}>
                           {line.name} lv.{line.level}
                         </span>
                       </div>
                     )
-                    : <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', lineHeight: '1.5' }}>{line}</div>
+                    : <div key={i} style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: accent(dark), lineHeight: '1.5' }}>{line}</div>
                   )
-                  : <div style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: '#facc15', marginTop: '2px' }}>{sub}</div>
+                  : <div style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: accent(dark), marginTop: '2px' }}>{sub}</div>
                 }
               </div>
             )}

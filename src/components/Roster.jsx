@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted, twoTone, STAT_BAR_LIGHT, STAT_BAR_DARK } from '../lib/colors'
+import { muted, accent, twoTone, STAT_BAR_LIGHT, STAT_BAR_DARK } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
@@ -61,8 +61,9 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
         <div style={{ display: 'flex', gap: s(4) }}>
           {pokemon.types.map(t => (
             <span key={t} style={{
-              fontFamily: 'Upheaval', fontSize: sf(7), color: '#fff',
+              fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: sf(7), color: '#1a1a1a',
               backgroundColor: TYPE_COLORS[t] || '#888',
+              border: '1px solid #000', boxShadow: '2px 2px 0 #000',
               padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
             }}>
               {t}
@@ -163,8 +164,9 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
                 {move.name.replace(/-/g, ' ')}
               </span>
               <span style={{
-                fontFamily: 'Upheaval', fontSize: sf(7), color: '#fff',
+                fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: sf(7), color: '#1a1a1a',
                 backgroundColor: TYPE_COLORS[move.type] || '#888',
+                border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                 padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
               }}>
                 {move.type}
@@ -499,9 +501,16 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       }}>
         {pokemon.name}
       </span>
+      {/* No outline. An 8-direction black text-shadow used to ring this label,
+          which is what you do to hold text over sprite art — but the slot has a
+          solid background (above), so there is nothing to separate from. At
+          6–10px Pokemon Classic the ring is wider than the glyph strokes and
+          floods the counters: "50" closes into two blobs. The fill color
+          already clears AA on the slot in both themes, so the ring was only
+          ever costing legibility. The FNT badge below keeps its 4-direction
+          ring — that one sits over the sprite. */}
       <span style={{
-        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : '10px', color: '#facc15', pointerEvents: 'none',
-        textShadow: '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
+        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : '10px', color: accent(dark), pointerEvents: 'none',
       }}>
         LVL {pokemon.level}
       </span>

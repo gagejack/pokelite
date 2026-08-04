@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
@@ -188,8 +188,9 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                         <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                           {pokemon.types?.map(t => (
                             <span key={t} style={{
-                              fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                              fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '7px', color: '#1a1a1a',
                               backgroundColor: TYPE_COLORS[t] || '#888',
+                              border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                               padding: '2px 5px', textTransform: 'capitalize',
                             }}>
                               {t}
@@ -197,7 +198,7 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                           ))}
                         </div>
                       </div>
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: '#facc15' }}>
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: accent(dark) }}>
                         LVL {pokemon.level}
                       </span>
                       {/* Reason line — `title` is desktop-only, so the block
@@ -491,14 +492,15 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: textColor, textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                   {pokemon.name}
                 </span>
-                <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark) }}>
                   LVL {pokemon.level}
                 </span>
                 <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {pokemon.types?.map(t => (
                     <span key={t} style={{
-                      fontFamily: 'Upheaval', fontSize: '10px', color: '#fff',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '10px', color: '#1a1a1a',
                       backgroundColor: TYPE_COLORS[t] || '#888',
+                      border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                       padding: '1px 4px', textTransform: 'capitalize',
                     }}>
                       {t}

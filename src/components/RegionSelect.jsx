@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
+import { accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { getRegionConfig } from '../game/regionRegistry'
 import Layout from './Layout'
@@ -123,7 +124,10 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
   // invisible against the light mode's off-white. Text inside the region cards
   // stays light, since those always have dark artwork behind them.
   const headingColor = dark ? '#ffffff' : '#2b2b2b'
-  const subheadingColor = dark ? '#facc15' : '#8a6d0b'
+  // Page-level heading, on the themed background rather than a region card —
+  // so unlike the text INSIDE the cards (which always has dark art behind it)
+  // this one flips with the theme. The hand-rolled #8a6d0b measured 3.55:1.
+  const subheadingColor = accent(dark)
   const headingShadow = dark ? '0 2px 6px rgba(0,0,0,0.8)' : 'none'
 
   return (

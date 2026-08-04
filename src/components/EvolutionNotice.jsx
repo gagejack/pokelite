@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '../lib/theme'
+import { accent } from '../lib/colors'
 
 // Evolution result, shown after a win / Evolve Stone / Rare Candy that changed
 // a Pokémon. Shared by NodeMap and EliteFour.
@@ -36,7 +37,7 @@ export default function EvolutionNotice({ notices, onDismiss }) {
   const mutedColor = dark ? '#888' : '#666'
   // The arrow is the one tinted element, so it has to hold at both themes:
   // #facc15 on the light card's #DBDBDB is thin, so light mode drops to amber.
-  const arrowColor = dark ? '#facc15' : '#8a5a00'
+  const arrowColor = accent(dark)
 
   // One side of the pair: sprite only. The line above each row names both
   // Pokémon, so a caption here would print every name twice.

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemOdds, itemIconUrl, TIER_COLORS, TIER_BUDGET, ITEMS } from '../game/items.js'
 import { catchOdds, CATCH_TIER_BUDGET } from '../game/catch.js'
@@ -42,13 +42,13 @@ function tierBands() {
 // stable across renders — a nested definition remounts the whole subtree on
 // every state change.
 function Panel({ title, subtitle, theme, children }) {
-  const { innerBg, panelBorder, mutedColor, shadow, titleSize } = theme
+  const { innerBg, panelBorder, mutedColor, shadow, titleSize, accentColor } = theme
   return (
     <div style={{
       backgroundColor: innerBg, border: panelBorder, boxShadow: shadow,
       padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
     }}>
-      <span style={{ fontFamily: 'Upheaval', fontSize: titleSize, color: '#facc15' }}>{title}</span>
+      <span style={{ fontFamily: 'Upheaval', fontSize: titleSize, color: accentColor }}>{title}</span>
       {subtitle && (
         <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor, lineHeight: 1.4 }}>
           {subtitle}
@@ -97,6 +97,7 @@ export default function BalanceDashboard() {
 
   const theme = useMemo(() => ({
     textColor, mutedColor, innerBg, panelBorder, trackBg,
+    accentColor: accent(dark),
     shadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
     titleSize: isDesktop ? '15px' : '13px',
     labelWidth: isDesktop ? '130px' : '92px',
@@ -249,7 +250,7 @@ export default function BalanceDashboard() {
           ))}
         </select>
         {band && (
-          <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#facc15' }}>
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: accent(dark) }}>
             Level band {band[0]}–{band[1]} · move tier {tierForLevel(band[0])}–{tierForLevel(band[1])}
           </span>
         )}

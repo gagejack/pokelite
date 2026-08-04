@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted, cash } from '../lib/colors'
+import { muted, cash, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
@@ -173,7 +173,7 @@ export default function Stats({ onClose, role = null }) {
       boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
       padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
     }}>
-      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>{value}</span>
+      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: accent(dark) }}>{value}</span>
       <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>{label}</span>
     </div>
   )
@@ -306,7 +306,7 @@ export default function Stats({ onClose, role = null }) {
                     boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
                     padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
                   }}>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: '#facc15' }}>
+                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: accent(dark) }}>
                       Win #{i + 1}
                     </span>
                     {/* Three across on desktop, two on mobile. A fixed count
@@ -376,8 +376,9 @@ export default function Stats({ onClose, role = null }) {
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {(p.types ?? []).map(t => (
                                 <span key={t} style={{
-                                  fontFamily: 'Orange Kid', fontSize: '14px', color: '#fff',
+                                  fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '14px', color: '#1a1a1a',
                                   backgroundColor: TYPE_COLORS[t] ?? '#888',
+                                  border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                                   padding: '0 5px', textTransform: 'capitalize',
                                 }}>
                                   {t}
@@ -449,7 +450,7 @@ export default function Stats({ onClose, role = null }) {
                 padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '28px' : '22px', color: '#facc15' }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '28px' : '22px', color: accent(dark) }}>
                     LV {stats.levelInfo.level}
                   </span>
                   {/* The REMAINING XP (xpForNext - xpIntoLevel), not the XP
@@ -482,7 +483,7 @@ export default function Stats({ onClose, role = null }) {
                   boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
                   padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
                 }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: '#facc15' }}>
+                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: accent(dark) }}>
                     {stats.bestRun ? stats.bestRun.maps : '—'}
                   </span>
                   {/* The time only appears once there is one. Runs recorded
@@ -564,7 +565,7 @@ export default function Stats({ onClose, role = null }) {
                           {m.name.replace(/-/g, ' ')}
                         </span>
                         <span style={{
-                          fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15',
+                          fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark),
                           textShadow: '0 0 6px rgba(0,0,0,0.45), 0 0 3px rgba(0,0,0,0.35)',
                         }}>
                           ×{m.count}
@@ -692,7 +693,7 @@ export default function Stats({ onClose, role = null }) {
                               table (nidoran-f, mr-mime), so the hyphen has to
                               go before capitalize does its work. */}
                           <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>{m.name.replace(/-/g, ' ')}</span>
-                          <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15' }}>×{m.count}</span>
+                          <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark) }}>×{m.count}</span>
                         </div>
                       ))}
                     </div>

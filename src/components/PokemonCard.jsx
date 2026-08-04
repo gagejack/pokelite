@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { TYPE_COLORS } from '../game/types.js'
 
@@ -75,7 +75,7 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           title="Shiny!"
           style={{
             position: 'absolute', top: '5px', right: '6px', zIndex: 1,
-            fontFamily: 'Upheaval', fontSize: '12px', color: '#facc15',
+            fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark),
             letterSpacing: '0.5px', textShadow: '0 1px 2px rgba(0,0,0,0.6)',
           }}
         >
@@ -104,8 +104,9 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {pokemon.types.map(type => (
           <span key={type} style={{
-            fontFamily: 'Orange Kid', fontSize: '12px', color: '#fff',
+            fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '12px', color: '#1a1a1a',
             backgroundColor: TYPE_COLORS[type] || '#888',
+            border: '1px solid #000', boxShadow: '2px 2px 0 #000',
             padding: '2px 8px', textTransform: 'capitalize',
             WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
           }}>
@@ -190,8 +191,9 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           </span>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <span style={{
-              fontFamily: 'Orange Kid', fontSize: '11px', color: '#ffffff',
+              fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '11px', color: '#1a1a1a',
               backgroundColor: TYPE_COLORS[pokemon.move.type] || '#888',
+              border: '1px solid #000', boxShadow: '2px 2px 0 #000',
               padding: '1px 5px', textTransform: 'capitalize', flexShrink: 0,
             }}>
               {pokemon.move.type}

@@ -28,6 +28,36 @@ export const cash = dark => (dark ? '#4ade80' : '#166534')
 // simply haven't saved for yet means.
 export const cashShort = dark => (dark ? '#f87171' : '#b91c1c')
 
+// Highlight/accent TEXT — levels, headline figures, the selected setting.
+//
+// Same two-value shape and the same reason as cash() above: #facc15 is the
+// game's accent and reads beautifully on the dark panel (8.87:1) but measures
+// 1.11:1 on the light one, where it simply disappears. The light value is dark
+// gold rather than a desaturated yellow, so the two modes still read as the
+// same accent rather than two unrelated colors.
+//
+// #6b5200 clears AA on all three light surfaces this lands on — the panel
+// #DBDBDB (5.36:1), the inner fill #c8c8c8 (4.43:1) and PokemonCard's white
+// card (7.42:1). The nearer-yellow candidates do not: #8a6d00 measures 3.55:1
+// on the panel and 2.94:1 on the inner fill, which is why the two hand-rolled
+// one-offs already in the tree (#8a6d0b in RegionSelect, #8a5a00 in
+// EvolutionNotice/UpdateNotice) are still under the line. Prefer this token
+// over adding a third variant.
+//
+// ONLY for yellow used as ink. Yellow BACKGROUNDS (the BAG chip, DEX button,
+// selected toggles) already pair with #1a1a1a at 11.36:1 and are correct as-is;
+// so is yellow on art-backed surfaces (region cards, battle scene), which are
+// dark in both themes and carry their own text-shadows.
+export const accent = dark => (dark ? '#facc15' : '#6b5200')
+
+// Type/move chips are set in Helvetica Neue with a flat #1a1a1a ink at every
+// call site — deliberately one rule, no per-color branching. A luminance-picked
+// ink used to live here; it maximized contrast but made the ink flip between
+// black and white across the row, so a set of chips stopped reading as one
+// component. Uniformity won. The tradeoff is that the five darkest fills (dark
+// 2.63:1, ghost 2.93:1, dragon 2.99:1, fighting 3.06:1, poison 3.10:1) sit
+// under AA; the chip's own color carries the type, and the label repeats it.
+
 // Two-tone bar fill: the light shade on the top half, a darker shade of the
 // same hue on the bottom half (hard 50/50 split). Shared by the roster stat
 // bars and the account-level XP bar so both read as the same object.

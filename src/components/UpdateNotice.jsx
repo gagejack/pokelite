@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '../lib/theme'
+import { accent } from '../lib/colors'
 import { itemIconUrl, tierColor } from '../game/items'
 import { UPDATE, updateItems } from '../game/updates'
 
@@ -26,7 +27,9 @@ export default function UpdateNotice({ onClose }) {
   // Money reads as gold on the dark row, but #facc15 on the light row's #c8c8c8
   // is barely legible, so light mode drops to a dark amber. Same signal —
   // "this figure is currency" — at a contrast that survives both themes.
-  const cashColor = dark ? '#facc15' : '#8a5a00'
+  // Via accent(): the hand-rolled #8a5a00 this used measured 3.54:1 on that
+  // #c8c8c8 row, which was still under AA.
+  const cashColor = accent(dark)
 
   // Focus the dismiss control on open (keyboard users land inside the dialog,
   // and Escape/Enter both work without a hunt) and close on Escape.

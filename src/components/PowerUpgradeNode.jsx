@@ -78,8 +78,9 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
-                      fontFamily: 'Orange Kid', fontSize: '9px', color: '#1a1a1a',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '9px', color: '#1a1a1a',
                       backgroundColor: TYPE_COLORS[move?.type] || '#888',
+                      border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                       padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
                     }}>
                       T{tier}

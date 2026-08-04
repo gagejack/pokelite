@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../lib/theme'
-import { muted, cash } from '../lib/colors'
+import { muted, cash, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useSettings } from '../lib/settings'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
@@ -996,14 +996,20 @@ function DefeatScreen({ roster, dark, onRestart, onMainMenu, seedCode, cashEarne
                 textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden',
                 textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center',
               }}>
-                {p.name} <span style={{ color: '#facc15', fontSize: '13px', textShadow: LV_OUTLINE }}>LV {p.level}</span>
+                {/* No LV_OUTLINE here: the sprite is a sibling above, so this
+                    line sits on the flat cellBg and the ring has nothing to
+                    separate from — it only thickens the glyphs. The outline is
+                    kept where the level DOES overlap a sprite (the two
+                    name plates below). */}
+                {p.name} <span style={{ color: accent(dark), fontSize: '13px' }}>LV {p.level}</span>
               </span>
               {/* Type chips below the name/level. */}
               <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {(p.types ?? []).map(t => (
                   <span key={t} style={{
-                    fontFamily: 'Upheaval', fontSize: '7px', color: '#fff',
+                    fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '7px', color: '#1a1a1a',
                     backgroundColor: TYPE_COLORS[t] ?? '#888',
+                    border: '1px solid #000', boxShadow: '2px 2px 0 #000',
                     padding: '2px 5px', textTransform: 'capitalize',
                   }}>
                     {t}
