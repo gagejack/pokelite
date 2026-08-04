@@ -9,7 +9,7 @@ const SPEEDS = [1, 1.5, 2, 2.5, 3]
 export default function SettingsPanel({ onClose, username, onRestart }) {
   const { dark, cards, toggle } = useTheme()
   const isDesktop = useIsDesktop()
-  const { battleSpeed, setSpeed, autoClose, setAutoClose } = useSettings()
+  const { battleSpeed, setSpeed, autoClose, setAutoClose, muted: soundMuted, setMuted, volume, setVolume } = useSettings()
 
   // Sign out via Supabase; onAuthStateChange (Layout/App) clears the session
   // everywhere, so we just close the panel afterward.
@@ -108,6 +108,57 @@ export default function SettingsPanel({ onClose, username, onRestart }) {
             ))}
           </div>
         </div>
+
+        {/* Sound — BOTH platforms, unlike Auto-Close below. sound.js has always
+            consulted isMuted() on every play, but nothing ever rendered it, so
+            the preference was unreachable. Labelled "Sound / On|Off" rather
+            than "Mute / On|Off", which inverts under you: "Mute: On" and
+            "Sound: On" mean opposite things, and the row reads as the thing
+            being controlled, not the thing being suppressed. */}
+        <div style={{
+          padding: '14px', borderTop: borderStyle,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
+            Sound
+          </span>
+          <button
+            onClick={() => setMuted(!soundMuted)}
+            aria-pressed={!soundMuted}
+            style={{
+              fontFamily: 'Upheaval', fontSize: '9px',
+              color: !soundMuted ? '#1a1a1a' : textColor,
+              border: borderStyle, padding: '4px 10px',
+              backgroundColor: !soundMuted ? '#facc15' : innerBg, cursor: 'pointer',
+            }}
+          >
+            {soundMuted ? 'Off' : 'On'}
+          </button>
+        </div>
+
+        {/* Volume — slider only shows when sound is On. Hiding rather than
+            disabling keeps the row count stable and avoids the "greyed-out
+            slider you can't use" frustration. */}
+        {!soundMuted && (
+          <div style={{ padding: '14px', borderTop: borderStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: textColor }}>
+                Volume
+              </span>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: '#facc15' }}>
+                {Math.round(volume * 100)}%
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min={0} max={1} step={0.05}
+              value={volume}
+              onChange={e => setVolume(parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: '#facc15', cursor: 'pointer' }}
+            />
+          </div>
+        )}
 
         {/* Auto-close battle — mobile only: the nav bar's Auto button doesn't
             exist on mobile (FloatingNav replaces the bar), so the toggle

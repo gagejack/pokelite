@@ -22,6 +22,8 @@ const SOUNDS = {
 const cache = new Map()
 
 const MUTE_KEY = 'muted'
+const VOLUME_KEY = 'volume'
+const DEFAULT_VOLUME = 0.6
 
 export function isMuted() {
   try { return localStorage.getItem(MUTE_KEY) === 'true' } catch { return false }
@@ -31,12 +33,23 @@ export function setMuted(v) {
   try { localStorage.setItem(MUTE_KEY, v ? 'true' : 'false') } catch { /* storage blocked */ }
 }
 
+export function getVolume() {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY))
+    return isNaN(v) ? DEFAULT_VOLUME : Math.min(1, Math.max(0, v))
+  } catch { return DEFAULT_VOLUME }
+}
+
+export function setVolume(v) {
+  try { localStorage.setItem(VOLUME_KEY, v) } catch { /* storage blocked */ }
+}
+
 /**
  * Play a sound effect by name.
  * @param {keyof typeof SOUNDS} name
  * @param {{ volume?: number }} [opts] volume 0–1, default 0.6
  */
-export function playSound(name, { volume = 0.6 } = {}) {
+export function playSound(name, { volume = getVolume() } = {}) {
   const src = SOUNDS[name]
   if (!src || isMuted()) return
 
@@ -68,7 +81,7 @@ export function playSound(name, { volume = 0.6 } = {}) {
  * @param {string} url
  * @param {{ volume?: number }} [opts] volume 0–1, default 0.6
  */
-export function playSoundUrl(url, { volume = 0.6 } = {}) {
+export function playSoundUrl(url, { volume = getVolume() } = {}) {
   if (!url || isMuted()) return
 
   try {

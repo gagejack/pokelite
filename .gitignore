@@ -31,3 +31,6 @@ supabase/.temp/
 
 # Nested plugin repo, not part of the game
 i-have-adhd/
+
+# Subagent-driven development scratch (ledger, briefs, review packages)
+.superpowers/
