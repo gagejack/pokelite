@@ -150,7 +150,7 @@ test('a payout that failed to reach the account tells the player, instead of jus
   // The figure itself is unchanged — it's true on this device — but the
   // player must be told it hasn't reached their account yet.
   expect(screen.getByText('+ $200 metacash')).toBeTruthy()
-  expect(container.textContent).toContain('Saved locally')
+  expect(container.textContent).toContain('Saved on this device')
 })
 
 test('a normal (saved) payout shows no local-save warning', () => {
@@ -158,5 +158,5 @@ test('a normal (saved) payout shows no local-save warning', () => {
     title: 'Region Cleared', titleColor: '#3f9d4f',
     metacashEarned: 200, keysEarned: 1, mapsCleared: 8,
   })
-  expect(container.textContent).not.toContain('Saved locally')
+  expect(container.textContent).not.toContain('Saved on this device')
 })

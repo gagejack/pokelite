@@ -154,7 +154,7 @@ export default function RunEndScreen({
                   than letting them believe a Supabase hiccup was a payment. */}
               {!payoutSaved && (
                 <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor, fontStyle: 'italic' }}>
-                  Saved locally — will bank next time you're online
+                  Saved on this device — sign in again to bank it
                 </span>
               )}
             </div>
