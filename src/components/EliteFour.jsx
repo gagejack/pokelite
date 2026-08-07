@@ -8,6 +8,8 @@ import Roster from './Roster'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import BattleCard from './BattleCard'
+import RunEndScreen from './RunEndScreen.jsx'
+import { victoryVerdict } from '../game/runVerdict.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedName } from '../game/pokemon.js'
@@ -418,31 +420,30 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
       {evo.render()}
 
+      {/* Region cleared — the same screen as a defeat, because it is the same
+          moment: the run is over and this is its record. Reusing the layout
+          means the player reads the ledger and the final team in the place
+          they already know, and the headline is what tells them which ending
+          they got. Waits on the evolution queue so a Pokémon that evolved on
+          the champion's defeat is shown in its new form, not its old one. */}
       {won && evo.evolutionNotices.length === 0 && evo.evolutionChoices.length === 0 && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }}>
-          <div style={{
-            backgroundColor: cardBg, border: borderStyle, boxShadow: shadowStyle,
-            padding: '28px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
-          }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: '26px', color: '#22c55e' }}>
-              Champion defeated!
-            </span>
-            <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: textColor, textAlign: 'center' }}>
-              You conquered the {region?.name} region. The run is complete!
-            </span>
-            <button
-              onClick={onBack}
-              style={{
-                fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a',
-                border: 'none', backgroundColor: '#facc15',
-                padding: '8px 28px', cursor: 'pointer',
-                boxShadow: '-2px 3px 0 0 #b89d0a',
-              }}
-            >
-              Home
-            </button>
-          </div>
-        </div>
+        <RunEndScreen
+          roster={roster}
+          title="Region Cleared"
+          // The Run Ledger band's green, not a new celebratory hue: the
+          // headline and the tally it sits above are the same statement.
+          titleColor="#3f9d4f"
+          verdict={victoryVerdict(speedCash)}
+          onRestart={onRestart}
+          restartLabel="New Run"
+          onMainMenu={onBack}
+          seedCode={seedCode}
+          cashEarned={cashEarned}
+          speedCash={speedCash}
+          // Clearing the gauntlet means every gym fell, so all badges show earned.
+          badges={config?.badges ?? []}
+          badgesEarned={config?.badges?.length ?? 0}
+        />
       )}
 
       {/* Finger-following icon while touch-dragging a bag item. */}
