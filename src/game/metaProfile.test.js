@@ -112,29 +112,31 @@ test('Dex Dividends bonus is win-only: a loss never adds it even when owned', ()
 
 // ── runEndPayout: Win Streak + Dex Dividends interaction ───────────────
 
-test('Win Streak and Dex Dividends stack: streak bonus added first, dividends applied to the total', () => {
+test('Dex Dividends multiplies the base, THEN Win Streak adds flat — they do not compound', () => {
   const profile = {
     ...createProfile(),
     ownedUpgrades: ['win_streak', 'dex_dividends'],
     winStreak: 4, // -> 5th consecutive win, 3 wins past threshold
   }
   const payout = runEndPayout('win', 6, profile, 50) // 2 dex tiers -> +4%
-  // (200 + 3*50) * 1.04 = 350 * 1.04 = 364
-  expect(payout.metacash).toBe(364)
+  // 200 * 1.04 + 3*50 = 208 + 150 = 358
+  expect(payout.metacash).toBe(358)
+  // Guards the ordering specifically: compounding would give
+  // (200 + 150) * 1.04 = 364. The dividend must never scale the flat bonus.
+  expect(payout.metacash).not.toBe(364)
 })
 
-test('rounding: an odd dividend percentage rounds to the nearest whole dollar', () => {
+test('rounding: float drift in the dividend never reaches the player', () => {
   const profile = {
     ...createProfile(),
-    ownedUpgrades: ['win_streak', 'dex_dividends'],
-    winStreak: 2, // 3rd consecutive win -> +$50
+    ownedUpgrades: ['dex_dividends'],
   }
-  // 25 species -> one 2% tier. (200 + 50) * 1.02 = 255, already whole —
-  // use a streak depth that produces a fractional intermediate instead.
-  const profileOddStreak = { ...profile, winStreak: 3 } // 4th win, 2 past threshold
-  const payout = runEndPayout('win', 6, profileOddStreak, 25)
-  // (200 + 2*50) * 1.02 = 300 * 1.02 = 306
-  expect(payout.metacash).toBe(306)
+  // Now that the dividend only ever multiplies the flat $200 base, 2%-per-tier
+  // can't produce a genuine fraction. It CAN produce binary-float drift:
+  // 200 * (1 + 5*0.02) evaluates to 220.00000000000003. roundMoney is what
+  // keeps that from surfacing as a wallet balance with a decimal tail.
+  const payout = runEndPayout('win', 6, profile, 125) // 5 tiers -> +10%
+  expect(payout.metacash).toBe(220)
   expect(Number.isInteger(payout.metacash)).toBe(true)
 })
 

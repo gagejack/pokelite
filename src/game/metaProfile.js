@@ -83,16 +83,16 @@ function roundMoney(amount) {
  * "per extra win"; Dex Dividends reads "per win") — a loss's payout is pure
  * $15/map with no multiplier stacked on top.
  *
- * Win Streak and Dex Dividends stack MULTIPLICATIVELY on the $200 base
- * (streak bonus is added first as a flat amount, then Dex Dividends applies
- * as a percentage of that total) rather than each computing its own
- * percentage of $200 independently and summing. Spec 3's payout is a flat
- * dollar bonus per extra win, not a percentage, so it has to be added before
- * any percentage step runs; Dex Dividends is explicitly worded as "% per
- * win", i.e. a multiplier on the win's total payout, so it is applied last
- * against whatever the streak already produced. This also means owning both
- * compounds (a streak win is worth MORE than base×1.02), which matches "keep
- * winning, keep saving" being the whole point of a prestige currency.
+ * ORDER: Dex Dividends multiplies the $200 base, THEN Win Streak's flat bonus
+ * is added — they do not compound. With both owned, 2 prior wins and 50
+ * species: 200 × 1.04 + 50 = $258, not (200 + 50) × 1.04 = $260.
+ *
+ * The two bonuses reward different things and shouldn't scale each other. Dex
+ * Dividends pays for lifetime collection breadth and is a percentage of what
+ * the run itself was worth; Win Streak pays a fixed amount for consecutive
+ * wins. Letting the percentage act on the streak bonus would make a deep dex
+ * quietly inflate every streak payout, so the two stay independent: the
+ * dividend scales the run, the streak adds on top.
  *
  * @param {'win'|'loss'} result
  * @param {number} mapsCleared - maps cleared this run (used for loss payout)
@@ -119,14 +119,16 @@ export function runEndPayout(result, mapsCleared, profile, dexCount) {
 
   let metacash = BASE_WIN_PAYOUT
 
-  if (owns(profile, 'win_streak') && newWinStreak > STREAK_THRESHOLD) {
-    const extraWins = newWinStreak - STREAK_THRESHOLD
-    metacash += extraWins * STREAK_BONUS
-  }
-
+  // Percentage first, against the base alone.
   if (owns(profile, 'dex_dividends')) {
     const tiers = Math.floor(dexCount / DEX_DIVIDEND_SPECIES_STEP)
     metacash += metacash * (tiers * DEX_DIVIDEND_RATE)
+  }
+
+  // Flat bonus last, so the dividend never scales it.
+  if (owns(profile, 'win_streak') && newWinStreak > STREAK_THRESHOLD) {
+    const extraWins = newWinStreak - STREAK_THRESHOLD
+    metacash += extraWins * STREAK_BONUS
   }
 
   return {
