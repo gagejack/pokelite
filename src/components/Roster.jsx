@@ -448,7 +448,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
 
 function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizontal, onClick,
   isDragging, isDropTarget, draggable, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd,
-  onTouchStart, onTouchMove, onTouchEnd, 'data-slot-index': slotIndex, onStartHeldItemDrag,
+  onTouchStart, onTouchMove, onTouchEnd, onTouchCancel, 'data-slot-index': slotIndex, onStartHeldItemDrag,
   onMouseEnter, onMouseLeave }) {
   const isFainted = pokemon.fainted
   // Desktop slots grew with the rail (90 → 132px) so the name and level can sit
@@ -467,6 +467,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
