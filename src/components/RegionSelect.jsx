@@ -16,21 +16,29 @@ import RegionBar from './menu/RegionBar'
 // Shared square box for both desktop and mobile: the two version-mascot
 // legendaries fill the background; region name (title font) + gen (Orange Kid)
 // are centered. Desktop scales the sprites/text up and adds a hover lift.
-function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered, onSelectRegion }) {
+function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered, onSelectRegion, unlockedRegions, keys }) {
     // A region is playable only if its config has authored maps — the others
-    // would crash at config.maps[0] when a run starts.
-    const available = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
-    const isHovered = available && hovered === region.name
+    // would crash at config.maps[0] when a run starts. This is separate from
+    // "locked": a mapless region (Johto today) stays unplayable regardless of
+    // keys, while a locked-but-mapped region is buyable.
+    const hasMaps = (getRegionConfig(region.name)?.maps?.length ?? 0) > 0
+    const unlocked = unlockedRegions.includes(region.name)
+    // Clicking is allowed either when the region is already unlocked, or when
+    // it's locked but the player can afford the 1-key unlock — App.jsx's
+    // unlockAndEnterRegion (via onSelectRegion) performs the actual spend.
+    // A locked region the player can't afford is inert, same as a mapless one.
+    const clickable = hasMaps && (unlocked || keys >= 1)
+    const isHovered = clickable && hovered === region.name
     const restShadow = cards ? '-4px 6px 0 0 #000000' : '-3px 4px 0 0 #2e2e2e'
     const hoverShadow = cards ? '-7px 10px 0 0 #000000' : '-5px 7px 0 0 #444444'
     return (
       <button
-        onClick={available ? () => onSelectRegion(region) : undefined}
+        onClick={clickable ? () => onSelectRegion(region) : undefined}
         onMouseEnter={() => setHovered(region.name)}
         onMouseLeave={() => setHovered(null)}
-        className={available ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
+        className={clickable ? 'relative overflow-hidden active:scale-95' : 'relative overflow-hidden'}
         style={{
-          cursor: available ? 'pointer' : 'default',
+          cursor: clickable ? 'pointer' : 'default',
           width: '100%', aspectRatio: '1',
           border: cards ? '3px solid #000000' : borderStyle,
           boxShadow: isHovered ? hoverShadow : restShadow,
@@ -49,7 +57,12 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
         <img src={region.map} alt="" style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           objectFit: 'cover', transform: 'scale(1.05)',
-          filter: available ? 'brightness(0.75)' : 'brightness(0.3) grayscale(0.5)',
+          // Mapless regions keep the grayscale "COMING SOON" treatment.
+          // Locked-but-mapped regions get their own darkened (not grayscale)
+          // look so the two unplayable states read differently — a mapless
+          // region isn't coming back with a key, a locked one is.
+          filter: !hasMaps ? 'brightness(0.3) grayscale(0.5)'
+            : unlocked ? 'brightness(0.75)' : 'brightness(0.4)',
         }} />
         {/* Legendary duo — fills the box as the background */}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -58,9 +71,9 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
               style={{
                 width: '58%', height: '58%', objectFit: 'contain', imageRendering: 'pixelated',
                 marginLeft: i === 1 ? '-22%' : 0,
-                filter: available
-                  ? `drop-shadow(3px 6px 9px rgba(0,0,0,0.9))${isHovered ? ' brightness(1.12)' : ''}`
-                  : 'grayscale(0.7) brightness(.8)',
+                filter: !hasMaps ? 'grayscale(0.7) brightness(.8)'
+                  : unlocked ? `drop-shadow(3px 6px 9px rgba(0,0,0,0.9))${isHovered ? ' brightness(1.12)' : ''}`
+                  : 'drop-shadow(3px 6px 9px rgba(0,0,0,0.9)) brightness(.6)',
                 transition: 'filter 0.2s',
               }}
             />
@@ -76,9 +89,14 @@ function RegionCard({ region, isDesktop, cards, borderStyle, hovered, setHovered
           <span style={{ fontFamily: 'Orange Kid', fontSize: isDesktop ? '20px' : '15px', color: '#facc15', textShadow: '0 2px 5px rgba(0,0,0,0.95)' }}>
             {region.gen}
           </span>
-          {!available && (
+          {!hasMaps && (
             <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '13px' : '10px', color: '#facc15', letterSpacing: '1px', marginTop: '4px', textShadow: '0 2px 5px rgba(0,0,0,0.95)' }}>
               COMING SOON
+            </span>
+          )}
+          {hasMaps && !unlocked && (
+            <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '13px' : '10px', color: keys >= 1 ? '#facc15' : '#9ca3af', letterSpacing: '1px', marginTop: '4px', textShadow: '0 2px 5px rgba(0,0,0,0.95)' }}>
+              🔑 1 to unlock
             </span>
           )}
         </div>
@@ -110,12 +128,18 @@ function ComingSoonCell({ cards, borderStyle, isDesktop }) {
   )
 }
 
-export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen, onCustomSeed, onOpenDaily }) {
+export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setPokedexOpen, onCustomSeed, onOpenDaily, profile }) {
   const { cards, dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [hovered, setHovered] = useState(null)
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
+  // profile is null for one frame while App.jsx's initial load is in flight
+  // (see its useState comment) — fall back to "only the starting region"
+  // rather than either crashing on unlockedRegions.includes or flashing
+  // every region open for a frame.
+  const unlockedRegions = profile?.unlockedRegions ?? ['Unova']
+  const keys = profile?.keys ?? 0
 
   const borderStyle = cards ? '3px solid #000000' : '2px solid #2e2e2e'
   const shadowStyle = cards ? '-2.5px 4px 0 0 #000000' : '-2.5px 4px 0 0 #2e2e2e'
@@ -160,7 +184,8 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
           {REGIONS.map(region => (
             <RegionCard key={region.name} region={region}
               isDesktop={isDesktop} cards={cards} borderStyle={borderStyle}
-              hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion} />
+              hovered={hovered} setHovered={setHovered} onSelectRegion={onSelectRegion}
+              unlockedRegions={unlockedRegions} keys={keys} />
           ))}
           <ComingSoonCell cards={cards} borderStyle={borderStyle} isDesktop={isDesktop} />
         </div>
@@ -261,7 +286,8 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
               dark={dark}
             />
             {REGIONS.map(region => (
-              <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion} />
+              <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion}
+                unlockedRegions={unlockedRegions} keys={keys} />
             ))}
             <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
               <MenuButton

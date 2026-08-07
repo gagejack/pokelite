@@ -260,3 +260,46 @@ export function totalVitamins(profile, speciesId) {
   if (!stats) return 0
   return Object.values(stats).reduce((sum, n) => sum + n, 0)
 }
+
+// Region unlock costs 1 key (spec §Key sinks). Not in metaCatalog.js's
+// KEY_ITEMS — see the comment above KEY_ITEMS in metaCatalog.js — because it
+// is parameterized by region name rather than a fixed catalog row, so
+// applyPurchase (which only ever looks items up by a fixed catalog id) can't
+// route it. This constant is the region-unlock equivalent of an item's
+// `cost` field; it lives here rather than metaCatalog.js because there is no
+// catalog row for it to live on.
+const REGION_UNLOCK_COST = 1
+
+/**
+ * Spend a key to unlock `regionName`, returning a NEW profile — same
+ * contract as applyPurchase (`{ ok, profile, reason? }`, reject rather than
+ * silently no-op, never mutate) so the shop UI (Task 9) can treat this
+ * purchase path identically to every catalog item.
+ *
+ * The starting region (Unova, per createProfile) is already present in
+ * `unlockedRegions` on a brand-new profile — that's how "choose one region
+ * to start, free" is satisfied, and it's why this function treats "already
+ * unlocked" as a rejection rather than something the caller has to check
+ * first: calling this on Unova (or on any region already unlocked) is always
+ * a no-op-with-reason, never a double charge and never a silent success.
+ *
+ * @param {MetaProfile} profile
+ * @param {string} regionName
+ * @returns {{ ok: boolean, profile: MetaProfile, reason?: string }}
+ */
+export function unlockRegion(profile, regionName) {
+  if (profile.unlockedRegions.includes(regionName)) {
+    return { ok: false, profile, reason: 'Region already unlocked' }
+  }
+  if (profile.keys < REGION_UNLOCK_COST) {
+    return { ok: false, profile, reason: 'Not enough keys' }
+  }
+  return {
+    ok: true,
+    profile: {
+      ...profile,
+      keys: profile.keys - REGION_UNLOCK_COST,
+      unlockedRegions: [...profile.unlockedRegions, regionName],
+    },
+  }
+}

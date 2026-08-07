@@ -14,8 +14,12 @@ import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile }) {
   const { dark } = useTheme()
+  // profile is null for one frame while App.jsx's initial load is in flight —
+  // fall back to "only the starting region," same fallback RegionSelect uses.
+  const unlockedRegions = profile?.unlockedRegions ?? ['Unova']
+  const keys = profile?.keys ?? 0
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
@@ -171,7 +175,8 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
       {dailyDef && <MenuButton def={dailyDef} dark={dark} />}
       {REGIONS.map(region => (
-        <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion} />
+        <RegionBar key={region.name} region={region} dark={dark} onSelect={onSelectRegion}
+          unlockedRegions={unlockedRegions} keys={keys} />
       ))}
       <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
         <MenuButton

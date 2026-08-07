@@ -18,7 +18,7 @@ import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
-import { createProfile, runEndPayout } from './game/metaProfile.js'
+import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -51,6 +51,15 @@ export default function App() {
   // Persistent set of species the player has EVER caught (across all saved runs).
   // Used to show the Poké Ball icon on in-run cards (starter / wild encounter).
   const [caughtSet, setCaughtSet] = useState(() => new Set())
+  // Meta-progression profile (metacash, keys, unlockedRegions, ...) — kept in
+  // state (not just loaded ad-hoc inside recordRunEnd) because region gating
+  // needs to read `profile.unlockedRegions` synchronously from the region
+  // UIs (RegionSelect, MainMenu's RegionBar) to decide what to render as
+  // locked, and handleSelectRegion/handleCustomSeed need it to enforce the
+  // gate. `null` until the initial load resolves; the region UIs treat null
+  // as "nothing unlocked yet" rather than crashing, so there's no flash of
+  // "everything unlocked" before the load lands.
+  const [profile, setProfile] = useState(null)
   const mapsCleared = useRef(0)
   const pokemonCaught = useRef(0)
   const pokemonCaughtIds = useRef([])
@@ -181,6 +190,21 @@ export default function App() {
       const set = new Set()
       data.forEach(row => (row.pokemon_caught_ids ?? []).forEach(id => set.add(id)))
       setCaughtSet(set)
+    })()
+    return () => { cancelled = true }
+  }, [user])
+
+  // Load the meta-progression profile whenever the user changes (login/
+  // logout/initial mount) — same shape as the caughtSet effect above. Falls
+  // back to createProfile() so a brand-new player (or a guest with nothing
+  // in localStorage yet) sees the starting region unlocked rather than the
+  // region UIs treating a null profile as "everything locked."
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const loaded = await loadProfile(user)
+      if (cancelled) return
+      setProfile(loaded ?? createProfile())
     })()
     return () => { cancelled = true }
   }, [user])
@@ -404,6 +428,11 @@ export default function App() {
     setMetacashEarned(payout.metacash)
     setKeysEarned(payout.keys)
     setPayoutSaved(saved || !user)
+    // Keep the in-memory profile (region gating reads this) in sync with what
+    // was just paid out — otherwise a player who wins their first region
+    // wouldn't see the new key reflected in RegionSelect/RegionBar until the
+    // next full profile reload (a user change or page refresh).
+    setProfile(nextProfile)
 
     // Everything below (the `runs` insert and the daily-attempt submission)
     // is logged-in-only: guests get no `runs` row at all, by design.
@@ -711,14 +740,60 @@ export default function App() {
     setTimeout(() => setScreen('nodemap'), 0)
   }
 
+  // The one gating seam for region unlocks (spec §Key sinks: 1 key per
+  // region). There are three ways into a run — RegionSelect (mobile),
+  // MainMenu's desktop RegionBar, and a typed/pasted custom seed code — and
+  // ALL THREE fork through here (handleSelectRegion) or handleCustomSeed
+  // below rather than checking `profile.unlockedRegions` in the UI
+  // components themselves. Gating in the UI alone would only stop the two
+  // click-driven paths; a seed code bypasses that UI entirely and would walk
+  // straight into a locked region's maps. The UIs still need their OWN read
+  // of `profile.unlockedRegions` (imported from App via props) to render the
+  // locked/playable/mapless visual states, but the actual enforcement — and
+  // the only place a key is ever spent — lives here.
+  //
+  // Distinct from `available` (does this region have authored maps at all —
+  // RegionCard/RegionBar's existing check): a locked-but-mapped region can be
+  // bought into; a mapless region (Johto today) can never be entered
+  // regardless of keys, because it would crash at config.maps[0]. That check
+  // stays first and is never overridden by owning a key.
+  //
+  // Returns { ok: true } on success (region already unlocked, or just
+  // unlocked here) or { ok: false, reason } — same shape as
+  // metaProfile.js's applyPurchase/unlockRegion, so callers don't have to
+  // learn a second failure convention.
+  function unlockAndEnterRegion(regionName) {
+    const config = getRegionConfig(regionName)
+    if (!config || (config.maps?.length ?? 0) === 0) {
+      return { ok: false, reason: 'Region not available yet' }
+    }
+    // profile starts null until the initial load resolves (see its useState
+    // comment) — treat that window as "nothing unlocked but the starting
+    // region," same as createProfile(), rather than either blocking every
+    // region select for a frame or letting a null profile fall through as
+    // "everything is unlocked."
+    const current = profile ?? createProfile()
+    if (current.unlockedRegions.includes(regionName)) {
+      return { ok: true }
+    }
+    const result = unlockRegion(current, regionName)
+    if (!result.ok) return result
+    setProfile(result.profile)
+    saveProfile(result.profile, user) // fire-and-forget, mirrors persistProgress
+    return { ok: true }
+  }
+
   // Shared by RegionSelect (mobile) and MainMenu's desktop region mode.
   function handleSelectRegion(region) {
+    const gate = unlockAndEnterRegion(region.name)
+    if (!gate.ok) return gate
     setRunSeed(null)        // normal run
     setRunMode('normal')
     setSelectedRegion(region)
     const config = getRegionConfig(region.name)
     if (config) prewarmCache(config)
     setScreen('starter')
+    return { ok: true }
   }
 
   function handleCustomSeed(code) {
@@ -730,6 +805,15 @@ export default function App() {
     const region = regionNames({ playableOnly: true })
       .find(n => n.toUpperCase() === decoded.region)
     if (!region) return { error: 'Unknown region' }
+    // A seed code has no "spend a key" affordance in its UI (just a text
+    // field + Go button), so unlike clicking a locked region card, entering
+    // a seed for a region you haven't unlocked is refused outright rather
+    // than silently spending a key on your behalf. This is also what stops a
+    // shared seed code from being a free bypass around the gate entirely.
+    const current = profile ?? createProfile()
+    if (!current.unlockedRegions.includes(region)) {
+      return { error: `${region} is locked — unlock it from Region Select first` }
+    }
     // decoded.code is already the normalized canonical string.
     setRunSeed({ region, seed: decoded.seed, code: decoded.code })
     setRunMode('custom')
@@ -755,6 +839,7 @@ export default function App() {
           onModeChange={setMenuMode}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
+          profile={profile}
         />
       )}
       {screen === 'region' && (
@@ -765,6 +850,7 @@ export default function App() {
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           onOpenDaily={() => setDailyOpen(true)}
+          profile={profile}
         />
       )}
       {screen === 'starter' && (
