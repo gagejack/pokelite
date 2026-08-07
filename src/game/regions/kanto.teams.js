@@ -107,7 +107,21 @@ export const RIVAL_STARTER_COUNTERS = {
   blueEarlyGame: BLUE_EARLY_STARTER_COUNTER,
 }
 
-// Per-map level ranges (indexed by mapIndex). Same pacing as Unova.
+// Per-map level ranges (indexed by mapIndex) for TRAINER and GRASS encounters.
+// Maps 1–2 are deliberately below Unova's pacing — an early-game nerf so a
+// fresh starter isn't outlevelled on the first two maps. Maps 3–8 match Unova.
 export const MAP_LEVEL_RANGES = [
   [1, 8], [8, 17], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
+]
+
+// Per-map level ranges for CATCH offers (Pokéball nodes), kept separate from
+// MAP_LEVEL_RANGES on purpose: nerfing the maps' trainers should not shrink
+// what the player can catch there. These hold the original pre-nerf pacing,
+// so maps 1–2 still offer Lv3–10 / Lv10–19 catches.
+//
+// Catch level also gates which evolution stage a node may offer (NodeMap's
+// rollStageForLevel keeps only stages whose minLevel ≤ level), so lowering
+// this table quietly biases early maps toward base forms.
+export const CATCH_LEVEL_RANGES = [
+  [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
 ]

@@ -28,6 +28,14 @@ import { sinnohConfig } from './regions/sinnoh.js'
 //                                                      // (base forms; stage rolled by level).
 //                                                      // Missing key → uses trainerSpeciesPools.
 //   mapLevelRanges:     [ [min, max] ],                // per-map (8) level bands
+//                                                      // for trainers + grass
+//   catchLevelRanges:   [ [min, max] ],                // optional per-map (8) bands
+//                                                      // for Pokéball catch offers.
+//                                                      // Separate from mapLevelRanges so
+//                                                      // trainer tuning can't move catch
+//                                                      // levels (which also gate the
+//                                                      // evolution-stage roll).
+//                                                      // Omitted → mapLevelRanges.
 //   bossTeams:          { [name]: [{ id, level }] },   // gym leaders
 //   eliteFourTeams:     { [name]: [{ id, level }] },   // E4 + champion
 //   rivalTeams:         { [variant]: [{ id, level }] },// RIVAL node teams

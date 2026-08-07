@@ -680,9 +680,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
-    // Catch levels scale per map (same range as that map's trainers), weighted
-    // by node position.
-    const level = pickLevel(mapLevelRange(config.mapLevelRanges, mapIndex), positionWeight)
+    // Catch levels scale per map, weighted by node position. They read the
+    // region's OWN catch bands (config.catchLevelRanges), NOT the trainer/grass
+    // bands: tuning a map's difficulty must not change what the player catches
+    // there. Regions that omit the table fall back to the trainer bands.
+    // Note this level also gates the evolution-stage roll below.
+    const catchBands = config.catchLevelRanges ?? config.mapLevelRanges
+    const level = pickLevel(mapLevelRange(catchBands, mapIndex), positionWeight)
 
     // Draw distinct species weighted by rarity tier.
     const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)

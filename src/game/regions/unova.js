@@ -1,6 +1,6 @@
 import { buildRows } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
-import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES } from './unova.teams.js'
+import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES, CATCH_LEVEL_RANGES } from './unova.teams.js'
 
 // --- Assets ---
 import bgStriaton from '../../assets/regions/Unova/MapAssets/Striaton.png'
@@ -686,6 +686,8 @@ export const unovaConfig = {
   bossTeams: BOSS_TEAMS,
   eliteFourTeams: ELITE_FOUR_TEAMS,
   mapLevelRanges: MAP_LEVEL_RANGES,
+  // Catch offers use their own bands, not the trainer/grass ones.
+  catchLevelRanges: CATCH_LEVEL_RANGES,
   // Catch tuning + generic draw algorithm (game/catch.js).
   catchTierBudget: CATCH_TIER_BUDGET,
   pickCatchOffer,

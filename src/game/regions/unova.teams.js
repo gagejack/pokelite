@@ -72,7 +72,16 @@ export const ELITE_FOUR_TEAMS = {
   'Alder':    [{ id: 617, level: 77 }, { id: 626, level: 77 }, { id: 621, level: 78 }, { id: 584, level: 78 }, { id: 637, level: 80 }], // Accelgor, Bouffalant, Druddigon, Vanilluxe, Volcarona (ace)
 }
 
-// Per-map level ranges (indexed by mapIndex). Mirrors the trainer pools above.
+// Per-map level ranges (indexed by mapIndex) for TRAINER and GRASS encounters.
+// Mirrors the trainer pools above.
 export const MAP_LEVEL_RANGES = [
+  [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
+]
+
+// Per-map level ranges for CATCH offers (Pokéball nodes). Separate table so a
+// trainer-difficulty nerf never drags catch levels down with it — see the same
+// split in kanto.teams.js. Currently identical to MAP_LEVEL_RANGES; the two are
+// free to diverge.
+export const CATCH_LEVEL_RANGES = [
   [3, 10], [10, 19], [18, 28], [26, 37], [34, 46], [42, 55], [50, 64], [58, 73],
 ]
