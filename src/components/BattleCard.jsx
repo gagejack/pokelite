@@ -56,7 +56,7 @@ const DESKTOP_CARD_GAP = 50
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
-export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, metacashEarned = 0, keysEarned = 0, mapsCleared = 0, badges = [], badgesEarned = 0 }) {
+export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, badges = [], badgesEarned = 0 }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
@@ -408,7 +408,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   // Defeat overlay — the final team (2×3) + Play Again. Shown on both layouts
   // in place of an in-card button.
   const defeatOverlay = battleResult === 'loss' ? (
-    <DefeatScreen roster={battleRoster} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} speedCash={speedCash} metacashEarned={metacashEarned} keysEarned={keysEarned} mapsCleared={mapsCleared} badges={badges} badgesEarned={badgesEarned} />
+    <DefeatScreen roster={battleRoster} onRestart={onRestart} onMainMenu={onMainMenu} seedCode={seedCode} cashEarned={cashEarned} speedCash={speedCash} metacashEarned={metacashEarned} keysEarned={keysEarned} payoutSaved={payoutSaved} mapsCleared={mapsCleared} badges={badges} badgesEarned={badgesEarned} />
   ) : null
 
   // Victory overlay — centered "Victory!" + Continue popup. Skipped entirely
@@ -883,7 +883,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
 // Play Again button below. Replaces the in-card "Play Again" button so the
 // battle card itself keeps all its space for the roster.
 // Layout lives in RunEndScreen, shared with the region-win screen.
-function DefeatScreen({ roster, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, metacashEarned = 0, keysEarned = 0, mapsCleared = 0, badges = [], badgesEarned = 0 }) {
+function DefeatScreen({ roster, onRestart, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, badges = [], badgesEarned = 0 }) {
   return (
     <RunEndScreen
       roster={roster}
@@ -897,6 +897,7 @@ function DefeatScreen({ roster, onRestart, onMainMenu, seedCode, cashEarned = 0,
       speedCash={speedCash}
       metacashEarned={metacashEarned}
       keysEarned={keysEarned}
+      payoutSaved={payoutSaved}
       mapsCleared={mapsCleared}
       badges={badges}
       badgesEarned={badgesEarned}

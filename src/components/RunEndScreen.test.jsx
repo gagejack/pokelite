@@ -141,3 +141,22 @@ test('a map-0 loss still shows the reward band at $0, rather than hiding it', ()
   expect(screen.getByText('+ $0 metacash')).toBeTruthy()
   expect(screen.getByText('0 maps × $15')).toBeTruthy()
 })
+
+test('a payout that failed to reach the account tells the player, instead of just showing the number as if it banked', () => {
+  const { container } = show({
+    title: 'Region Cleared', titleColor: '#3f9d4f',
+    metacashEarned: 200, keysEarned: 1, mapsCleared: 8, payoutSaved: false,
+  })
+  // The figure itself is unchanged — it's true on this device — but the
+  // player must be told it hasn't reached their account yet.
+  expect(screen.getByText('+ $200 metacash')).toBeTruthy()
+  expect(container.textContent).toContain('Saved locally')
+})
+
+test('a normal (saved) payout shows no local-save warning', () => {
+  const { container } = show({
+    title: 'Region Cleared', titleColor: '#3f9d4f',
+    metacashEarned: 200, keysEarned: 1, mapsCleared: 8,
+  })
+  expect(container.textContent).not.toContain('Saved locally')
+})

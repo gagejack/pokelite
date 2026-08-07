@@ -27,6 +27,7 @@ export default function RunEndScreen({
   badgesEarned = 0,
   metacashEarned = 0,
   keysEarned = 0,
+  payoutSaved = true,
   mapsCleared = 0,
 }) {
   const { dark } = useTheme()
@@ -143,6 +144,17 @@ export default function RunEndScreen({
               {keysEarned === 0 && (
                 <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
                   {mapsCleared} maps × $15
+                </span>
+              )}
+              {/* Only shown when a logged-in player's payout failed to reach
+                  their account (saveProfile fell back to localStorage — see
+                  App.jsx's recordRunEnd). The number above is still true on
+                  THIS device, so it stays displayed as-is; this line is the
+                  only thing that tells the player it isn't safe yet, rather
+                  than letting them believe a Supabase hiccup was a payment. */}
+              {!payoutSaved && (
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor, fontStyle: 'italic' }}>
+                  Saved locally — will bank next time you're online
                 </span>
               )}
             </div>

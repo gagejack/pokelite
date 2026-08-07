@@ -76,6 +76,13 @@ export default function App() {
   // frame before the next end fires.
   const [metacashEarned, setMetacashEarned] = useState(0)
   const [keysEarned, setKeysEarned] = useState(0)
+  // Whether the payout above actually reached the player's account. Starts
+  // `true` (nothing to complain about before a run has ended, and every
+  // existing RunEndScreen call site that doesn't pass this prop should keep
+  // rendering exactly as before). Set from saveProfile's own return value —
+  // see the comment at its call site in recordRunEnd for why this can't be
+  // discarded the way it was before.
+  const [payoutSaved, setPayoutSaved] = useState(true)
 
   // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
   // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
@@ -384,9 +391,19 @@ export default function App() {
       keys: profile.keys + payout.keys,
       winStreak: payout.newWinStreak,
     }
-    await saveProfile(nextProfile, user)
+    // saveProfile's return says whether this reached the account (`true`) or
+    // only landed in the localStorage fallback (`false`) — see its doc
+    // comment in metaSave.js. For a guest, `false` is expected and not a
+    // failure (there is no account to reach); for a logged-in player it means
+    // the Supabase upsert errored and the reward the screen is about to show
+    // hasn't actually banked anywhere but this browser. migrateMetaProfile
+    // already treats this return value as load-bearing — it must not be
+    // dropped here just because this call site doesn't need it to decide
+    // what to do next, only what to tell the player.
+    const saved = await saveProfile(nextProfile, user)
     setMetacashEarned(payout.metacash)
     setKeysEarned(payout.keys)
+    setPayoutSaved(saved || !user)
 
     // Everything below (the `runs` insert and the daily-attempt submission)
     // is logged-in-only: guests get no `runs` row at all, by design.
@@ -532,6 +549,7 @@ export default function App() {
     setCashEarned(0)
     setMetacashEarned(0)
     setKeysEarned(0)
+    setPayoutSaved(true)
   }
 
   // Equip straight from an item offer. This path bypasses moveItem, so it has
@@ -781,6 +799,7 @@ export default function App() {
           cashEarned={cashEarned}
           metacashEarned={metacashEarned}
           keysEarned={keysEarned}
+          payoutSaved={payoutSaved}
           mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onSpendCash={spendCash}
@@ -831,6 +850,7 @@ export default function App() {
           cashEarned={cashEarned}
           metacashEarned={metacashEarned}
           keysEarned={keysEarned}
+          payoutSaved={payoutSaved}
           mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
