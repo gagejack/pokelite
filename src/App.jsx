@@ -17,6 +17,7 @@ import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
+import { saveProfile, loadProfile, migrateGuestProfile, clearLocalProfile } from './lib/metaSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -79,6 +80,12 @@ export default function App() {
   // saved as resumable when the player then hits Home.
   const runEnded = useRef(false)
 
+  // Guest→account meta-profile migration (spec §7): which user id migration
+  // has already run for, so it can never re-fire for the same login. See the
+  // onAuthStateChange effect below for why SIGNED_IN (not `user` changing)
+  // is the trigger.
+  const migratedUserId = useRef(null)
+
   // On load / auth change, check whether a saved run exists (logged in → the
   // account, logged out → localStorage) so the menu can show "Resume Run".
   useEffect(() => {
@@ -98,11 +105,58 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+      // Migration fires on the SUPABASE EVENT, not on `user` changing, and
+      // specifically only 'SIGNED_IN' — the SDK's event for an actual sign-in
+      // action (signInWithPassword/setSession/signUp). It deliberately
+      // excludes 'INITIAL_SESSION' (a page load that restores an already-
+      // active session — nothing changed, there's no new guest state to
+      // fold in) and 'TOKEN_REFRESHED' (fires periodically for a session
+      // that never logged out; treating it as a login would re-run the sum
+      // every refresh and keep doubling the player's metacash). A `user` ===
+      // effect keyed on identity can't tell these apart because all three
+      // land on the same "user is now set" state; the event string can.
+      //
+      // migratedUserId guards against running it twice for the SAME sign-in
+      // (React 18 StrictMode double-invokes effect callbacks in dev, and
+      // Supabase can in principle emit SIGNED_IN more than once for one
+      // session). It is intentionally NOT reset on sign-out, so a
+      // sign-out/sign-in-again cycle for the same account within one tab
+      // session does not re-merge a guest profile that was already cleared
+      // the first time (clearLocalProfile() removes the local copy, so a
+      // second merge would just be a no-op merge against `null` — but
+      // skipping it outright is simpler to reason about than relying on
+      // that no-op).
+      if (event === 'SIGNED_IN' && session?.user && migratedUserId.current !== session.user.id) {
+        migratedUserId.current = session.user.id
+        migrateMetaProfile(session.user)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Guest→account meta-profile migration (spec §7). Runs once per real
+  // sign-in (see the SIGNED_IN guard above): merge whatever guest profile
+  // sits in localStorage into the account's own profile, persist the merged
+  // result, then clear the local copy so a later logout doesn't leave a
+  // stale guest wallet to double-merge from. Errors are non-fatal — the
+  // account keeps whatever it already had rather than losing progress to a
+  // failed migration; the guest copy is left in place on failure so the
+  // migration can be retried on a future login instead of silently
+  // discarding it.
+  async function migrateMetaProfile(signedInUser) {
+    try {
+      const localProfile = await loadProfile(null)
+      if (!localProfile) return // nothing to migrate
+      const accountProfile = await loadProfile(signedInUser)
+      const merged = migrateGuestProfile(localProfile, accountProfile)
+      await saveProfile(merged, signedInUser)
+      clearLocalProfile()
+    } catch (e) {
+      console.warn('migrateMetaProfile failed:', e)
+    }
+  }
 
   // Load the player's persistent caught set from saved runs whenever the user
   // changes (login/logout). Feeds the Poké Ball icon on in-run cards.
