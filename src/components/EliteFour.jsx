@@ -24,7 +24,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, mapsCleared = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -410,6 +410,9 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             seedCode={seedCode}
             cashEarned={cashEarned}
             speedCash={speedCash}
+            metacashEarned={metacashEarned}
+            keysEarned={keysEarned}
+            mapsCleared={mapsCleared}
             // Reaching the gauntlet means every gym is cleared, so all badges
             // show earned — there is no mapIndex here to count from.
             badges={config?.badges ?? []}
@@ -440,6 +443,9 @@ export default function EliteFour({ region, character, starter, roster, setRoste
           seedCode={seedCode}
           cashEarned={cashEarned}
           speedCash={speedCash}
+          metacashEarned={metacashEarned}
+          keysEarned={keysEarned}
+          mapsCleared={mapsCleared}
           // Clearing the gauntlet means every gym fell, so all badges show earned.
           badges={config?.badges ?? []}
           badgesEarned={config?.badges?.length ?? 0}

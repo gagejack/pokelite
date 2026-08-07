@@ -17,7 +17,8 @@ import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
-import { migrateMetaProfile } from './lib/metaSave.js'
+import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
+import { createProfile, runEndPayout } from './game/metaProfile.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -68,6 +69,13 @@ export default function App() {
   // accrue into a void. This makes the whole economy visible at the end even
   // for a player who never shopped. Local only — no `runs` column.
   const [cashEarned, setCashEarned] = useState(0)
+  // Meta-progression payout for the run that just ended (spec §Currencies,
+  // §6b) — set once by recordRunEnd, read by the run-end screen's reward
+  // band. Zero until a run actually ends; resetRunStats below clears it back
+  // to 0 so a new run's screen never shows the previous run's payout for a
+  // frame before the next end fires.
+  const [metacashEarned, setMetacashEarned] = useState(0)
+  const [keysEarned, setKeysEarned] = useState(0)
 
   // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
   // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
@@ -345,9 +353,43 @@ export default function App() {
   }
 
   async function recordRunEnd(result, winRoster) {
-    // The run is over — it must not be saved as resumable (even for guests, who
-    // don't get a `runs` row but still shouldn't keep a dead localStorage save).
+    // Exactly-once guard. NodeMap and EliteFour each wire onRunEnd to more
+    // than one trigger (boss-win, loss, gauntlet-win), and a resumed run
+    // could in principle race a second call — runEnded already existed to
+    // stop a finished run from being saved as resumable; it doubles here as
+    // the payout gate. Checked BEFORE it's set (a run that already ended
+    // must not pay again), and set unconditionally right after so every
+    // exit path below — guest or logged-in, win or loss — is covered by one
+    // flag rather than one guard per branch.
+    if (runEnded.current) return
     runEnded.current = true
+
+    // Payout runs for EVERYONE, guest or logged-in — metacash/keys are a
+    // localStorage-backed wallet for guests (metaSave.js), not a `runs` row.
+    // dexCount is unique species caught LIFETIME: caughtSet is seeded from
+    // every prior `runs` row (App.jsx's pokemon_caught_ids aggregation
+    // effect, above) but was loaded before this run started, so it doesn't
+    // yet include anything caught just now — union it with this run's own
+    // pokemonCaughtIds so Dex Dividends sees the count as of this instant,
+    // not as of run-start. (For guests caughtSet is always empty — that
+    // aggregation only queries the `runs` table — so a guest's Dex Dividends
+    // is effectively scoped to species caught in the current run only. A
+    // pre-existing limitation of caughtSet, not something this task fixes.)
+    const dexCount = new Set([...caughtSet, ...pokemonCaughtIds.current]).size
+    const profile = (await loadProfile(user)) ?? createProfile()
+    const payout = runEndPayout(result, mapsCleared.current, profile, dexCount)
+    const nextProfile = {
+      ...profile,
+      metacash: profile.metacash + payout.metacash,
+      keys: profile.keys + payout.keys,
+      winStreak: payout.newWinStreak,
+    }
+    await saveProfile(nextProfile, user)
+    setMetacashEarned(payout.metacash)
+    setKeysEarned(payout.keys)
+
+    // Everything below (the `runs` insert and the daily-attempt submission)
+    // is logged-in-only: guests get no `runs` row at all, by design.
     if (!user) return
     const payload = {
       user_id: user.id,
@@ -488,6 +530,8 @@ export default function App() {
     pokemonSeenShinyIds.current = []
     setSpeedCash(0)
     setCashEarned(0)
+    setMetacashEarned(0)
+    setKeysEarned(0)
   }
 
   // Equip straight from an item offer. This path bypasses moveItem, so it has
@@ -735,6 +779,9 @@ export default function App() {
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
           cashEarned={cashEarned}
+          metacashEarned={metacashEarned}
+          keysEarned={keysEarned}
+          mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onSpendCash={spendCash}
           mapIndex={mapIndex}
@@ -782,6 +829,9 @@ export default function App() {
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
           cashEarned={cashEarned}
+          metacashEarned={metacashEarned}
+          keysEarned={keysEarned}
+          mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}

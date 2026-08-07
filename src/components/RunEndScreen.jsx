@@ -25,6 +25,9 @@ export default function RunEndScreen({
   speedCash = 0,
   badges = [],
   badgesEarned = 0,
+  metacashEarned = 0,
+  keysEarned = 0,
+  mapsCleared = 0,
 }) {
   const { dark } = useTheme()
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -114,6 +117,42 @@ export default function RunEndScreen({
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Meta reward band — what the run PAID rather than what it earned
+              in-run. A third band, not a third column: it answers "what you
+              keep" after "how far" (badges) and "how well" (earned/unspent)
+              have already been answered above it. Same divider treatment as
+              the columns above (borderTop, same border color) so it reads as
+              part of the same ledger rather than a bolted-on addition.
+              Always rendered, even at $0/0 keys — a vanishing band reads as a
+              bug, and "you earned nothing" is itself information (spec §6b). */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '18px', padding: '10px 6px', borderTop: borderStyle,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '22px', color: cash(dark), lineHeight: 1 }}>
+                + ${metacashEarned.toLocaleString()} metacash
+              </span>
+              {/* Loss only: show the arithmetic so a player who lost can see
+                  that going further pays more — the total alone doesn't
+                  teach that (spec §6b). Omitted on a win, where the payout is
+                  the flat $200 base (plus Win Streak/Dex Dividends, which
+                  aren't a simple multiply-out the player can reconstruct). */}
+              {keysEarned === 0 && (
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
+                  {mapsCleared} maps × $15
+                </span>
+              )}
+            </div>
+            {keysEarned > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '22px', color: '#facc15', lineHeight: 1 }}>
+                  + {keysEarned} key{keysEarned === 1 ? '' : 's'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

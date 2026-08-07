@@ -110,3 +110,34 @@ test('every badge shows earned on a region clear, unlike a mid-run defeat', () =
   const hive = lost.container.querySelector('img[alt="Hive"]')
   expect(hive.style.filter).toBe('brightness(0) opacity(0.45)')
 })
+
+test('a win shows the metacash and key payout, with no maps arithmetic', () => {
+  const { container } = show({
+    title: 'Region Cleared', titleColor: '#3f9d4f',
+    metacashEarned: 200, keysEarned: 1, mapsCleared: 8,
+  })
+  expect(screen.getByText('+ $200 metacash')).toBeTruthy()
+  expect(screen.getByText('+ 1 key')).toBeTruthy()
+  // A win's payout isn't a simple maps × $15 the player can reconstruct, so
+  // that line is loss-only.
+  expect(container.textContent).not.toContain('maps × $15')
+})
+
+test('a loss shows the metacash payout with the maps arithmetic beneath it, and no key figure', () => {
+  const { container } = show({
+    title: 'Defeated...', titleColor: '#ef4444',
+    metacashEarned: 45, keysEarned: 0, mapsCleared: 3,
+  })
+  expect(screen.getByText('+ $45 metacash')).toBeTruthy()
+  expect(screen.getByText('3 maps × $15')).toBeTruthy()
+  expect(container.textContent).not.toMatch(/\+ \d+ keys?/)
+})
+
+test('a map-0 loss still shows the reward band at $0, rather than hiding it', () => {
+  show({
+    title: 'Defeated...', titleColor: '#ef4444',
+    metacashEarned: 0, keysEarned: 0, mapsCleared: 0,
+  })
+  expect(screen.getByText('+ $0 metacash')).toBeTruthy()
+  expect(screen.getByText('0 maps × $15')).toBeTruthy()
+})
