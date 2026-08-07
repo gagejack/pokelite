@@ -27,6 +27,15 @@ import { VITAMIN_CAP_PER_STARTER } from '../game/metaCatalog.js'
 const LOCAL_KEY = 'speedmon.metaProfile'
 
 // Save (or overwrite) the profile. `user` may be null (→ localStorage).
+//
+// Returns whether the profile actually reached the account: `true` if a
+// logged-in user's write was confirmed by Supabase, `false` if it fell back
+// to localStorage (either because there's no user, or the Supabase upsert
+// errored). Callers that need to know whether it's now safe to delete some
+// OTHER copy of the data (see migrateMetaProfile below) must check this
+// before doing so — the localStorage fallback on error exists precisely so a
+// failed write isn't a lost write, and deleting the fallback unconditionally
+// would defeat that.
 export async function saveProfile(profile, user) {
   if (user) {
     const { error } = await supabase
@@ -35,10 +44,12 @@ export async function saveProfile(profile, user) {
     if (error) {
       console.warn('saveProfile (supabase) failed, falling back to localStorage:', error.message)
       writeLocal(profile)
+      return false
     }
-    return
+    return true
   }
   writeLocal(profile)
+  return false
 }
 
 // Load the profile, or null if there isn't one yet (caller should fall back
@@ -84,6 +95,45 @@ function readLocal() {
 // tab would lose its balance the moment the same person logs in elsewhere.
 export function clearLocalProfile() {
   writeLocal(null)
+}
+
+/**
+ * Guest→account meta-profile migration (spec §7), orchestration extracted
+ * out of App.jsx so it can be unit-tested without mounting the component.
+ *
+ * Loads whatever guest profile sits in localStorage, merges it into the
+ * signed-in account's own profile (migrateGuestProfile, below), persists the
+ * merged result, and — ONLY if that persist is confirmed to have reached the
+ * account — clears the local guest copy.
+ *
+ * The clear is conditional on saveProfile's return value on purpose. If the
+ * Supabase write fails, saveProfile already fell back to writing the merged
+ * profile into localStorage (so the sum isn't lost), but that fallback IS
+ * the local profile slot — clearing it unconditionally would delete the only
+ * copy of the merged balance and hand back a caller-visible success with
+ * nothing durably saved. On a confirmed failure this also returns `false` so
+ * the caller can reset its once-only migration guard and let a later
+ * sign-in retry.
+ *
+ * @param {object} signedInUser - Supabase user object (must have `.id`).
+ * @returns {Promise<boolean>} true if migration completed and the local copy
+ *   was cleared; false if there was nothing to migrate, or migration/persist
+ *   failed and the local copy was deliberately left in place for a retry.
+ */
+export async function migrateMetaProfile(signedInUser) {
+  try {
+    const localProfile = await loadProfile(null)
+    if (!localProfile) return false // nothing to migrate
+    const accountProfile = await loadProfile(signedInUser)
+    const merged = migrateGuestProfile(localProfile, accountProfile)
+    const persisted = await saveProfile(merged, signedInUser)
+    if (!persisted) return false // fell back to local; don't delete the fallback
+    clearLocalProfile()
+    return true
+  } catch (e) {
+    console.warn('migrateMetaProfile failed:', e)
+    return false
+  }
 }
 
 /**

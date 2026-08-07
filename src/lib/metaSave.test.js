@@ -1,4 +1,4 @@
-import { test, expect } from 'vitest'
+import { test, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { migrateGuestProfile } from './metaSave.js'
 import { createProfile } from '../game/metaProfile.js'
 import { VITAMIN_CAP_PER_STARTER } from '../game/metaCatalog.js'
@@ -197,4 +197,131 @@ test('migrateGuestProfile returns a new object, not a mutated input, for a real 
   expect(result).not.toBe(account)
   expect(guest.metacash).toBe(800)
   expect(account.metacash).toBe(2000)
+})
+
+// ── saveProfile / migrateMetaProfile: Supabase failure posture ───────────
+//
+// These need a mocked Supabase client and a fake localStorage, so they're
+// separated from the pure migrateGuestProfile tests above. vi.mock is
+// hoisted above the imports by vitest, so the mock is in place before
+// metaSave.js's own `import { supabase } from './supabase'` runs.
+
+vi.mock('./supabase.js', () => ({
+  supabase: {
+    from: vi.fn(),
+  },
+}))
+
+const { supabase } = await import('./supabase.js')
+const { saveProfile, loadProfile, migrateMetaProfile } = await import('./metaSave.js')
+
+const FAKE_USER = { id: 'user-123' }
+
+// This jsdom environment doesn't supply localStorage (same gap worked around
+// in RunEndScreen.test.jsx) — a map-backed stub is enough since metaSave.js
+// only calls getItem/setItem/removeItem through it.
+beforeAll(() => {
+  if (typeof localStorage !== 'undefined') return
+  const store = new Map()
+  globalThis.localStorage = {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k),
+    clear: () => store.clear(),
+  }
+})
+
+beforeEach(() => {
+  localStorage.clear()
+  supabase.from.mockReset()
+})
+
+function mockUpsert(error) {
+  supabase.from.mockReturnValue({
+    upsert: vi.fn().mockResolvedValue({ error }),
+  })
+}
+
+test('saveProfile returns true when the Supabase upsert succeeds', async () => {
+  mockUpsert(null)
+  const result = await saveProfile({ ...createProfile(), metacash: 100 }, FAKE_USER)
+  expect(result).toBe(true)
+})
+
+test('saveProfile returns false and falls back to localStorage when the Supabase upsert errors', async () => {
+  mockUpsert({ message: 'network blip' })
+  const profile = { ...createProfile(), metacash: 2800 }
+  const result = await saveProfile(profile, FAKE_USER)
+  expect(result).toBe(false)
+  // The fallback write must actually have happened — this is the copy
+  // migrateMetaProfile must NOT delete on a failed account write.
+  const fallback = await loadProfile(null)
+  expect(fallback.metacash).toBe(2800)
+})
+
+test('saveProfile returns false for a logged-out (guest) save — it always writes local, never the account', async () => {
+  const result = await saveProfile({ ...createProfile(), metacash: 50 }, null)
+  expect(result).toBe(false)
+  expect(supabase.from).not.toHaveBeenCalled()
+})
+
+// ── migrateMetaProfile: clear-only-on-confirmed-save ──────────────────────
+
+test('migrateMetaProfile clears the local guest copy after a successful account write', async () => {
+  const guestProfile = { ...createProfile(), metacash: 800, keys: 2 }
+  await saveProfile(guestProfile, null) // seed localStorage as the guest copy
+
+  // migrateMetaProfile also loads the account's existing profile (select)
+  // before merging, in addition to the upsert it does to save the result.
+  supabase.from.mockImplementation(() => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      }),
+    }),
+    upsert: vi.fn().mockResolvedValue({ error: null }), // account write succeeds
+  }))
+
+  const migrated = await migrateMetaProfile(FAKE_USER)
+
+  expect(migrated).toBe(true)
+  const remaining = await loadProfile(null)
+  expect(remaining).toBe(null) // local copy cleared
+})
+
+test('migrateMetaProfile does NOT clear the local copy when the account write fails — the merged balance must survive', async () => {
+  // Guest has $800, "account" (mocked load below returns null so the
+  // merge is just the guest profile) — the exact numbers don't matter as
+  // much as: merged data must still be readable locally afterward.
+  const guestProfile = { ...createProfile(), metacash: 800, keys: 2 }
+  await saveProfile(guestProfile, null) // seed localStorage as the guest copy
+
+  // loadProfile(signedInUser) inside migrateMetaProfile also goes through
+  // supabase.from(...).select(...); make that resolve to "no account row yet"
+  // so the merge result is deterministic, then fail the upsert.
+  supabase.from.mockImplementation((table) => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      }),
+    }),
+    upsert: vi.fn().mockResolvedValue({ error: { message: 'upsert failed' } }),
+  }))
+
+  const migrated = await migrateMetaProfile(FAKE_USER)
+
+  expect(migrated).toBe(false)
+  // Critical assertion: the merged balance must still be sitting in
+  // localStorage, not wiped out by an unconditional clearLocalProfile().
+  const remaining = await loadProfile(null)
+  expect(remaining).not.toBe(null)
+  expect(remaining.metacash).toBe(800)
+  expect(remaining.keys).toBe(2)
+})
+
+test('migrateMetaProfile returns false and does nothing when there is no local guest profile', async () => {
+  // localStorage is empty (cleared in beforeEach) — nothing to migrate.
+  const migrated = await migrateMetaProfile(FAKE_USER)
+  expect(migrated).toBe(false)
+  expect(supabase.from).not.toHaveBeenCalled()
 })

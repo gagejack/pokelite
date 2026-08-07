@@ -17,7 +17,7 @@ import { decodeSeed } from './game/seed.js'
 import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
-import { saveProfile, loadProfile, migrateGuestProfile, clearLocalProfile } from './lib/metaSave.js'
+import { migrateMetaProfile } from './lib/metaSave.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -81,9 +81,10 @@ export default function App() {
   const runEnded = useRef(false)
 
   // Guest→account meta-profile migration (spec §7): which user id migration
-  // has already run for, so it can never re-fire for the same login. See the
-  // onAuthStateChange effect below for why SIGNED_IN (not `user` changing)
-  // is the trigger.
+  // has already run for, so it can never re-fire for the same signed-in
+  // session. Reset on sign-out and on a failed migration — see the
+  // onAuthStateChange effect below for both why SIGNED_IN (not `user`
+  // changing) is the trigger, and why the guard needs those resets.
   const migratedUserId = useRef(null)
 
   // On load / auth change, check whether a saved run exists (logged in → the
@@ -121,42 +122,35 @@ export default function App() {
       // migratedUserId guards against running it twice for the SAME sign-in
       // (React 18 StrictMode double-invokes effect callbacks in dev, and
       // Supabase can in principle emit SIGNED_IN more than once for one
-      // session). It is intentionally NOT reset on sign-out, so a
-      // sign-out/sign-in-again cycle for the same account within one tab
-      // session does not re-merge a guest profile that was already cleared
-      // the first time (clearLocalProfile() removes the local copy, so a
-      // second merge would just be a no-op merge against `null` — but
-      // skipping it outright is simpler to reason about than relying on
-      // that no-op).
-      if (event === 'SIGNED_IN' && session?.user && migratedUserId.current !== session.user.id) {
+      // session). It IS reset on SIGNED_OUT (below), so a later sign-in to
+      // the same account re-runs migration rather than skipping it — the ref
+      // only needs to survive within one signed-in session, not across a
+      // sign-out. Resetting on sign-out matters because new guest progress
+      // can accrue AFTER a sign-out (play a few guest runs, sign back into
+      // the same account in the same tab); without the reset that new local
+      // balance would be permanently stranded since migration would never
+      // fire for it. Re-running migration when there's nothing new to merge
+      // is safe: migrateMetaProfile loads the local profile first and
+      // returns immediately if it's null (already cleared by a prior run).
+      if (event === 'SIGNED_OUT') {
+        migratedUserId.current = null
+      } else if (event === 'SIGNED_IN' && session?.user && migratedUserId.current !== session.user.id) {
         migratedUserId.current = session.user.id
-        migrateMetaProfile(session.user)
+        migrateMetaProfile(session.user).then(migrated => {
+          // A failed persist (Supabase upsert error, or the merge/load
+          // itself throwing) must not leave the once-only guard set, or a
+          // later sign-in for this same user would silently skip migration
+          // forever and strand whatever didn't make it to the account. See
+          // metaSave.js's migrateMetaProfile doc comment for what `false`
+          // covers (nothing to migrate vs. an actual failure) — either way,
+          // clearing the guard here just means the next SIGNED_IN re-checks
+          // for local guest state, which is cheap and safe to repeat.
+          if (!migrated) migratedUserId.current = null
+        })
       }
     })
     return () => subscription.unsubscribe()
   }, [])
-
-  // Guest→account meta-profile migration (spec §7). Runs once per real
-  // sign-in (see the SIGNED_IN guard above): merge whatever guest profile
-  // sits in localStorage into the account's own profile, persist the merged
-  // result, then clear the local copy so a later logout doesn't leave a
-  // stale guest wallet to double-merge from. Errors are non-fatal — the
-  // account keeps whatever it already had rather than losing progress to a
-  // failed migration; the guest copy is left in place on failure so the
-  // migration can be retried on a future login instead of silently
-  // discarding it.
-  async function migrateMetaProfile(signedInUser) {
-    try {
-      const localProfile = await loadProfile(null)
-      if (!localProfile) return // nothing to migrate
-      const accountProfile = await loadProfile(signedInUser)
-      const merged = migrateGuestProfile(localProfile, accountProfile)
-      await saveProfile(merged, signedInUser)
-      clearLocalProfile()
-    } catch (e) {
-      console.warn('migrateMetaProfile failed:', e)
-    }
-  }
 
   // Load the player's persistent caught set from saved runs whenever the user
   // changes (login/logout). Feeds the Poké Ball icon on in-run cards.
