@@ -4,11 +4,15 @@ import { META_CATALOG_BY_ID } from './metaCatalog.js'
 
 // ── createProfile ────────────────────────────────────────────────────────
 
-test('createProfile starts with zero currency and the starting region unlocked', () => {
+test('createProfile starts with zero currency and no region pre-unlocked', () => {
   const profile = createProfile()
   expect(profile.metacash).toBe(0)
   expect(profile.keys).toBe(0)
-  expect(profile.unlockedRegions).toEqual(['Unova'])
+  // No region is hardcoded as a default — "choose one region to start, free"
+  // means the PLAYER'S first choice is free, not a fixed region. See
+  // unlockRegion's isFirstRegion branch, which grants whichever region an
+  // empty unlockedRegions' first pick is, free.
+  expect(profile.unlockedRegions).toEqual([])
   expect(profile.ownedUpgrades).toEqual([])
   expect(profile.vitamins).toEqual({})
   expect(profile.winStreak).toBe(0)
@@ -330,31 +334,42 @@ test('applyPurchase respects an admin override price when charging', () => {
 
 // ── unlockRegion ─────────────────────────────────────────────────────────
 
-test('the starting region (already in unlockedRegions on a fresh profile) unlocks free — no key spend', () => {
-  const profile = createProfile() // unlockedRegions: ['Unova'], keys: 0
-  const result = unlockRegion(profile, 'Unova')
-  // Already unlocked: this is a rejection, not a free grant — calling
-  // unlockRegion on the starting region is a no-op-with-reason, never a
-  // silent success and never a charge (there'd be nothing to charge; keys is 0).
-  expect(result.ok).toBe(false)
-  expect(result.profile).toBe(profile)
-  expect(result.reason).toBeTruthy()
+test('a fresh profile has no unlocked regions', () => {
+  const profile = createProfile()
+  expect(profile.unlockedRegions).toEqual([])
 })
 
-test('unlockRegion spends 1 key and adds the region to unlockedRegions', () => {
-  const profile = { ...createProfile(), keys: 3 }
+test('the first unlock is free for ANY region, not just Unova (regression: bug let only Unova start free)', () => {
+  const profile = createProfile() // unlockedRegions: [], keys: 0
   const result = unlockRegion(profile, 'Kanto')
   expect(result.ok).toBe(true)
-  expect(result.profile.keys).toBe(2)
-  expect(result.profile.unlockedRegions).toEqual(['Unova', 'Kanto'])
+  expect(result.profile.keys).toBe(0) // free — no key spent, and there were none to spend
+  expect(result.profile.unlockedRegions).toEqual(['Kanto'])
 })
 
-test('unlockRegion is refused when the player has no keys, profile unchanged', () => {
-  const profile = createProfile() // keys: 0
-  const result = unlockRegion(profile, 'Kanto')
-  expect(result.ok).toBe(false)
-  expect(result.profile).toBe(profile) // same reference: truly unchanged
+test('the first unlock is free regardless of which region is chosen (Unova specifically)', () => {
+  const profile = createProfile()
+  const result = unlockRegion(profile, 'Unova')
+  expect(result.ok).toBe(true)
+  expect(result.profile.keys).toBe(0)
   expect(result.profile.unlockedRegions).toEqual(['Unova'])
+})
+
+test('the second unlock costs 1 key', () => {
+  const first = unlockRegion(createProfile(), 'Kanto').profile // free, keys: 0
+  const funded = { ...first, keys: 3 }
+  const result = unlockRegion(funded, 'Hoenn')
+  expect(result.ok).toBe(true)
+  expect(result.profile.keys).toBe(2)
+  expect(result.profile.unlockedRegions).toEqual(['Kanto', 'Hoenn'])
+})
+
+test('the second unlock is rejected when the player has 0 keys, profile unchanged', () => {
+  const first = unlockRegion(createProfile(), 'Kanto').profile // free, keys: 0
+  const result = unlockRegion(first, 'Hoenn')
+  expect(result.ok).toBe(false)
+  expect(result.profile).toBe(first) // same reference: truly unchanged
+  expect(result.profile.unlockedRegions).toEqual(['Kanto'])
   expect(result.reason).toBeTruthy()
 })
 
@@ -367,7 +382,7 @@ test('unlockRegion is refused for a region already unlocked, even with keys to s
 })
 
 test('unlockRegion returns a NEW profile object on success, never mutating the input', () => {
-  const profile = { ...createProfile(), keys: 1 }
+  const profile = { ...createProfile(), keys: 1, unlockedRegions: ['Unova'] }
   const result = unlockRegion(profile, 'Hoenn')
   expect(result.ok).toBe(true)
   expect(result.profile).not.toBe(profile)

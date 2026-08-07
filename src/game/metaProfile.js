@@ -23,16 +23,18 @@
 
 import { META_CATALOG_BY_ID, VITAMIN_CAP_PER_STARTER } from './metaCatalog.js'
 
-// The starting region is always unlocked (spec §1); Unova is the one every
-// other spec example and the RegionSelect default use, so it's the default
-// here too. A later task may make this configurable per save; today there is
-// exactly one starting region.
-const STARTING_REGION = 'Unova'
-
 /**
- * A fresh profile for a brand-new player. No upgrades, no cash, no keys —
- * everything the shop can grant starts at its "not owned" value so
+ * A fresh profile for a brand-new player. No upgrades, no cash, no keys, no
+ * region — everything the shop can grant starts at its "not owned" value so
  * `applyPurchase` never has to special-case an undefined field.
+ *
+ * `unlockedRegions` starts EMPTY, not pre-loaded with a hardcoded region: the
+ * spec's promise (§Currencies, echoed by RegionSelect's own copy) is "choose
+ * ONE region to start, free" — the player's choice, not a fixed default. An
+ * empty array plus unlockRegion()'s "first pick is free" rule (below) is what
+ * actually implements that; hardcoding a region here previously meant only
+ * that one region was free and every other first-time player was hard-locked
+ * out of starting a run at all (0 keys, no way to earn one without a run).
  *
  * @returns {MetaProfile}
  */
@@ -40,7 +42,7 @@ export function createProfile() {
   return {
     metacash: 0,
     keys: 0,
-    unlockedRegions: [STARTING_REGION],
+    unlockedRegions: [],
     ownedUpgrades: [],
     vitamins: {},
     ownedSprites: [],
@@ -276,12 +278,15 @@ const REGION_UNLOCK_COST = 1
  * silently no-op, never mutate) so the shop UI (Task 9) can treat this
  * purchase path identically to every catalog item.
  *
- * The starting region (Unova, per createProfile) is already present in
- * `unlockedRegions` on a brand-new profile — that's how "choose one region
- * to start, free" is satisfied, and it's why this function treats "already
- * unlocked" as a rejection rather than something the caller has to check
- * first: calling this on Unova (or on any region already unlocked) is always
- * a no-op-with-reason, never a double charge and never a silent success.
+ * "Choose one region to start, free" (spec §Currencies) is implemented HERE,
+ * not by pre-loading a fixed region in createProfile(): a brand-new profile
+ * has an EMPTY unlockedRegions, and whichever region the player picks first —
+ * any of them, not just one hardcoded default — is unlocked free. That's the
+ * `profile.unlockedRegions.length === 0` branch below. Every unlock after
+ * that (unlockedRegions non-empty) costs a key like normal, and "already
+ * unlocked" is still a rejection rather than something the caller has to
+ * check first: calling this on a region already unlocked is always a
+ * no-op-with-reason, never a double charge and never a silent success.
  *
  * @param {MetaProfile} profile
  * @param {string} regionName
@@ -291,14 +296,15 @@ export function unlockRegion(profile, regionName) {
   if (profile.unlockedRegions.includes(regionName)) {
     return { ok: false, profile, reason: 'Region already unlocked' }
   }
-  if (profile.keys < REGION_UNLOCK_COST) {
+  const isFirstRegion = profile.unlockedRegions.length === 0
+  if (!isFirstRegion && profile.keys < REGION_UNLOCK_COST) {
     return { ok: false, profile, reason: 'Not enough keys' }
   }
   return {
     ok: true,
     profile: {
       ...profile,
-      keys: profile.keys - REGION_UNLOCK_COST,
+      keys: isFirstRegion ? profile.keys : profile.keys - REGION_UNLOCK_COST,
       unlockedRegions: [...profile.unlockedRegions, regionName],
     },
   }
