@@ -55,11 +55,25 @@ test('leaves every other node type untouched', () => {
 })
 
 test('de-duplicates species within a row when the pool allows it', () => {
-  // Three bakeable nodes against a three-species pool — all distinct.
+  // Three bakeable nodes against a three-species pool — all distinct. De-dup
+  // is a filtered draw (availableIn removes used species before drawing), not
+  // draw-and-retry, so this holds every run rather than most runs.
   const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
   bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
   const ids = rows[0].map(n => n.species.id)
   expect(new Set(ids).size).toBe(3)
+})
+
+test('grass de-dup holds across many generations, not just on a lucky seed', () => {
+  // Guards the property the previous test asserts once. A draw-and-retry
+  // de-dup passes that test most runs and fails a few percent of the time;
+  // this loop makes such an implementation fail reliably.
+  for (let i = 0; i < 200; i++) {
+    const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
+    bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+    const ids = rows[0].map(n => n.species.id)
+    expect(new Set(ids).size).toBe(3)
+  }
 })
 
 test('allows duplicates when a row has more nodes than the pool has species', () => {
