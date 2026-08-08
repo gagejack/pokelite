@@ -14,7 +14,7 @@ vi.mock('./supabase.js', () => ({
 
 const { supabase } = await import('./supabase.js')
 const {
-  getShopPrice, getShopOverrides, loadShopPrices, saveShopPrice, PRICE_MIN, PRICE_MAX,
+  getShopPrice, getShopOverrides, loadShopPrices, saveShopPrice, isCommittablePrice, PRICE_MIN, PRICE_MAX,
 } = await import('./metaShopBalance.js')
 
 beforeEach(() => {
@@ -137,4 +137,26 @@ test('saveShopPrice calls upsert with onConflict item_id and includes updated_by
     expect.objectContaining({ item_id: 'interest', price: 1100, updated_by: 'admin-1' }),
     { onConflict: 'item_id' },
   )
+})
+
+// ── isCommittablePrice: the empty-box guard ───────────────────────────────
+
+test('an empty or whitespace-only box is not committable', () => {
+  // The bug this exists for: Number('') is 0, and 0 is a LEGITIMATE price (a
+  // free promo), so clamp() can't distinguish "mid-edit" from "make this
+  // free". Selecting a price, clearing it, and tabbing away before retyping
+  // would silently zero the item for every player and report "Saved".
+  expect(isCommittablePrice('')).toBe(false)
+  expect(isCommittablePrice('   ')).toBe(false)
+  expect(isCommittablePrice(null)).toBe(false)
+  expect(isCommittablePrice(undefined)).toBe(false)
+})
+
+test('an explicit zero IS committable — free is a real price', () => {
+  expect(isCommittablePrice('0')).toBe(true)
+})
+
+test('ordinary values are committable', () => {
+  expect(isCommittablePrice('600')).toBe(true)
+  expect(isCommittablePrice('5')).toBe(true)
 })

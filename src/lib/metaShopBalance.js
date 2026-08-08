@@ -36,6 +36,22 @@ function clamp(n) {
   return Math.min(PRICE_MAX, Math.max(PRICE_MIN, Math.round(num)))
 }
 
+/**
+ * Is `draft` a price the admin actually meant to set?
+ *
+ * An empty box is "mid-edit", not "make this free" — and clamp() can't tell
+ * them apart, because Number('') is 0 and 0 is a legitimate price (a free
+ * promo). So the distinction has to be drawn before clamping. Without it,
+ * selecting a price and clearing it, then tabbing away before retyping,
+ * silently zeroes that item for every player and reports "Saved".
+ *
+ * @param {string} draft - the raw input value
+ * @returns {boolean} false when the commit should be skipped entirely
+ */
+export function isCommittablePrice(draft) {
+  return String(draft ?? '').trim() !== ''
+}
+
 // The catalog default for `itemId` — either a metacash/key item's `cost` or
 // (for the four sprite-tier ids) SPRITE_TIER_PRICES' base price. Falls back
 // to 0 for an unrecognized id rather than undefined, so arithmetic on a

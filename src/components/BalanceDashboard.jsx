@@ -10,7 +10,7 @@ import { calcStat, fetchPokemonBase, cachedName } from '../game/pokemon.js'
 import { mapLevelRange } from '../game/battleTeams.js'
 import { getRegionConfig, regionNames } from '../game/regionRegistry.js'
 import { getRegionBalance, saveRegionBalance, defaultsFor, BALANCE_MIN, BALANCE_MAX } from '../lib/regionBalance.js'
-import { getShopPrice, saveShopPrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
+import { getShopPrice, saveShopPrice, isCommittablePrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
 import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { SPRITE_TIERS } from '../game/spriteTiers.js'
 
@@ -105,6 +105,12 @@ function PriceRow({ itemId, label, unit, defaultPrice, theme }) {
   useEffect(() => { setDraft(String(getShopPrice(itemId))) }, [itemId])
 
   async function commit() {
+    // See isCommittablePrice: an empty box is mid-edit, not "make this free".
+    if (!isCommittablePrice(draft)) {
+      setDraft(String(getShopPrice(itemId))) // put the live value back
+      setStatus('idle')
+      return
+    }
     const value = Number(draft)
     setStatus('saving')
     const { error } = await saveShopPrice(itemId, value)
