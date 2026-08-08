@@ -156,9 +156,49 @@ export function _seedChainCacheForTest(id, root) {
 }
 ```
 
-- [ ] **Step 5: Extract the shared stage walk**
+- [ ] **Step 5: Pin the existing behavior before refactoring**
 
-`resolveEvolutionLine` currently contains the walk inline. Pull the pure part into a helper both callers use, so the sync and async paths can never diverge.
+Step 6 edits `resolveEvolutionLine`, which already works. Add a characterization test first so the extraction is provably behavior-preserving — without it, a silent change here would make the previewed sprite disagree with the species fought, the one failure the mode cannot have.
+
+Add to `src/game/pokemon.test.js`:
+
+```js
+import { rollStageForLevel, _seedChainCacheForTest as seedChain } from './pokemon.js'
+
+// Characterization test: pins rollStageForLevel's CURRENT behavior so the
+// stagesFromRoot extraction in the next step can be proven not to change it.
+// Uses the same warm-cache seam as the sync tests, so no network is involved.
+test('rollStageForLevel (async) is unchanged by the stagesFromRoot extraction', async () => {
+  const LINE = {
+    id: 10,
+    minLevel: 1,
+    levelUp: true,
+    evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+  }
+  seedChain(10, LINE)
+
+  // Below the evolution level, only the base form is reachable.
+  await expect(rollStageForLevel(10, 5)).resolves.toBe(10)
+
+  // Above it, both stages are reachable — sample until both appear.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(await rollStageForLevel(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+
+  // The generation ceiling drops the evolved branch entirely.
+  const capped = new Set()
+  for (let i = 0; i < 50; i++) capped.add(await rollStageForLevel(10, 50, 10))
+  expect(capped).toEqual(new Set([10]))
+})
+```
+
+Run: `npm test -- src/game/pokemon.test.js`
+Expected: PASS **before** any refactor. If it fails now, the test is wrong — fix it before touching `resolveEvolutionLine`, because a red characterization test cannot prove anything about the change.
+
+- [ ] **Step 6: Extract the shared stage walk**
+
+`resolveEvolutionLine` currently contains the walk inline. Pull the pure part into a helper both callers use, so the sync and async paths can never diverge. The Step 5 test must still pass afterward, unchanged.
 
 In `src/game/pokemon.js`, add above `resolveEvolutionLine`:
 
@@ -203,12 +243,12 @@ function stagesFromRoot(root, id, level, maxSpeciesId) {
 
 Then replace that same walk inside `resolveEvolutionLine` with a call to `stagesFromRoot(root, pokeId, level, maxSpeciesId)`, keeping its existing `await`-and-error handling around it. Do not change what `resolveEvolutionLine` returns.
 
-- [ ] **Step 6: Run the full test suite**
+- [ ] **Step 7: Run the full test suite**
 
 Run: `npm test`
-Expected: PASS, including every pre-existing `pokemon.test.js` test. The extraction in Step 5 is a refactor — if an existing test now fails, `stagesFromRoot` does not match the original walk. Fix it rather than editing the test.
+Expected: PASS, including the Step 5 characterization test and every pre-existing `pokemon.test.js` test. The extraction in Step 6 is a refactor — if any of them now fail, `stagesFromRoot` does not match the original walk. Fix the code rather than editing the test.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/game/pokemon.js src/game/pokemon.test.js
