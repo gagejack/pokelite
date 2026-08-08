@@ -23,18 +23,21 @@
 
 import { META_CATALOG_BY_ID, VITAMIN_CAP_PER_STARTER } from './metaCatalog.js'
 
+// Kanto is where a new player starts, and the only region unlocked for free.
+// Something has to be: keys come only from WINNING a run, so a profile with
+// nothing unlocked could never enter a region, never win, and never earn the
+// key it needs — a hard block at the first screen. Kanto is gen 1, so it's the
+// least surprising default for a Pokémon roguelike.
+const STARTING_REGION = 'Kanto'
+
 /**
- * A fresh profile for a brand-new player. No upgrades, no cash, no keys, no
- * region — everything the shop can grant starts at its "not owned" value so
+ * A fresh profile for a brand-new player. No upgrades, no cash, no keys —
+ * everything the shop can grant starts at its "not owned" value so
  * `applyPurchase` never has to special-case an undefined field.
  *
- * `unlockedRegions` starts EMPTY, not pre-loaded with a hardcoded region: the
- * spec's promise (§Currencies, echoed by RegionSelect's own copy) is "choose
- * ONE region to start, free" — the player's choice, not a fixed default. An
- * empty array plus unlockRegion()'s "first pick is free" rule (below) is what
- * actually implements that; hardcoding a region here previously meant only
- * that one region was free and every other first-time player was hard-locked
- * out of starting a run at all (0 keys, no way to earn one without a run).
+ * The one exception is `unlockedRegions`, which starts with Kanto. See
+ * STARTING_REGION above for why a profile can't start with nothing unlocked.
+ * Every OTHER region — Unova included — costs 1 key.
  *
  * @returns {MetaProfile}
  */
@@ -42,7 +45,7 @@ export function createProfile() {
   return {
     metacash: 0,
     keys: 0,
-    unlockedRegions: [],
+    unlockedRegions: [STARTING_REGION],
     ownedUpgrades: [],
     vitamins: {},
     ownedSprites: [],
@@ -278,13 +281,11 @@ const REGION_UNLOCK_COST = 1
  * silently no-op, never mutate) so the shop UI (Task 9) can treat this
  * purchase path identically to every catalog item.
  *
- * "Choose one region to start, free" (spec §Currencies) is implemented HERE,
- * not by pre-loading a fixed region in createProfile(): a brand-new profile
- * has an EMPTY unlockedRegions, and whichever region the player picks first —
- * any of them, not just one hardcoded default — is unlocked free. That's the
- * `profile.unlockedRegions.length === 0` branch below. Every unlock after
- * that (unlockedRegions non-empty) costs a key like normal, and "already
- * unlocked" is still a rejection rather than something the caller has to
+ * There is no free unlock here. Kanto is already in a new profile's
+ * unlockedRegions (see STARTING_REGION), and every other region — Unova
+ * included — costs a key through this function.
+ *
+ * "Already unlocked" is a rejection rather than something the caller has to
  * check first: calling this on a region already unlocked is always a
  * no-op-with-reason, never a double charge and never a silent success.
  *
@@ -296,15 +297,14 @@ export function unlockRegion(profile, regionName) {
   if (profile.unlockedRegions.includes(regionName)) {
     return { ok: false, profile, reason: 'Region already unlocked' }
   }
-  const isFirstRegion = profile.unlockedRegions.length === 0
-  if (!isFirstRegion && profile.keys < REGION_UNLOCK_COST) {
+  if (profile.keys < REGION_UNLOCK_COST) {
     return { ok: false, profile, reason: 'Not enough keys' }
   }
   return {
     ok: true,
     profile: {
       ...profile,
-      keys: isFirstRegion ? profile.keys : profile.keys - REGION_UNLOCK_COST,
+      keys: profile.keys - REGION_UNLOCK_COST,
       unlockedRegions: [...profile.unlockedRegions, regionName],
     },
   }

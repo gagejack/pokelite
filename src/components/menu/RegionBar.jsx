@@ -5,9 +5,9 @@ import { SPRITE } from '../../game/regions/regionList'
 // One region as a 320x68 bar for the desktop main menu's region mode.
 // Same border/bevel language as MenuButton so the column reads as one family;
 // taller than a menu bar (40px) so the three 64px starter sprites stay legible.
-// `unlockedRegions` defaults to empty, not to a named region: a new player's
-// first pick is free whichever one it is, so defaulting to a specific region
-// would render it owned and the rest priced at a key.
+// `unlockedRegions` defaults to empty rather than to a named region: showing
+// a region as unlocked before the caller has told us would let a click
+// through on a region the player may not own.
 export default function RegionBar({ region, dark, onSelect, unlockedRegions = [], keys = 0 }) {
   // A region is playable only if its config has authored maps — the others
   // would crash at config.maps[0] when a run starts. Same gate as RegionSelect.

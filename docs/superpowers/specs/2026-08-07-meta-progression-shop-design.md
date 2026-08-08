@@ -41,22 +41,21 @@ only).** Keys never drop on a loss.
 | Extra Slot | 5 keys | +1 party slot (roster cap 6 → 7) |
 | Déjà Vu | 6 keys | StarterSelect offers any previously-used starter |
 
-**The starter region is the player's choice, not a fixed one.** A new profile
-has `unlockedRegions: []`, and the first region the player selects — any of
-them — unlocks free. Every region after that costs 1 key. With 4 playable
-regions that is 1 free + 3 paid, which is where the "3 total" above comes from.
+**Kanto is the starting region.** A new profile has
+`unlockedRegions: ['Kanto']`, and every other region — Unova included — costs
+1 key. There is no free choice and no free first pick.
 
-An earlier draft of this spec hardcoded Unova as the starting region. That
-contradicted the copy already on the RegionSelect screen ("Choose one region to
-start…") and hard-blocked any new player who picked Kanto first: 0 keys, "Not
-enough keys", and no way to earn one without finishing a run. The player's
-choice governs.
+Something has to be unlocked at the start: keys drop only from *winning* a run,
+so a profile with nothing unlocked could never enter a region, never win, and
+never earn the key it needs. Kanto is gen 1, which makes it the least
+surprising default for a Pokémon roguelike.
 
-*Merge caveat:* `migrateGuestProfile` unions `unlockedRegions`, so two guest
-profiles that each took a free starter merge into an account holding two free
-regions. Accepted — both were legitimately free choices and no key was
-short-changed. It is reachable only by playing as a guest on two devices and
-signing into the same account from both.
+With 4 playable regions that is 1 starting + 3 paid, which is where the "3
+total" above comes from.
+
+*Merge caveat:* `migrateGuestProfile` unions `unlockedRegions`, so a guest and
+an account that each hold Kanto merge to one Kanto. No key is short-changed and
+no region is duplicated.
 
 Full key catalog = 15 keys + 3 region unlocks = **18 wins**. Wins are hard;
 this is the deliberate prestige long tail (confirmed in brainstorming).
@@ -88,7 +87,7 @@ Profile shape (conceptual):
 {
   metacash: 0,
   keys: 0,
-  unlockedRegions: [],                 // empty until the player picks their free starter region
+  unlockedRegions: ['Kanto'],          // Kanto is the starting region; every other costs 1 key
   ownedUpgrades: ['quick_heal', ...],
   vitamins: { 4: { attack: 2, speed: 1 } },  // speciesId → stat → count
   ownedSprites: ['Kanto/Lance 4', ...],

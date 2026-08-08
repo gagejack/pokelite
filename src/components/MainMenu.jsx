@@ -18,9 +18,10 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   const { dark } = useTheme()
   // profile is null for one frame while App.jsx's initial load is in flight —
   // fall back to "nothing unlocked yet", same fallback RegionSelect uses.
-  // Not a hardcoded region: a new player's first pick is free whichever region
-  // it is, so naming one here would flash it as owned and the rest as costing
-  // a key, which is the opposite of what they're about to be offered.
+  // Deliberately empty rather than mirroring createProfile()'s starting
+  // region: under-reporting for one frame is harmless, but showing a region
+  // as unlocked before we know would let a click through on a region the
+  // player may not own.
   const unlockedRegions = profile?.unlockedRegions ?? []
   const keys = profile?.keys ?? 0
   const isDesktop = useIsDesktop()

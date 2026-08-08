@@ -4,15 +4,14 @@ import { META_CATALOG_BY_ID } from './metaCatalog.js'
 
 // ── createProfile ────────────────────────────────────────────────────────
 
-test('createProfile starts with zero currency and no region pre-unlocked', () => {
+test('createProfile starts with zero currency and only Kanto unlocked', () => {
   const profile = createProfile()
   expect(profile.metacash).toBe(0)
   expect(profile.keys).toBe(0)
-  // No region is hardcoded as a default — "choose one region to start, free"
-  // means the PLAYER'S first choice is free, not a fixed region. See
-  // unlockRegion's isFirstRegion branch, which grants whichever region an
-  // empty unlockedRegions' first pick is, free.
-  expect(profile.unlockedRegions).toEqual([])
+  // Kanto is the starting region and the ONLY one granted free. Something has
+  // to be: keys come only from winning a run, so a profile with nothing
+  // unlocked could never enter a region, never win, and never earn a key.
+  expect(profile.unlockedRegions).toEqual(['Kanto'])
   expect(profile.ownedUpgrades).toEqual([])
   expect(profile.vitamins).toEqual({})
   expect(profile.winStreak).toBe(0)
@@ -334,25 +333,28 @@ test('applyPurchase respects an admin override price when charging', () => {
 
 // ── unlockRegion ─────────────────────────────────────────────────────────
 
-test('a fresh profile has no unlocked regions', () => {
+test('a fresh profile has exactly Kanto unlocked', () => {
   const profile = createProfile()
-  expect(profile.unlockedRegions).toEqual([])
+  expect(profile.unlockedRegions).toEqual(['Kanto'])
 })
 
-test('the first unlock is free for ANY region, not just Unova (regression: bug let only Unova start free)', () => {
-  const profile = createProfile() // unlockedRegions: [], keys: 0
-  const result = unlockRegion(profile, 'Kanto')
-  expect(result.ok).toBe(true)
-  expect(result.profile.keys).toBe(0) // free — no key spent, and there were none to spend
+test('Unova is NOT free — a fresh profile cannot afford it', () => {
+  // Guards the rule directly: there is no free-first-pick, so a brand-new
+  // player with 0 keys is refused every region except the Kanto they start
+  // with. Unova specifically, because it used to be the hardcoded free one.
+  const profile = createProfile()
+  const result = unlockRegion(profile, 'Unova')
+  expect(result.ok).toBe(false)
+  expect(result.reason).toBe('Not enough keys')
   expect(result.profile.unlockedRegions).toEqual(['Kanto'])
 })
 
-test('the first unlock is free regardless of which region is chosen (Unova specifically)', () => {
-  const profile = createProfile()
-  const result = unlockRegion(profile, 'Unova')
+test('no region is free: even the first PAID unlock costs a key', () => {
+  const profile = { ...createProfile(), keys: 1 }
+  const result = unlockRegion(profile, 'Hoenn')
   expect(result.ok).toBe(true)
-  expect(result.profile.keys).toBe(0)
-  expect(result.profile.unlockedRegions).toEqual(['Unova'])
+  expect(result.profile.keys).toBe(0) // charged, not granted
+  expect(result.profile.unlockedRegions).toEqual(['Kanto', 'Hoenn'])
 })
 
 test('the second unlock costs 1 key', () => {
