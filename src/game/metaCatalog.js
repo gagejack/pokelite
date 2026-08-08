@@ -125,7 +125,10 @@ export const METACASH_ITEMS = [
     name: 'Bonded',
     cost: 700,
     currency: 'metacash',
-    description: 'Pokémon surviving a boss fight gain +1 level (that run)',
+    // "Gym leader", not "boss": the Elite Four and Champion are deliberately
+    // NOT covered (see spec §2). Wording matters here — a player reading
+    // "boss fight" would reasonably expect it in the gauntlet.
+    description: 'Pokémon surviving a gym leader fight gain +1 level (that run)',
     effect: { type: 'boss_survive_level_bonus', amount: 1 },
   },
   {

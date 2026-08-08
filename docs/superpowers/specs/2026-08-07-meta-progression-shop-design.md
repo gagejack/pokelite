@@ -117,7 +117,7 @@ rotation would be actively hostile here.
 | 7 | Zinc | $500 | +5% SpDef for one chosen starter |
 | 8 | Carbos | $500 | +5% Speed for one chosen starter |
 | 9 | Bargain Hunter | $500 | 15% off all shop prices (meta + Pokémart) |
-| 10 | Bonded | $700 | Pokémon surviving a boss fight gain +1 level (that run) |
+| 10 | Bonded | $700 | Pokémon surviving a **gym leader** fight gain +1 level (that run) |
 | 11 | Type Synergy | $800 | ≥3 party mons share a type → +10% damage for those types |
 | 12 | Treasure Map | $800 | Item nodes roll +1 extra option |
 | 13 | Quick Heal | $800 | Victory heal 8% (up from 5%) |
@@ -128,6 +128,14 @@ rotation would be actively hostile here.
 | 18 | Win Streak | $1,200 | After 2 consecutive wins, +$50 metacash per extra win (resets on loss) |
 | 19 | Shiny Charm | $1,500 | +25% shiny odds |
 | 20 | Dex Dividends | $1,500 | +2% metacash per win for every 25 unique species caught lifetime |
+
+**Bonded is gym leaders only — not the Elite Four or Champion.** The final
+gauntlet grants more levels per fight already, and Bonded is meant to help a
+player *reach* the Elite Four rather than power through it. The item's wording
+says "gym leader" rather than "boss" for exactly this reason: a player reading
+"boss fight" would reasonably expect it in the gauntlet, and it does not apply
+there. `NodeMap` passes `bonusLevelsForSurvivors` on a boss win; `EliteFour`
+deliberately does not.
 
 **Payout order when both #18 and #20 are owned.** Dex Dividends multiplies the
 $200 base, then Win Streak's flat bonus is added — they do **not** compound.
