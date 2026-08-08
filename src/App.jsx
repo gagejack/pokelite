@@ -19,7 +19,7 @@ import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
 import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js'
-import { setActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
+import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -374,6 +374,17 @@ export default function App() {
     // Feed the current map's layout + node progress to NodeMap on mount.
     mapProgress.current = run.map ?? null
     runEnded.current = false
+    // Resume is the THIRD way into a run (startRun and restartRun are the
+    // others), so it has to install the meta modifiers too. Without this the
+    // resumed run reads whatever module state the last started run left —
+    // stock BALANCE after a page refresh, since that state doesn't survive a
+    // reload. A player who owns Quick Heal would finish the run at the base
+    // 5% heal with no Bonded, Treasure Map, Interest, or Type Synergy.
+    //
+    // Uses the CURRENT profile rather than a snapshot taken when the run began:
+    // upgrades are permanent and a purchase made between saving and resuming
+    // should apply, the same way it would to a fresh run.
+    setActiveRunModifiers(profile)
     // A resumed run is no longer "saved" — it's active again. Clear the store so
     // it doesn't linger if the tab is refreshed mid-run without hitting Home.
     savedRunData.current = null
@@ -389,6 +400,12 @@ export default function App() {
   // leaving to the menu after a save, and by resetRun below.
   function clearRunState() {
     setSelectedRegion(null)
+    // Drop the run's meta modifiers with the rest of its state. Every reader is
+    // inside a run and each run-entry path re-installs them, so leaving them
+    // set is not currently observable — but a stale overlay outliving its run
+    // is the exact leak this function exists to prevent, and it makes any
+    // future menu-side reader of getEffectiveBalance correct by default.
+    clearActiveRunModifiers()
     clearRng()
     setRunSeed(null)
     setRunMode('normal')
