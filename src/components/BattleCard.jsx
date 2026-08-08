@@ -57,6 +57,45 @@ const DESKTOP_CARD_GAP = 50
 // pixel fonts than -webkit-text-stroke, which eats thin glyphs).
 const LV_OUTLINE = '1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
 
+// The desktop roster rail's vertical budget for its row stack. Fixed inputs,
+// not measured at runtime: trainer card (74px, flexShrink:0) and the roster
+// panel's own padding (4px top + 4px bottom) are both constants, so the
+// remainder is a constant too.
+//   DESKTOP_CARD_H(540) - trainerCard(74) - panelPadding(8) = 458
+const ROSTER_PANEL_BUDGET = DESKTOP_CARD_H - 74 - 8
+const ROSTER_ROW_GAP = 4
+const ROSTER_SPRITE_BOX = 58
+// Default (≤6 Pokémon) vertical padding on each row — unchanged from before
+// this fix, so a 6-mon roster renders byte-identical to today.
+const ROSTER_ROW_PAD_Y_DEFAULT = 3
+
+// Pure fit calculation: given a roster size, find the largest per-row
+// vertical padding (each row's height is spriteBox + 2*padY) that still lets
+// `count` rows plus their gaps fit inside the fixed rail budget. Extracted so
+// the arithmetic backing the desktop roster rail's "does the last row get
+// clipped" question can be tested directly, independent of DOM measurement.
+//
+// Never *exceeds* the default padding — a roster with room to spare (≤6)
+// must render exactly as it did before this fix existed.
+export function rosterRowPadY(count) {
+  if (count <= 0) return ROSTER_ROW_PAD_Y_DEFAULT
+  const gapTotal = (count - 1) * ROSTER_ROW_GAP
+  const maxRowH = (ROSTER_PANEL_BUDGET - gapTotal) / count
+  const maxPadY = Math.floor((maxRowH - ROSTER_SPRITE_BOX) / 2)
+  return Math.max(0, Math.min(ROSTER_ROW_PAD_Y_DEFAULT, maxPadY))
+}
+
+// Whether `count` rows, laid out with the padding rosterRowPadY(count) would
+// pick, actually fit inside the rail budget. Should be true for any count —
+// this is the regression guard: if it ever goes false, the rail is clipping.
+export function rosterFitsRail(count) {
+  if (count <= 0) return true
+  const padY = rosterRowPadY(count)
+  const rowH = ROSTER_SPRITE_BOX + 2 * padY
+  const total = count * rowH + (count - 1) * ROSTER_ROW_GAP
+  return total <= ROSTER_PANEL_BUDGET
+}
+
 export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoster, character, damageMultiplier = 2, onBattleEnd, onDefeat, onRestart, runItBackAvailable = false, onRunItBack, onMainMenu, seedCode, cashEarned = 0, speedCash = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, badges = [], badgesEarned = 0 }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -1062,7 +1101,7 @@ function TwoToneHpBar({ hp, maxHp, width = 140, resetKey, height = 10 }) {
 
 // A single roster row: sprite + (name / level / HP) + held item.
 // `mirrored` flips the row so sprites hug the right edge (enemy column).
-function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, levelsGained = 0 }) {
+function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, levelsGained = 0, padY = ROSTER_ROW_PAD_Y_DEFAULT }) {
   const itemSlot = (
     <div style={{ width: '18px', height: '18px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {pokemon.heldItem && (
@@ -1080,7 +1119,10 @@ function RosterRow({ pokemon, hp, fainted, active, mirrored, celebrate = false, 
     <div style={{
       display: 'flex', flexDirection: mirrored ? 'row-reverse' : 'row',
       alignItems: 'center', gap: '6px',
-      padding: '3px 5px',
+      // Vertical padding shrinks only once the roster exceeds the 6-slot
+      // default (Extra Slot's 7th row) — see rosterRowPadY. At ≤6 this is
+      // always 3px, identical to before this row became roster-size-aware.
+      padding: `${padY}px 5px`,
       // Active slot: a lifted plate. That alone carries the state now that the
       // text keeps one palette — a yellow edge rule was tried here and cut, it
       // competed with the yellow level figure for the same glance.
@@ -1184,6 +1226,12 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
   const reorderable = !!onSwap && phase === 'prep'
   const [dragFrom, setDragFrom] = useState(null)
   const [dragOver, setDragOver] = useState(null)
+  // Fixed-height rail (DESKTOP_CARD_H doesn't grow): a stock 6-mon roster
+  // fits with room to spare at the 3px default, but a 7th row (Extra Slot)
+  // pushes the stack 14px past the panel's 458px budget and gets clipped by
+  // the card's overflow:hidden. Shrinking padY only when count > 6 buys back
+  // exactly enough to fit 7 rows — see rosterRowPadY/rosterFitsRail.
+  const rowPadY = rosterRowPadY(roster.length)
 
   // Touch reorder, sharing its gesture with the bag drag and the map roster's
   // reorder: same 4px threshold, same rect hit testing over data-battle-slot,
@@ -1291,6 +1339,7 @@ function RosterColumn({ side, trainerSprite, trainerName, roster, hpArr, fainted
               mirrored={mirrored}
               celebrate={celebrate && !faintedArr[i]}
               levelsGained={levelsGained}
+              padY={rowPadY}
             />
           </div>
         ))}
