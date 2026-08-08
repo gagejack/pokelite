@@ -94,6 +94,14 @@ function makeSpriteId(region, displayName) {
 function buildRegionSprites(region) {
   const files = REGION_GLOBS[region]
   const sprites = []
+  // Ids are region + display name, and a player's ownedSprites is keyed by
+  // them forever. Two files in one region that normalize to the same display
+  // name — "Lance.webp" alongside a future "Lance.png", or two casings that
+  // collapse — would put TWO different sprites behind one purchase key: buy
+  // one, and which art you get depends on glob order. There are no collisions
+  // in the current asset set, so this exists to make a future asset drop fail
+  // loudly at build/dev time rather than quietly mis-selling a sprite.
+  const seenIds = new Set()
   for (const path of Object.keys(files)) {
     const basename = basenameOf(path)
     // Johto allowlist: only Spr_HGSS_-prefixed files are real, individually
@@ -107,12 +115,17 @@ function buildRegionSprites(region) {
     if (isJunkBasename(basename)) continue
 
     const displayName = displayNameFromBasename(basename)
-    sprites.push({
-      id: makeSpriteId(region, displayName),
-      region,
-      name: displayName,
-      url: files[path],
-    })
+    const id = makeSpriteId(region, displayName)
+    if (seenIds.has(id)) {
+      console.warn(
+        `spriteIndex: duplicate sprite id "${id}" from ${path} — ` +
+        'two files normalize to the same display name. The first one wins; ' +
+        'rename one of them so each sprite has its own purchase key.'
+      )
+      continue
+    }
+    seenIds.add(id)
+    sprites.push({ id, region, name: displayName, url: files[path] })
   }
   sprites.sort((a, b) => a.name.localeCompare(b.name))
   return sprites

@@ -82,3 +82,14 @@ test('allSprites flattens every region in SPRITE_REGIONS order and matches the t
   expect(all).toHaveLength(428)
   expect(SPRITE_REGIONS).toEqual(['Kanto', 'Hoenn', 'Sinnoh', 'Unova', 'Johto'])
 })
+
+test('every sprite id is unique across the whole index', () => {
+  // ownedSprites is keyed by these ids and persists forever, so a collision
+  // would put two different sprites behind one purchase key — buy one, and
+  // which art you get depends on glob order. buildRegionSprites drops
+  // duplicates with a console.warn rather than shipping that ambiguity; this
+  // pins the invariant so a future asset drop can't reintroduce it silently.
+  const all = allSprites()
+  const ids = new Set(all.map(s => s.id))
+  expect(ids.size).toBe(all.length)
+})
