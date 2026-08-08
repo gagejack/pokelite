@@ -1,5 +1,5 @@
-import { test, expect } from 'vitest'
-import { displayNameFromBasename, spritesForRegion, allSprites, SPRITE_REGIONS } from './spriteIndex.js'
+import { test, expect, vi } from 'vitest'
+import { displayNameFromBasename, spritesForRegion, allSprites, SPRITE_REGIONS, buildRegionSprites } from './spriteIndex.js'
 
 // Pure name-derivation logic, PLUS the glob-backed exports: vitest.config.js
 // registers @vitejs/plugin-react and runs tests through the Vite transform
@@ -84,12 +84,37 @@ test('allSprites flattens every region in SPRITE_REGIONS order and matches the t
 })
 
 test('every sprite id is unique across the whole index', () => {
-  // ownedSprites is keyed by these ids and persists forever, so a collision
-  // would put two different sprites behind one purchase key — buy one, and
-  // which art you get depends on glob order. buildRegionSprites drops
-  // duplicates with a console.warn rather than shipping that ambiguity; this
-  // pins the invariant so a future asset drop can't reintroduce it silently.
   const all = allSprites()
   const ids = new Set(all.map(s => s.id))
   expect(ids.size).toBe(all.length)
+})
+
+test('two files that normalize to the same display name yield ONE sprite, not two', () => {
+  // The real guard test. ownedSprites is keyed by sprite id forever, so two
+  // files collapsing to one id would put two different arts behind a single
+  // purchase key — which one you got would depend on glob order. Injected as
+  // a synthetic file map because the shipped asset set has no collision, so
+  // asserting over allSprites() would pass with or without the guard.
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const sprites = buildRegionSprites('Kanto', {
+    '/x/Lance.webp': '/assets/lance-webp.webp',
+    '/x/Lance.png': '/assets/lance-png.png',
+  })
+  expect(sprites).toHaveLength(1)
+  expect(sprites[0].url).toBe('/assets/lance-webp.webp') // first one wins
+  expect(warn).toHaveBeenCalledOnce()
+  expect(warn.mock.calls[0][0]).toContain('Kanto/Lance')
+  expect(warn.mock.calls[0][0]).toContain('Lance.png')   // names the offender
+  warn.mockRestore()
+})
+
+test('the same display name in DIFFERENT regions is not a collision', () => {
+  // Ids embed the region, so a Youngster in Kanto and a Youngster in Johto are
+  // distinct purchases. A guard scoped globally instead of per-region would
+  // wrongly drop the second.
+  const kanto = buildRegionSprites('Kanto', { '/x/Youngster.webp': '/a.webp' })
+  const johto = buildRegionSprites('Johto', { '/x/Spr_HGSS_Youngster.png': '/b.png' })
+  expect(kanto).toHaveLength(1)
+  expect(johto).toHaveLength(1)
+  expect(kanto[0].id).not.toBe(johto[0].id)
 })

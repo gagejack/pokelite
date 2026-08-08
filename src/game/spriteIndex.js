@@ -91,8 +91,10 @@ function makeSpriteId(region, displayName) {
   return `${region}/${displayName}`
 }
 
-function buildRegionSprites(region) {
-  const files = REGION_GLOBS[region]
+// `files` is injectable (a path -> url map, the shape import.meta.glob returns)
+// purely so the collision guard below can be tested against a synthetic map.
+// Production callers omit it and get the real glob for the region.
+export function buildRegionSprites(region, files = REGION_GLOBS[region]) {
   const sprites = []
   // Ids are region + display name, and a player's ownedSprites is keyed by
   // them forever. Two files in one region that normalize to the same display
