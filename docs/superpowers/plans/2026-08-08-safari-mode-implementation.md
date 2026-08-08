@@ -401,11 +401,26 @@ test('leaves every other node type untouched', () => {
 })
 
 test('de-duplicates species within a row when the pool allows it', () => {
-  // Three bakeable nodes against a three-species pool — all distinct.
+  // Three bakeable nodes against a three-species pool — all distinct. This is
+  // deterministic, not probabilistic: availableIn removes used species from
+  // the pool before each draw, so the third node can only draw the one that
+  // is left. A retry-based de-dup would make this test flaky.
   const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
   bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
   const ids = rows[0].map(n => n.species.id)
   expect(new Set(ids).size).toBe(3)
+})
+
+test('grass de-dup holds across many generations, not just on a lucky seed', () => {
+  // Guards the property the previous test asserts once. A draw-and-retry
+  // de-dup passes that test most runs and fails a few percent of the time;
+  // this loop makes such an implementation fail reliably.
+  for (let i = 0; i < 200; i++) {
+    const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
+    bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+    const ids = rows[0].map(n => n.species.id)
+    expect(new Set(ids).size).toBe(3)
+  }
 })
 
 test('allows duplicates when a row has more nodes than the pool has species', () => {
@@ -483,21 +498,31 @@ import { mapLevelRange, pickLevel } from './battleTeams.js'
 import { rollStageForLevelSync } from './pokemon.js'
 import { rng } from './rng.js'
 
-// How many times to redraw when a row already used a species. Best-effort: a
-// row with more bakeable nodes than the pool has species MUST still generate,
-// so after this many attempts the duplicate is accepted.
-const DEDUP_ATTEMPTS = 8
-
 // Grass levels sit this far below the map's trainer band — mirrors the Classic
 // grass draw in NodeMap.fetchEnemyTeam.
 const GRASS_LEVEL_OFFSET = 3
 
+// Exclude species a row has already used, so de-dup is a filtered draw rather
+// than draw-and-retry. Retrying would be probabilistic: three nodes against a
+// three-species pool leaves the last node a (2/3)^N chance of never finding
+// the free species, which makes map generation — and any test of it — flaky.
+// Filtering is deterministic and costs exactly one draw per node, so it also
+// keeps the rng() stream stable.
+//
+// Returns the full pool when filtering would empty it: a row with more nodes
+// than the pool has species MUST still generate, duplicates and all.
+function availableIn(pool, usedInRow) {
+  const free = pool.filter(entry => !usedInRow.has(entry.id))
+  return free.length > 0 ? free : pool
+}
+
 // Draw one grass species. Mirrors the Classic grass path exactly: uniform pick
 // over the catch pool (grass ignores rarity — it is a forced fight, not a
 // reward) at the trainer band minus GRASS_LEVEL_OFFSET.
-function bakeGrass(config, mapIndex, positionWeight) {
+function bakeGrass(config, mapIndex, positionWeight, usedInRow) {
   const pool = config.catchPools?.[mapIndex] ?? []
-  const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+  const drawable = availableIn(pool, usedInRow)
+  const id = drawable.length > 0 ? pick(drawable).id : (config.fallbackSpeciesId ?? 504)
   const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
   const band = [
     Math.max(1, min - GRASS_LEVEL_OFFSET),
@@ -511,13 +536,15 @@ function bakeGrass(config, mapIndex, positionWeight) {
 // multi-Pokémon offer on any path, which is why Collector's Eye is inert here.
 // Levels come from the region's own catch bands so difficulty tuning cannot
 // move what the player catches.
-function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId) {
+function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow) {
   const pool = config.catchPools?.[mapIndex] ?? []
   if (pool.length === 0) return null
 
   const bands = config.catchLevelRanges ?? config.mapLevelRanges
   const level = pickLevel(mapLevelRange(bands, mapIndex), positionWeight)
-  const [chosen] = config.pickCatchOffer(pool, 1, config.catchTierBudget)
+  // Draw from the row's unused species so rarity weighting still applies,
+  // just over a smaller pool — see availableIn.
+  const [chosen] = config.pickCatchOffer(availableIn(pool, usedInRow), 1, config.catchTierBudget)
   if (!chosen) return null
 
   // Same stage roll Classic applies to catch offers, in its sync form.
@@ -549,22 +576,21 @@ export function bakeSafariSpecies(rows, { config, mapIndex, maxSpeciesId = Infin
     row.forEach(node => {
       const positionWeight = totalNodes > 0 ? node.id / totalNodes : 0.5
 
+      // One draw per node — availableIn has already removed this row's used
+      // species from the pool, so there is nothing to retry.
       let species = null
-      for (let attempt = 0; attempt < DEDUP_ATTEMPTS; attempt++) {
-        if (node.type === NODE_TYPES.GRASS) {
-          species = bakeGrass(config, mapIndex, positionWeight)
-        } else if (node.type === NODE_TYPES.POKEBALL) {
-          species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId)
-        } else if (node.type === NODE_TYPES.MASTER_BALL) {
-          species = bakeMasterBall(config, mapIndex)
-        } else {
-          return // not a bakeable node type
-        }
-
-        // An empty pool yields null — nothing to bake, nothing to retry.
-        if (!species) return
-        if (!usedInRow.has(species.id)) break
+      if (node.type === NODE_TYPES.GRASS) {
+        species = bakeGrass(config, mapIndex, positionWeight, usedInRow)
+      } else if (node.type === NODE_TYPES.POKEBALL) {
+        species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow)
+      } else if (node.type === NODE_TYPES.MASTER_BALL) {
+        species = bakeMasterBall(config, mapIndex)
+      } else {
+        return // not a bakeable node type
       }
+
+      // An empty pool yields null — nothing to bake.
+      if (!species) return
 
       usedInRow.add(species.id)
       node.species = species

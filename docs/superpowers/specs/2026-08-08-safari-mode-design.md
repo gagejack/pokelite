@@ -191,9 +191,19 @@ produces a multi-species offer.
 ### Row de-duplication
 
 Grass and Pokéball both draw from `catchPools[mapIndex]`, so a row could show
-the same species twice. Generation tracks species ids already used in the
-current row and redraws on collision, capped at a few attempts, then accepts the
-duplicate. Best-effort, scoped to the row, never blocks generation.
+the same species twice. Generation tracks the species a row has already used
+and removes them from the pool before each draw, falling back to the full pool
+when filtering would empty it. Deterministic, scoped to the row, one draw per
+node, never blocks generation.
+
+Not retry-based on purpose: redrawing until the id is unused is probabilistic,
+and with three nodes against a three-species pool the last node fails to find
+the free species a few percent of the time — flaky maps, and a flaky test.
+
+One accepted gap: a Pokéball's drawn species passes through the evolution-stage
+roll, which may produce an id the row already used. De-dup applies to the drawn
+species, not the post-evolution id, so a row can occasionally still show a
+repeat. Rare, cosmetic, and closing it would mean re-drawing after the roll.
 
 ### Persistence
 
