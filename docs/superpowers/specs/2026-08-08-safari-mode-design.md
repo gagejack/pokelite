@@ -124,9 +124,11 @@ further signature churn:
 buildRows(trainerPool, bossTrainer, mapIndex, { mode, config, maxSpeciesId })
 ```
 
-All four region files (`kanto`, `hoenn`, `sinnoh`, `unova`) thread `mode` and
-`config` through their `generate()`. Mechanical, but it is four files plus
-`nodeMap.js`.
+Only **Kanto and Unova** thread `mode` and `config` through their `generate()`.
+Hoenn and Sinnoh ship `maps: []` and have no `generate()` to change — they are
+registered but not playable. Safari's region list therefore uses
+`regionNames({ playableOnly: true })`, exactly as the rest of the game does, so
+an unplayable region can never be unlocked or entered.
 
 ## Data model
 
