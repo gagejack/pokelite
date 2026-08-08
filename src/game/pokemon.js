@@ -301,41 +301,6 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
   }
 }
 
-// Backfill `_starterSpeciesId`/`_multipliers` onto a roster restored from a
-// run saved BEFORE those fields existed. Without this, a legacy starter's
-// levelUp (see below) falls back to a flat 1x multiplier forever — not just
-// "no vitamin boost," but a visible mid-run SHRINK the moment it next levels
-// up, since the plain 1.3x starterBoost baked into its saved stats silently
-// disappears. A save made after this change already carries both fields on
-// its starter entry and passes through this function unchanged (the `!=
-// null` guard below is a no-op for it).
-//
-// Identity: matches ONLY `entry.pokeId === starterId` (the un-evolved case).
-// A starter that had already evolved before the legacy save has no reliable
-// synchronous signal here — resolving its evolution line requires the same
-// async PokéAPI/local-data fetch `resolveEvolutionLine`/`allSpeciesInLine`
-// use elsewhere, which this restore path can't await, and roster POSITION
-// isn't trustworthy either (EliteFour/NodeMap both let the player reorder
-// the roster, so index 0 is not reliably "the starter" by the time a run is
-// saved). Rather than guess and risk tagging a caught Pokémon of some other
-// species as the starter, an already-evolved legacy starter is left
-// unboosted, exactly as it already plays today (this is not a regression
-// for that case — it's the pre-existing "boost dies on first level-up"
-// behavior, just permanently instead of transiently). Every OTHER roster
-// entry is returned byte-identical.
-export function backfillStarterFields(roster, starterId) {
-  if (!Array.isArray(roster) || starterId == null) return roster ?? []
-  return roster.map(entry => {
-    if (entry?._starterSpeciesId != null) return entry
-    if (entry?.pokeId !== starterId) return entry
-    return {
-      ...entry,
-      _starterSpeciesId: starterId,
-      _multipliers: getVitaminMultipliers(starterId),
-    }
-  })
-}
-
 // Resolve a Pokémon's slimmed evolution-chain root — from the local bundled
 // data when available, else from live PokéAPI (raw chain slimmed on ingest).
 // Cached under every species id in the line so any member resolves without
