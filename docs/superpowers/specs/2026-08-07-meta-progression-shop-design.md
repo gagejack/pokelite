@@ -186,6 +186,23 @@ snapshot machinery already exists; this reuses it at map-start instead of on
 exit. Consumed on use; one use per run even if owned (the item is permanent,
 the use is per-run).
 
+**The loss and the replay both pay out — deliberately.** The loss banks the
+moment it happens, and the replay's own outcome banks separately, so a player
+who dies on map 6 and then wins collects `$90 + $200 + 1 key` where a clean win
+collects `$200 + 1 key`. Dying first is worth $90 more than never dying.
+
+This is a known consequence, accepted: Run It Back costs 4 keys — four
+wins — so a player who has one has already earned it, and letting it partly pay
+for itself is a reasonable return on the most expensive tier of the shop. The
+alternative (voiding the loss payout when the offer is taken) makes the item
+strictly a rescue with no upside, and the deliberate-death exploit it prevents
+costs a whole map's progress to execute for less than half a win.
+
+Do not "fix" this without deciding to change the balance — the payout path is
+structured this way on purpose. `recordRunEnd`'s `runEnded` guard is what stops
+a single outcome paying twice; `runItBack()` re-arms that guard for the
+replay's outcome rather than bypassing it.
+
 **Déjà Vu (6 keys).** StarterSelect gains a section offering any starter id in
 the profile's `usedStarters` list, regardless of region. Starters enter that
 list on run start.
