@@ -17,8 +17,11 @@ import { supabase } from '../lib/supabase'
 export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile }) {
   const { dark } = useTheme()
   // profile is null for one frame while App.jsx's initial load is in flight —
-  // fall back to "only the starting region," same fallback RegionSelect uses.
-  const unlockedRegions = profile?.unlockedRegions ?? ['Unova']
+  // fall back to "nothing unlocked yet", same fallback RegionSelect uses.
+  // Not a hardcoded region: a new player's first pick is free whichever region
+  // it is, so naming one here would flash it as owned and the rest as costing
+  // a key, which is the opposite of what they're about to be offered.
+  const unlockedRegions = profile?.unlockedRegions ?? []
   const keys = profile?.keys ?? 0
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)

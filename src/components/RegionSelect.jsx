@@ -135,10 +135,12 @@ export default function RegionSelect({ onBack, onSelectRegion, pokedexOpen, setP
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
   // profile is null for one frame while App.jsx's initial load is in flight
-  // (see its useState comment) — fall back to "only the starting region"
-  // rather than either crashing on unlockedRegions.includes or flashing
-  // every region open for a frame.
-  const unlockedRegions = profile?.unlockedRegions ?? ['Unova']
+  // (see its useState comment) — fall back to "nothing unlocked yet" rather
+  // than either crashing on unlockedRegions.includes or flashing every region
+  // open for a frame. Not a hardcoded region: a new player's first pick is
+  // free whichever region it is, so naming one here would flash it as owned
+  // and the rest as costing a key, which is the opposite of the offer.
+  const unlockedRegions = profile?.unlockedRegions ?? []
   const keys = profile?.keys ?? 0
 
   const borderStyle = cards ? '3px solid #000000' : '2px solid #2e2e2e'
