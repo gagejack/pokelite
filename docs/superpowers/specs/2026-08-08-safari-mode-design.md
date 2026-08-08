@@ -190,8 +190,14 @@ wall, reachable only by winning a Classic run.
 Safari run rebuilds Safari; a legacy run with no `mode` reads as Classic.
 
 **Seeds.** Safari's generation-time draws change `rng()` call ordering, so the
-same seed produces different maps in each mode. Seed codes carry the mode, and a
-cross-mode seed is rejected rather than silently generating a different map.
+same seed produces different maps in each mode. Seed codes are **left
+unchanged** — no mode marker, no cross-mode rejection. Existing codes stay
+valid, and a code pasted into the wrong mode generates a different map rather
+than erroring. Accepted: seeds already only reproduce within an identical game
+version, so a code that does not match its origin is a failure players can
+already encounter. Adding a mode marker would break every code in circulation
+for a soft failure.
+
 **Daily challenge stays Classic-only** — it derives region and seed from the
 date and assumes one map per date.
 
@@ -208,9 +214,11 @@ The node payout pays either way, matching the existing floor-payout rule.
 
 **Meta upgrades.** All apply. Two behave differently by construction:
 
-- **Collector's Eye** (3→4 offer) has no effect in Safari — there is no offer. A
-  player can buy it, see no change, and reasonably call that a bug. Grey it in
-  the shop with a "Classic only" note. A label, not a mechanic.
+- **Collector's Eye** (3→4 offer) has no effect in Safari — there is no offer.
+  Disabled under the hood: `getActiveExtras().catchOfferCount` is ignored on the
+  Safari path, which bakes exactly one species. No shop change, no "Classic
+  only" label — the upgrade stays fully purchasable and simply does nothing
+  here.
 - **Run It Back** replays a map with full knowledge of every species on it.
   Shipping as-is; tune later if degenerate.
 
@@ -233,7 +241,8 @@ Unit tests for pure functions, following the existing `.test.js` convention:
   most
 - Profile: first Safari region free; subsequent regions spend a shared key;
   Safari unlocks do not leak into Classic
-- Seed codes carry the mode; cross-mode seeds are rejected
+- Seed code format is unchanged — an existing code still parses and still
+  produces its original Classic map
 
 Manual verification: red outline legible on every region background in both
 themes; silhouette reads as a Master Ball; sprite scale sits right against the
