@@ -380,7 +380,13 @@ export async function allSpeciesInLine(pokeId) {
 // cache).
 function stagesFromRoot(root, id, level, maxSpeciesId) {
   let effectiveId = id
-  if (root) {
+  // Guard on `level`, NOT on `root` — both callers have already checked root,
+  // so `if (root)` would be vacuously true and would run the downgrade even
+  // when no level was supplied. downgradeTarget compares `minLevel <= level`,
+  // which is false for every stage when level is undefined, collapsing the
+  // result to the chain root and silently changing what resolveEvolutionLine
+  // returns for its level-less callers.
+  if (level != null) {
     const path = levelUpPathTo(root, id)
     if (path) effectiveId = downgradeTarget(path, level)
   }
