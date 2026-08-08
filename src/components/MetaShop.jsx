@@ -385,7 +385,18 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
     runPurchase(result.profile)
   }
 
+  // Sprites aren't catalog rows, so applyPurchase can't route them and this
+  // reimplements its checks. That means it also has to reimplement the guard
+  // applyPurchase gives every other purchase for free: refusing to charge for
+  // something already owned. Two layers upstream should make this unreachable
+  // (dailyOffers excludes owned ids from the roll, and the card renders EQUIP
+  // instead of a price when owned) — but this is the money path, and the cost
+  // of being wrong is charging a player twice for one sprite.
   function handleBuySprite(sprite) {
+    if ((profile?.ownedSprites ?? []).includes(sprite.id)) {
+      setNotice('Already owned')
+      return
+    }
     const price = sprite.price ?? 0
     if ((profile?.metacash ?? 0) < price) {
       setNotice('Not enough metacash')
