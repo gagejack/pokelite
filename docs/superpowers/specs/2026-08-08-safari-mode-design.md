@@ -15,12 +15,15 @@ Two mechanical changes follow from that:
 
 - A Pokéball node holds **one** Pokémon, taken by clicking it — not a
   three-Pokémon offer. Choice moves from the modal onto the map: you pick which
-  node to walk to, having seen every species on the row.
+  node to walk to, having seen every species on the row. This holds on every
+  path, including a Mystery node that resolves into a Pokéball.
 - Region unlocks are tracked separately, and the first Safari region is free and
   unforced — no Kanto requirement.
 
 Everything else — battles, items, TMs, Pokécenters, Pokémarts, rivals, bosses,
-the Elite Four, payouts, meta upgrades — is unchanged.
+the Elite Four, payouts — is unchanged. Meta upgrades all remain active, with
+one consequence of the single-Pokémon rule: Collector's Eye has nothing to
+enlarge and is inert in Safari.
 
 ## Naming
 
@@ -36,10 +39,11 @@ will carry the wrong expectation in.
 Safari is a mode flag threaded through map generation. One map generator, one
 battle system, one profile. Three seams:
 
-**Generation** — `buildRows(trainerPool, bossTrainer, mapIndex, { mode })`. In
-Safari, grass / pokeball / master_ball nodes get a `species` field baked on at
-build time, drawn from the same pools the click path uses today. Every other
-node type is untouched and carries no `species`.
+**Generation** — a bake pass runs during `generate()`. In Safari, grass /
+pokeball / master_ball nodes get a `species` field baked on at build time, drawn
+from the same pools the click path uses today. Every other node type is
+untouched and carries no `species`. See *Generation mechanics* for the
+signature, the bake point, and the synchronous stage roll.
 
 **Render** — `getIcon()` in `NodeMap.jsx` checks `node.species` first. Present →
 render that Pokémon's sprite. Absent → today's icon lookup, unchanged. The
@@ -66,6 +70,63 @@ drift. The mode changes what a node *knows*, not how maps are shaped.
 be reproducible outside the click path, which the project's `rng()` ordering
 rule forbids. It is also the option that quietly produces a sprite that does not
 match the fight.
+
+## Generation mechanics
+
+Three details that determine whether the mode is buildable at all. Each is a
+constraint discovered in the existing code, not a preference.
+
+### The bake runs after region post-processing
+
+Region `generate()` functions overwrite nodes *after* `buildRows` returns —
+Kanto plants its rival on row 4, and other regions do their own fixups. Baking
+inside `buildRows` would draw species for nodes that are then overwritten,
+wasting `rng()` draws and making the call order depend on each region's
+post-processing.
+
+So the bake is a **separate pass over the finished rows**, run at the end of
+`generate()` once every fixup has landed. Uniform `rng()` ordering across
+regions, no wasted draws, and the bake sees the final node set.
+
+### The stage roll must be synchronous
+
+`rollStageForLevel()` is `async` — it awaits `resolveEvolutionLine()`, which can
+hit the network. But `generate()` is synchronous and is called inside the
+synchronous `withRng()` for seeded runs, which cannot await.
+
+Resolution: a synchronous `rollStageForLevelSync(id, level, maxSpeciesId)` that
+reads the already-warmed `chainCache` and returns the base `id` unchanged on a
+miss — the same fallback the async version uses on failure. This works because
+`prewarmCache` already warms the full evolution line of every catch-pool species
+via `allSpeciesInLine`, populating `chainCache` and `evoCache` as a documented
+side effect. The data the bake needs is in memory before a map renders.
+
+Rejected alternatives: making `generate()` async ripples through `withRng`'s
+synchronous contract, the `useMemo`, the resume path, and the daily path — a
+large blast radius for data that is already local. Baking only the base id and
+rolling the stage at click time breaks the mode's core promise, since the
+previewed sprite would not be the species fought.
+
+**Ordering requirement:** prewarm must finish before Safari generation runs.
+Today generation happens in a `useMemo` on mount while prewarm is async. If a
+bake races ahead of prewarm, every stage roll misses and silently bakes base
+forms — no crash, just a quietly wrong map. Safari generation is gated on
+prewarm completion.
+
+### Signature
+
+Baking needs pool access that `buildRows` does not have today (it receives
+`trainerPool`, `bossTrainer`, `mapIndex`). The whole region config is passed
+rather than the seven individual fields the bake reads, so future bakes need no
+further signature churn:
+
+```js
+buildRows(trainerPool, bossTrainer, mapIndex, { mode, config, maxSpeciesId })
+```
+
+All four region files (`kanto`, `hoenn`, `sinnoh`, `unova`) thread `mode` and
+`config` through their `generate()`. Mechanical, but it is four files plus
+`nodeMap.js`.
 
 ## Data model
 
@@ -103,10 +164,27 @@ clears the node on click if it does.
 ### Mystery nodes
 
 Bake nothing. A "?" resolves at click time via `resolveMysteryNode()`;
-pre-resolving it would defeat the node. If it resolves into grass / pokeball /
-master_ball, that instance draws at click time exactly as Classic does. Safari
-maps therefore keep a small pocket of genuine unknown, which is correct — the
-mode promises the map is honest, not that the game is solved.
+pre-resolving it would defeat the node. Safari maps therefore keep a small
+pocket of genuine unknown, which is correct — the mode promises the map is
+honest, not that the game is solved.
+
+What a resolved Mystery does depends on the type it rolls:
+
+- **Grass, Item, TM, Master Ball** — behave exactly as in Classic. Nothing about
+  these conflicts with Safari.
+- **Pokéball** — draws **one** species at click time, using the same rules a
+  baked node uses, and the player takes it. It does **not** open the Classic
+  three-Pokémon offer. A mode that abolished the offer everywhere else must not
+  reintroduce it here.
+
+**The Mystery reroll bonus still applies**, rerolling that single species.
+`MYSTERY_REROLLS` is the Mystery node's entire bonus, so dropping it would make
+a Mystery-resolved Pokéball strictly worse than a plain one. `PokeballNode`'s
+reroll path is already wired through `node.fromMystery`, so this is a count
+change, not new plumbing.
+
+This keeps Collector's Eye consistently inert in Safari: no path in the mode
+produces a multi-species offer.
 
 ### Row de-duplication
 
@@ -117,16 +195,20 @@ duplicate. Best-effort, scoped to the row, never blocks generation.
 
 ### Persistence
 
-`species` is plain JSON on the node and serializes with the run for free. No
-migration: Classic runs have no `species` and render exactly as before.
+`species` is plain JSON on the node and serializes with the run for free.
+Classic runs have no `species` and render exactly as before.
+
+Note this applies to run *nodes* only. The profile's new fields do need merge
+work — see *Guest/account merge*.
 
 ## Rendering
 
-**Sprite source.** `prewarmCache` already populates a base cache before a map
-renders, which `cachedType` / `cachedName` read for tooltips. A `cachedSprite(id)`
-alongside them keeps the render path synchronous — no loading states on the map.
-A cache miss falls back to the Classic icon rather than rendering a hole; the
-node stays playable, only the preview is lost.
+**Sprite source.** `prewarmCache` already populates `baseCache` before a map
+renders, which `cachedType` / `cachedName` read for tooltips. `baseCache`
+entries already carry a `sprite` URL, so `cachedSprite(id)` is a one-line reader
+in the same style — no cache-shape change. The render path stays synchronous,
+with no loading states on the map. A cache miss falls back to the Classic icon
+rather than rendering a hole; the node stays playable, only the preview is lost.
 
 **Red outline (grass).** Four stacked `drop-shadow` filters at ~1.5px, offset
 N/S/E/W, red. Traces the transparent PNG's actual silhouette, holds at small
@@ -169,12 +251,23 @@ different data source. Two behavioral differences:
 - Reads `profile.safariUnlockedRegions`.
 
 **Profile shape.** Two new fields, both defaulting empty on existing profiles,
-so no migration:
+so no data migration is required:
 
 ```js
 safariUnlockedRegions: [],   // region names unlocked in Safari
 safariFirstRegionClaimed: false,
 ```
+
+**Guest/account merge.** `migrateGuestProfile` in `metaSave.js` builds its
+result from an **explicit field list**, so any field it does not name is
+silently dropped when a guest profile merges into an account. Both new fields
+need rules there:
+
+- `safariUnlockedRegions` → `union(account, local)`, same as `unlockedRegions`
+- `safariFirstRegionClaimed` → logical OR
+
+The OR matters: if either side has claimed the free region, the merged profile
+must stay claimed, or the merge hands out a second free region.
 
 **Unlock rules.** First Safari region: free, sets `safariFirstRegionClaimed`.
 Every region after: 1 key from the **shared** `profile.keys` wallet, via the
@@ -214,13 +307,16 @@ The node payout pays either way, matching the existing floor-payout rule.
 
 **Meta upgrades.** All apply. Two behave differently by construction:
 
-- **Collector's Eye** (3→4 offer) has no effect in Safari — there is no offer.
-  Disabled under the hood: `getActiveExtras().catchOfferCount` is ignored on the
-  Safari path, which bakes exactly one species. No shop change, no "Classic
-  only" label — the upgrade stays fully purchasable and simply does nothing
-  here.
+- **Collector's Eye** (3→4 offer) has no effect in Safari — there is no offer on
+  any path, baked or Mystery-resolved. Disabled under the hood:
+  `getActiveExtras().catchOfferCount` is ignored in Safari, which always draws
+  exactly one species. No shop change, no "Classic only" label — the upgrade
+  stays fully purchasable and simply does nothing here.
 - **Run It Back** replays a map with full knowledge of every species on it.
-  Shipping as-is; tune later if degenerate.
+  Verified, not assumed: `buildRunSnapshot` stores `mapData` in the snapshot,
+  and NodeMap reuses `initialMapData` when its `mapIndex` matches rather than
+  regenerating. The replayed map is byte-identical, baked species included — no
+  redraw, no `rng()` shift. Shipping as-is; tune later if degenerate.
 
 **Empty catch pool.** Grass falls back to `config.fallbackSpeciesId` as today.
 Pokéball bakes nothing and the node clears on click, matching the existing
@@ -239,8 +335,14 @@ Unit tests for pure functions, following the existing `.test.js` convention:
 - Row de-dup avoids repeats when the pool allows and permits them when it cannot
 - **Classic generation is unchanged from today** — the regression that matters
   most
+- `rollStageForLevelSync` matches its async counterpart's result for a warmed
+  line, and returns the base id unchanged on a cache miss
+- The bake runs after region post-processing: a node overwritten by a region
+  fixup (Kanto's rival) carries no stale `species`
 - Profile: first Safari region free; subsequent regions spend a shared key;
   Safari unlocks do not leak into Classic
+- `migrateGuestProfile` unions `safariUnlockedRegions` and ORs
+  `safariFirstRegionClaimed` — a merge never grants a second free region
 - Seed code format is unchanged — an existing code still parses and still
   produces its original Classic map
 
