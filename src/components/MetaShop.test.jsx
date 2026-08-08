@@ -106,3 +106,108 @@ test('switching to Cosmetics shows region sub-tabs, and a locked region reads "U
   const lockNotices = screen.getAllByText((_, el) => el.textContent === 'Unlock Hoenn')
   expect(lockNotices.length).toBeGreaterThan(0)
 })
+
+test('a locked-region sprite card is inert: clicking it never calls onPurchase', () => {
+  let called = false
+  show({ onPurchase: () => { called = true; return {} } })
+  fireEvent.click(screen.getByText('COSMETICS'))
+  fireEvent.click(screen.getByText('HOENN'))
+
+  const lockNotice = screen.getAllByText((_, el) => el.textContent === 'Unlock Hoenn')[0]
+  // Click the whole offer card (the locked overlay's ancestor), not just the
+  // text — the overlay has pointer-events: none specifically so clicks pass
+  // through to the card, and the card's onClick no-ops when unlocked=false.
+  const card = lockNotice.closest('div[style*="position: relative"]')
+  expect(card).toBeTruthy()
+  fireEvent.click(card)
+
+  expect(called).toBe(false)
+})
+
+test('a starter at the 3-vitamin cap renders a disabled button in the picker', () => {
+  const profile = { ...createProfile(), metacash: 1000, vitamins: { 1: { hp: 3 } } }
+  show({ profile })
+  fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
+
+  const bulbasaurCell = screen.getByText('Bulbasaur').closest('button')
+  expect(bulbasaurCell.disabled).toBe(true)
+})
+
+test('an owned sprite can be equipped from the YOUR SPRITES section (end to end)', () => {
+  let captured = null
+  const profile = {
+    ...createProfile(),
+    metacash: 1000,
+    ownedSprites: ['Kanto/Ace Trainer 1'],
+    equippedSprite: null,
+  }
+  show({ profile, onPurchase: p => { captured = p; return {} } })
+  fireEvent.click(screen.getByText('COSMETICS'))
+
+  expect(screen.getByText('YOUR SPRITES')).toBeTruthy()
+  const equipButtons = screen.getAllByText('EQUIP')
+  fireEvent.click(equipButtons[equipButtons.length - 1].closest('div[role="button"]'))
+
+  expect(captured).not.toBeNull()
+  expect(captured.equippedSprite).toBe('Kanto/Ace Trainer 1')
+})
+
+test('an equipped owned sprite can be un-equipped back to the default trainer sprite', () => {
+  let captured = null
+  const profile = {
+    ...createProfile(),
+    metacash: 1000,
+    ownedSprites: ['Kanto/Ace Trainer 1'],
+    equippedSprite: 'Kanto/Ace Trainer 1',
+  }
+  show({ profile, onPurchase: p => { captured = p; return {} } })
+  fireEvent.click(screen.getByText('COSMETICS'))
+  fireEvent.click(screen.getByText('Reset to default'))
+
+  expect(captured).not.toBeNull()
+  expect(captured.equippedSprite).toBeNull()
+})
+
+test('a rejected onPurchase (e.g. a save failure) surfaces a notice instead of an unhandled rejection', async () => {
+  const profile = { ...createProfile(), metacash: 1000 }
+  show({ profile, onPurchase: () => Promise.reject(new Error('network down')) })
+
+  const row = screen.getByText('Side Hustle').closest('div').parentElement
+  fireEvent.click(row.querySelector('button'))
+
+  expect(await screen.findByText('Could not save — try again')).toBeTruthy()
+})
+
+test('a funds race during confirm keeps the picker open and shows the reason inline, instead of closing silently', () => {
+  // Exactly enough for one HP Up and nothing else, so the row that opens the
+  // picker reads 'affordable'. starterPickerRows' atCap check (the only thing
+  // that disables a button in the picker grid) never looks at metacash, so
+  // Bulbasaur stays clickable even after the rerender below drains the
+  // balance to 0 — a realistic race with another purchase landing while the
+  // picker is open. applyPurchase re-checks affordability at confirm time
+  // regardless of what the (now stale) picker grid shows.
+  const profile = { ...createProfile(), metacash: 500 }
+  const { rerender } = render(
+    <ThemeProvider>
+      <MetaShop profile={profile} onClose={() => {}} onPurchase={() => {}} />
+    </ThemeProvider>,
+  )
+  fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
+  expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
+
+  const racedProfile = { ...profile, metacash: 0 }
+  rerender(
+    <ThemeProvider>
+      <MetaShop profile={racedProfile} onClose={() => {}} onPurchase={() => {}} />
+    </ThemeProvider>,
+  )
+
+  const bulbasaurButton = screen.getByText('Bulbasaur').closest('button')
+  expect(bulbasaurButton.disabled).toBe(false)
+  fireEvent.click(bulbasaurButton)
+
+  // Picker stays open (title still present) and shows the rejection reason,
+  // rather than vanishing with no explanation.
+  expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
+  expect(screen.getByText('Not enough metacash')).toBeTruthy()
+})

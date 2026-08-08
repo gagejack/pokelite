@@ -92,8 +92,11 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
 // The starter picker modal, opened when Buy is clicked on a vitamin row.
 // Grid of the player's unlocked starters; starters at the 3-vitamin cap are
 // dimmed and unselectable (spec §6c). Confirming applies the purchase and
-// closes the picker — the only two-step purchase in the shop.
-function StarterPicker({ item, profile, dark, onConfirm, onCancel }) {
+// closes the picker on success — the only two-step purchase in the shop. On
+// failure (an applyPurchase rejection reached from this flow — at-cap
+// starters are already disabled, so this is defence-in-depth, not the normal
+// path) the picker stays open and shows `error` instead of silently closing.
+function StarterPicker({ item, profile, dark, error, onConfirm, onCancel }) {
   const rows = starterPickerRows(profile)
   const textColor = dark ? '#DBDBDB' : '#333333'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -125,6 +128,11 @@ function StarterPicker({ item, profile, dark, onConfirm, onCancel }) {
         {rows.length === 0 && (
           <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: muted(dark) }}>
             No starters unlocked yet.
+          </span>
+        )}
+        {error && (
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#f87171' }}>
+            {error}
           </span>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -222,6 +230,20 @@ function CosmeticsRegionPanel({ region, profile, dark, overrides, onBuy, onEquip
     return () => clearInterval(id)
   }, [])
 
+  // Owned sprites for this region — a SEPARATE surface from the daily
+  // rotation above, not a filter over it. dailyOffers() excludes owned ids by
+  // design (spec §5: the rotation is a buy list), so an owned sprite can only
+  // ever be re-equipped from here. Per-region rather than all-regions-at-once
+  // because sprite ids are already region-namespaced ("Kanto/Lance 4") and the
+  // tab itself is region-scoped — no new navigation, and a 1-3-sprite
+  // collection (the common case for a long time) reads as a short strip
+  // rather than an awkward near-empty full-collection view.
+  const ownedInRegion = useMemo(
+    () => spriteList.filter(sprite => owned.has(sprite.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [spriteList, profile?.ownedSprites]
+  )
+
   const textColor = dark ? '#DBDBDB' : '#333333'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -295,6 +317,67 @@ function CosmeticsRegionPanel({ region, profile, dark, overrides, onBuy, onEquip
           )
         })}
       </div>
+
+      {/* Owned sprites for this region — always visible, independent of the
+          daily rotation above. This is the only way to re-equip a sprite once
+          it's no longer one of today's 2 offers (which is true for EVERY
+          owned sprite, by design — see the comment on `ownedInRegion`). */}
+      {unlocked && ownedInRegion.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: muted(dark) }}>
+            YOUR SPRITES
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            {ownedInRegion.map(sprite => {
+              const isEquipped = profile?.equippedSprite === sprite.id
+              return (
+                <div
+                  key={sprite.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (!isEquipped) onEquip(sprite.id) }}
+                  onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !isEquipped) onEquip(sprite.id) }}
+                  style={{
+                    backgroundColor: cellBg, border: borderStyle,
+                    padding: '8px', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: '4px',
+                    cursor: isEquipped ? 'default' : 'pointer',
+                  }}
+                >
+                  <img
+                    src={sprite.url}
+                    alt={sprite.name}
+                    style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+                  />
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: textColor, textAlign: 'center' }}>
+                    {sprite.name}
+                  </span>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: isEquipped ? muted(dark) : cash(dark) }}>
+                    {isEquipped ? 'EQUIPPED' : 'EQUIP'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          {/* Un-equip back to the default trainer sprite — only shown once
+              something in THIS region is actually equipped, so it doesn't
+              clutter every region's panel with a button that does nothing
+              differently from "just don't equip anything". */}
+          {ownedInRegion.some(sprite => sprite.id === profile?.equippedSprite) && (
+            <button
+              type="button"
+              onClick={() => onEquip(null)}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+                backgroundColor: cellBg, border: borderStyle, padding: '6px 10px',
+                alignSelf: 'flex-start', cursor: 'pointer',
+              }}
+            >
+              Reset to default
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -340,6 +423,7 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
   const { dark } = useTheme()
   const [tab, setTab] = useState('upgrades')
   const [pendingVitamin, setPendingVitamin] = useState(null) // item awaiting a starter choice
+  const [vitaminError, setVitaminError] = useState(null) // inline error inside the open picker
   const [notice, setNotice] = useState(null)
 
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -371,6 +455,16 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
     try {
       const outcome = await onPurchase(nextProfile)
       if (outcome?.notice) setNotice(outcome.notice)
+    } catch {
+      // onPurchase (App.jsx's handleShopProfileChange) awaits saveProfile,
+      // which can reject rather than resolve false — a thrown error here, not
+      // just an { ok: false } outcome. Without this catch the optimistic
+      // profile the player already sees would sit there with zero indication
+      // the save failed, and the rejection would surface as an unhandled
+      // promise rejection instead of UI. Same wording as the guest-safe save
+      // notice below, since a player can't tell the difference and shouldn't
+      // need to.
+      setNotice('Could not save — try again')
     } finally {
       purchasing.current = false
     }
@@ -378,6 +472,7 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
 
   function handleBuyUpgrade(item) {
     if (item.effect?.type === 'vitamin') {
+      setVitaminError(null)
       setPendingVitamin(item)
       return
     }
@@ -389,14 +484,21 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
     runPurchase(result.profile)
   }
 
+  // Only closes the picker on success. On failure the picker stays open and
+  // shows the reason inline (vitaminError, not the shop-wide `notice` banner
+  // — that banner renders behind the modal we just opened, so a player would
+  // see the picker vanish with no explanation). At-cap starters are already
+  // `disabled` in the grid, so reaching the failure branch here means either
+  // a stale `profile` prop or a race with another purchase — rare, but the
+  // picker must not silently disappear either way.
   function handleConfirmVitamin(speciesId) {
-    const item = pendingVitamin
-    setPendingVitamin(null)
-    const result = applyPurchase(profile, item, speciesId, overrides)
+    const result = applyPurchase(profile, pendingVitamin, speciesId, overrides)
     if (!result.ok) {
-      setNotice(result.reason)
+      setVitaminError(result.reason)
       return
     }
+    setVitaminError(null)
+    setPendingVitamin(null)
     runPurchase(result.profile)
   }
 
@@ -426,6 +528,11 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
     runPurchase(nextProfile)
   }
 
+  // Reachable from two places: an owned sprite that happens to still be one
+  // of today's 2 rotation offers, and (the only path for everything else,
+  // since dailyOffers excludes owned ids from the roll) the "YOUR SPRITES"
+  // section in CosmeticsRegionPanel. `spriteId === null` un-equips back to
+  // the default trainer sprite — same write, no special case needed.
   function handleEquipSprite(spriteId) {
     runPurchase({ ...profile, equippedSprite: spriteId })
   }
@@ -513,8 +620,9 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
           item={pendingVitamin}
           profile={profile}
           dark={dark}
+          error={vitaminError}
           onConfirm={handleConfirmVitamin}
-          onCancel={() => setPendingVitamin(null)}
+          onCancel={() => { setVitaminError(null); setPendingVitamin(null) }}
         />
       )}
     </div>
