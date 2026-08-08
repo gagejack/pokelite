@@ -10,7 +10,7 @@ import DailyChallenge from './components/DailyChallenge'
 // starts, so they load on demand instead of bloating the initial chunk.
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
-import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism, backfillStarterFields } from './game/pokemon.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
@@ -359,7 +359,6 @@ export default function App() {
     setSelectedRegion(run.region)
     setSelectedCharacter(run.character ?? DEFAULT_CHARACTER)
     setSelectedStarter(run.starter)
-    setRoster(run.roster ?? [])
     setBag(run.bag ?? [])
     setMapIndex(run.mapIndex ?? 0)
     setRunSeed(run.runSeed ?? null)
@@ -390,6 +389,15 @@ export default function App() {
     // upgrades are permanent and a purchase made between saving and resuming
     // should apply, the same way it would to a fresh run.
     setActiveRunModifiers(profile)
+    // Backfill _starterSpeciesId/_multipliers onto a legacy save's starter
+    // roster entry — those fields didn't exist before this run's vitamins
+    // work, so a pre-existing save's starter would otherwise fall back to a
+    // flat 1x multiplier on its next level-up and visibly SHRINK (see
+    // backfillStarterFields' comment in pokemon.js). Must run AFTER
+    // setActiveRunModifiers above: it looks up vitamins via the just-installed
+    // profile. run.starter?.id, not selectedStarter (state set above hasn't
+    // committed yet within this same function).
+    setRoster(backfillStarterFields(run.roster ?? [], run.starter?.id))
     // A resumed run is no longer "saved" — it's active again. Clear the store so
     // it doesn't linger if the tab is refreshed mid-run without hitting Home.
     savedRunData.current = null
