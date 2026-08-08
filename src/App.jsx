@@ -351,6 +351,11 @@ export default function App() {
   function resumeRun() {
     const run = savedRunData.current
     if (!run) return
+    // The Resume button is already gated on `profile != null`, but guard here
+    // too: modifiersFor(null) returns stock BALANCE without complaint, so any
+    // future caller that skipped that gate would silently strip the player's
+    // paid upgrades for the rest of the run rather than failing visibly.
+    if (profile == null) return
     setSelectedRegion(run.region)
     setSelectedCharacter(run.character ?? DEFAULT_CHARACTER)
     setSelectedStarter(run.starter)
@@ -912,9 +917,16 @@ export default function App() {
     <SettingsProvider>
     <Suspense fallback={<div style={{ position: 'fixed', inset: 0 }} />}>
       {screen === 'menu' && (
+        // `hasSavedRun` is ANDed with the profile having loaded: resumeRun
+        // installs the run's meta modifiers from it, and hasSavedRun comes
+        // from a SEPARATE async effect (loadRun) than the profile's
+        // (loadProfile). Whichever resolves first, Resume must not be
+        // clickable until both are in — modifiersFor(null) silently yields
+        // stock BALANCE, so a fast click would drop every paid upgrade for
+        // the rest of the run.
         <MainMenu
           onPlay={() => setScreen('region')}
-          hasSavedRun={hasSavedRun}
+          hasSavedRun={hasSavedRun && profile != null}
           onResume={resumeRun}
           onOpenDaily={() => setDailyOpen(true)}
           onSelectRegion={handleSelectRegion}
