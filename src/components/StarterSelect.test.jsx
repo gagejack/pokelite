@@ -1,5 +1,35 @@
-import { test, expect, beforeAll } from 'vitest'
+import { test, expect, beforeAll, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+
+// Stub the species fetch. StarterSelect awaits fetchPokemonBase for every
+// starter it offers, and unmocked that is a real PokeAPI request — which made
+// this file fail roughly half the time under a parallel full-suite run
+// (findByText timing out at ~1s) while passing in isolation. These tests are
+// about which starters get OFFERED, not about the network, so the stub keeps
+// them deterministic and removes the only network dependency in the suite.
+vi.mock('../game/pokemon.js', async importOriginal => {
+  const actual = await importOriginal()
+  const NAMES = {
+    1: 'bulbasaur', 4: 'charmander', 7: 'squirtle',
+    152: 'chikorita', 155: 'cyndaquil', 158: 'totodile',
+    252: 'treecko', 255: 'torchic', 258: 'mudkip',
+    387: 'turtwig', 390: 'chimchar', 393: 'piplup',
+    495: 'snivy', 498: 'tepig', 501: 'oshawott',
+  }
+  return {
+    ...actual,
+    fetchPokemonBase: vi.fn(async id => ({
+      pokeId: id,
+      name: NAMES[id] ?? `species-${id}`,
+      types: ['normal'],
+      baseStats: { hp: 50, attack: 50, defense: 50, spAtk: 50, spDef: 50, speed: 50 },
+      sprite: `/${id}.png`,
+      spriteBack: `/${id}-back.png`,
+      shinySprite: `/${id}-shiny.png`,
+      shinySpriteBack: `/${id}-shiny-back.png`,
+    })),
+  }
+})
 import { ThemeProvider } from '../lib/theme'
 import { SettingsProvider } from '../lib/settings'
 import StarterSelect from './StarterSelect.jsx'
