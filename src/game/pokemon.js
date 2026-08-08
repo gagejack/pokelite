@@ -3,7 +3,7 @@ import { attackTypeFor, alternateTypeFor } from './attackTypes.js'
 import { slimChain, speciesIdFromUrl, levelUpPathTo, downgradeTarget } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
-import { getEffectiveBalance } from './metaModifiers.js'
+import { getEffectiveBalance, getVitaminMultipliers } from './metaModifiers.js'
 
 const baseCache = new Map()
 
@@ -239,18 +239,35 @@ export function shinyOdds() {
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
 // `forceShiny` skips the roll and uses the given value. Only the starter needs
 // it: StarterSelect builds preview instances to render the three choices, then
-// App.initRoster rebuilds the chosen one to apply the 1.3× starter boost. Left
-// to roll again, that rebuild would decide shininess a SECOND time — so the
+// App.initRoster rebuilds the chosen one to apply the starter boost. Left to
+// roll again, that rebuild would decide shininess a SECOND time — so the
 // shiny Charmander you picked could arrive normal, and a normal one could
 // arrive shiny. Passing the preview's flag through makes the sprite on the
 // select screen a promise. Everything else passes nothing and rolls once.
+//
+// `starterSpeciesId` carries the vitamin lookup key through evolution and
+// level-ups (see buildEvolvedInstance/levelUp below). buildPokemonInstance's
+// own callers never pass it explicitly — for a freshly-picked starter it is
+// just `base.pokeId`, the species being built right now — but
+// buildEvolvedInstance overrides it afterward on the returned instance so an
+// evolved starter keeps looking itself up under its ORIGINAL species id (a
+// Charmander's Protein purchases are stored under Charmander's id, not
+// Charmeleon's, even after it evolves).
 export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShiny = null) {
   // Clamp here too, not just in levelUp: this is the single constructor for
   // every instance (spawns, evolutions, enemy teams), so nothing can enter the
   // game above MAX_LEVEL regardless of what a caller passes.
   const level = Math.min(MAX_LEVEL, Math.max(1, rawLevel))
-  const boost = isStarter ? BALANCE.pokemon.starterBoost : 1
-  const hp = Math.floor(calcHP(base.baseStats.hp, level) * boost)
+  // Per-stat multiplier, keyed by species id (spec §3: vitamins are a
+  // per-stat, not uniform, boost). getVitaminMultipliers reads the active
+  // run's effective starterBoost as its base, so a profile with zero
+  // vitamins for this species reproduces the old uniform scalar exactly —
+  // every stat gets the same number, just computed per-stat instead of once.
+  // Non-starters get a flat 1 on every stat, same as the old `boost = 1`.
+  const multipliers = isStarter
+    ? getVitaminMultipliers(base.pokeId)
+    : { hp: 1, attack: 1, defense: 1, spAtk: 1, spDef: 1, speed: 1 }
+  const hp = Math.floor(calcHP(base.baseStats.hp, level) * multipliers.hp)
   const move = getTypeMove(attackTypeFor(base.pokeId, base.types), tierForLevel(level))
   // Null (not false) means "no opinion, roll it" — so an explicit false can
   // still force a non-shiny without being mistaken for an absent argument.
@@ -266,15 +283,21 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
     stats: {
       maxHp:   hp,
       hp,
-      attack:  Math.floor(calcStat(base.baseStats.attack,  level) * boost),
-      defense: Math.floor(calcStat(base.baseStats.defense, level) * boost),
-      spAtk:   Math.floor(calcStat(base.baseStats.spAtk,   level) * boost),
-      spDef:   Math.floor(calcStat(base.baseStats.spDef,   level) * boost),
-      speed:   Math.floor(calcStat(base.baseStats.speed,   level) * boost),
+      attack:  Math.floor(calcStat(base.baseStats.attack,  level) * multipliers.attack),
+      defense: Math.floor(calcStat(base.baseStats.defense, level) * multipliers.defense),
+      spAtk:   Math.floor(calcStat(base.baseStats.spAtk,   level) * multipliers.spAtk),
+      spDef:   Math.floor(calcStat(base.baseStats.spDef,   level) * multipliers.spDef),
+      speed:   Math.floor(calcStat(base.baseStats.speed,   level) * multipliers.speed),
     },
     move,
     fainted: false,
     _base: base,
+    // Present only on starters (and their evolutions/level-ups downstream —
+    // see buildEvolvedInstance and levelUp). Doubles as both "is this a
+    // starter" and "which species id to look vitamins up under": absence
+    // means "not a starter," never a starter with zero vitamins (that case
+    // is still present, just with a flat-starterBoost `_multipliers`).
+    ...(isStarter ? { _starterSpeciesId: base.pokeId, _multipliers: multipliers } : {}),
   }
 }
 
@@ -438,11 +461,46 @@ export async function rollStageForLevel(id, level, maxSpeciesId = Infinity) {
 // Rebuild an instance as its evolved form: fresh stats at the same level with
 // the HP ratio preserved, plus move tier, shininess, held item, and fainted
 // state carried over (buildPokemonInstance omits them).
-function buildEvolvedInstance(instance, evolvedBase, newLevel) {
+//
+// PRE-EXISTING BUG, fixed as part of Task 6 (vitamins): this used to call
+// buildPokemonInstance(evolvedBase, newLevel) with NO isStarter argument, so
+// a starter's boost (and now, vitamins) evaporated the instant it evolved —
+// the evolved form was built as if it were any wild spawn. Vitamins would
+// have inherited the exact same bug: buy Protein for Charmander, evolve to
+// Charmeleon, silently lose the boost AND the vitamin, which would make the
+// feature visibly fail for most players (most starters get evolved). Fixed
+// here rather than left, since it's the same instance-tagging mechanism this
+// task already had to build for the per-species vitamin lookup: `instance`
+// carries `_starterSpeciesId` (set in buildPokemonInstance, present only on
+// starters) forward across the evolution, and it is THAT id — the run's
+// original starter species, not evolvedBase's — that both the boost-eligible
+// check and the vitamin lookup use, since profile.vitamins is keyed by the
+// starter's original species id (spec §3: "choose one unlocked starter"),
+// which does not change just because the instance representing it does.
+export function buildEvolvedInstance(instance, evolvedBase, newLevel) {
   const hpRatio = instance.stats.hp / instance.stats.maxHp
-  const evolved = buildPokemonInstance(evolvedBase, newLevel)
+  // A starter is anything carrying the tag buildPokemonInstance sets — absent
+  // on every non-starter, so this is a no-op for the vast majority of
+  // evolutions exactly as before.
+  const isStarter = instance._starterSpeciesId != null
+  const evolved = buildPokemonInstance(evolvedBase, newLevel, isStarter)
+  // buildPokemonInstance above looked vitamins up under evolvedBase.pokeId
+  // (the species it was JUST asked to build) — wrong for a starter, since
+  // profile.vitamins is keyed by the run's ORIGINAL starter species
+  // (instance._starterSpeciesId), which does not change across evolution.
+  // Recompute the multipliers and every multiplier-scaled stat under the
+  // correct key rather than trust evolved.stats, which used evolvedBase's id.
+  const multipliers = isStarter ? getVitaminMultipliers(instance._starterSpeciesId) : evolved._multipliers
+  const stats = isStarter ? {
+    maxHp:   Math.floor(calcHP(evolvedBase.baseStats.hp, newLevel) * multipliers.hp),
+    attack:  Math.floor(calcStat(evolvedBase.baseStats.attack,  newLevel) * multipliers.attack),
+    defense: Math.floor(calcStat(evolvedBase.baseStats.defense, newLevel) * multipliers.defense),
+    spAtk:   Math.floor(calcStat(evolvedBase.baseStats.spAtk,   newLevel) * multipliers.spAtk),
+    spDef:   Math.floor(calcStat(evolvedBase.baseStats.spDef,   newLevel) * multipliers.spDef),
+    speed:   Math.floor(calcStat(evolvedBase.baseStats.speed,   newLevel) * multipliers.speed),
+  } : evolved.stats
   // Preserve HP ratio
-  const evolvedHp = Math.max(1, Math.floor(evolved.stats.maxHp * hpRatio))
+  const evolvedHp = Math.max(1, Math.floor(stats.maxHp * hpRatio))
   // Preserve the Pokémon's current move tier across evolution (set via TM nodes,
   // not by level), using the evolved Pokémon's primary type.
   const preservedTier = instance.move?.tier ?? tierForLevel(newLevel)
@@ -453,7 +511,7 @@ function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     shiny,
     sprite:     shiny ? evolvedBase.shinySprite : evolvedBase.sprite,
     spriteBack: shiny ? evolvedBase.shinySpriteBack : evolvedBase.spriteBack,
-    stats: { ...evolved.stats, hp: evolvedHp },
+    stats: { ...stats, hp: evolvedHp },
     // The evolved form re-picks its attacking type: an evolution can change
     // typing entirely (Charmeleon fire → Charizard fire/flying), so the
     // pre-evolution's choice may no longer apply.
@@ -468,6 +526,14 @@ function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     // Carry the held item through evolution (buildPokemonInstance omits it).
     heldItem: instance.heldItem ?? null,
     fainted: instance.fainted,
+    // Preserve the ORIGINAL starter species id (for future evolutions/level-
+    // ups downstream of this one) and the multipliers computed under it,
+    // overwriting whatever buildPokemonInstance above set under evolvedBase's
+    // (wrong, for this purpose) id.
+    ...(isStarter ? {
+      _starterSpeciesId: instance._starterSpeciesId,
+      _multipliers: multipliers,
+    } : {}),
   }
 }
 
@@ -592,12 +658,26 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
 
 // Level up a Pokémon instance — recalculates stats only.
 // The move never changes on level-up; only a TM / Power Upgrade node changes it.
+// PRE-EXISTING BUG, fixed alongside the evolution one above: this recalculated
+// every stat from base with NO multiplier at all, starter or not — so a
+// starter's 1.3× boost was already gone after its FIRST level-up, before this
+// task and before any evolution happened. Left unfixed, vitamins would have
+// been invisible in practice: a bought Protein would show up for exactly one
+// battle (the level the instance was created at) and vanish on the very next
+// victory. Fixed the same way as buildEvolvedInstance: `instance._multipliers`
+// (set once, in buildPokemonInstance/buildEvolvedInstance, present only on
+// starters) is reapplied here rather than recomputed, since levelUp has no
+// species-id parameter to look vitamins up with and doesn't need one — the
+// multiplier was already resolved correctly at creation/evolution time and
+// levels don't change which species (or vitamins) apply. Absent on every
+// non-starter, so this is a no-op there — byte-identical to the old behavior.
 export function levelUp(instance, base, levels) {
   // Clamp at MAX_LEVEL — a full run's victories would otherwise push levels
   // past 100, where the stat formulas stop being meaningful. Already-capped
   // Pokémon keep their stats exactly (newLevel === level, so hpDiff is 0).
   const newLevel = Math.min(MAX_LEVEL, instance.level + levels)
-  const newHp = calcHP(base.baseStats.hp, newLevel)
+  const m = instance._multipliers ?? { hp: 1, attack: 1, defense: 1, spAtk: 1, spDef: 1, speed: 1 }
+  const newHp = Math.floor(calcHP(base.baseStats.hp, newLevel) * m.hp)
   const hpDiff = newHp - instance.stats.maxHp
   return {
     ...instance,
@@ -607,11 +687,11 @@ export function levelUp(instance, base, levels) {
       maxHp:   newHp,
       // Leveling raises max HP but must not revive a fainted Pokémon.
       hp:      instance.fainted ? 0 : Math.min(instance.stats.hp + hpDiff, newHp),
-      attack:  calcStat(base.baseStats.attack,  newLevel),
-      defense: calcStat(base.baseStats.defense, newLevel),
-      spAtk:   calcStat(base.baseStats.spAtk,   newLevel),
-      spDef:   calcStat(base.baseStats.spDef,   newLevel),
-      speed:   calcStat(base.baseStats.speed,   newLevel),
+      attack:  Math.floor(calcStat(base.baseStats.attack,  newLevel) * m.attack),
+      defense: Math.floor(calcStat(base.baseStats.defense, newLevel) * m.defense),
+      spAtk:   Math.floor(calcStat(base.baseStats.spAtk,   newLevel) * m.spAtk),
+      spDef:   Math.floor(calcStat(base.baseStats.spDef,   newLevel) * m.spDef),
+      speed:   Math.floor(calcStat(base.baseStats.speed,   newLevel) * m.speed),
     },
   }
 }

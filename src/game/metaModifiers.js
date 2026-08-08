@@ -246,6 +246,44 @@ export function qualifyingSynergyTypes(party, threshold) {
   return qualifying
 }
 
+// ── Vitamins: per-species, per-stat multiplier (spec §3, Task 6) ───────────
+//
+// Deliberately NOT folded into modifiersFor/balanceOverrides: BALANCE has one
+// starterBoost NUMBER, not a per-species table, and overlaying it there would
+// mean inventing a new BALANCE shape just to store a lookup keyed by species
+// id — a shape nothing else in BALANCE has. pokemon.js needs "this species'
+// six multipliers," not "a tweak to a shared constant," so it stays a
+// standalone pure function that pokemon.js calls directly (via the runtime
+// getter below), the same way shinyOdds() already reads getEffectiveBalance()
+// at roll time instead of a module-level constant.
+
+const STATS = ['hp', 'attack', 'defense', 'spAtk', 'spDef', 'speed']
+
+/**
+ * Pure: profile + species id → per-stat multiplier object, e.g.
+ * `{ hp: 1.3, attack: 1.35, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 }`.
+ *
+ * Base is `baseBoost` (the run's effective starterBoost — callers pass
+ * `getEffectiveBalance().pokemon.starterBoost` so a future BALANCE override of
+ * the base boost is honored) on every stat, plus +0.05 per vitamin the
+ * profile holds in that stat for that species. A profile with no vitamins for
+ * this species returns the base boost unchanged on all six stats — the
+ * no-vitamins case is byte-identical to today's scalar `boost`.
+ *
+ * @param {import('./metaProfile.js').MetaProfile | null | undefined} profile
+ * @param {number} speciesId
+ * @param {number} baseBoost
+ * @returns {{ hp: number, attack: number, defense: number, spAtk: number, spDef: number, speed: number }}
+ */
+export function vitaminMultipliers(profile, speciesId, baseBoost) {
+  const owned = profile?.vitamins?.[speciesId] ?? {}
+  const out = {}
+  for (const stat of STATS) {
+    out[stat] = baseBoost + 0.05 * (owned[stat] ?? 0)
+  }
+  return out
+}
+
 // ── Runtime layer: one run's modifiers, set once, read synchronously ───────
 //
 // Mirrors regionBalance.js's cache/getter shape exactly: a module-level
@@ -257,7 +295,7 @@ export function qualifyingSynergyTypes(party, threshold) {
 // getter below falls back to stock BALANCE / a neutral extras value in that
 // case — the "owns nothing" behavior and the "no run active" behavior are the
 // SAME code path, not two.
-let active = null // { balanceOverrides, extras } | null
+let active = null // { balanceOverrides, extras, profile } | null
 
 /**
  * Compute and cache this run's modifiers from `profile`. Call once, at run
@@ -266,10 +304,16 @@ let active = null // { balanceOverrides, extras } | null
  * bought a Quick Heal upgrade mid-run must not retroactively change a heal
  * that already happened).
  *
+ * The raw `profile` is cached alongside the derived overlay (not just
+ * balanceOverrides/extras) so getVitaminMultipliers below can look up a
+ * starter's per-species vitamin counts — vitamins are keyed by species id in
+ * profile.vitamins directly, not folded into balanceOverrides (see
+ * vitaminMultipliers's comment above).
+ *
  * @param {import('./metaProfile.js').MetaProfile | null | undefined} profile
  */
 export function setActiveRunModifiers(profile) {
-  active = modifiersFor(profile)
+  active = { ...modifiersFor(profile), profile }
 }
 
 /** Clear the active run's modifiers (e.g. returning to the main menu). Not
@@ -309,4 +353,19 @@ const NEUTRAL_EXTRAS = {
 
 export function getActiveExtras() {
   return active?.extras ?? NEUTRAL_EXTRAS
+}
+
+// A starter species' per-stat multiplier for the active run: the effective
+// starterBoost on every stat, plus +0.05 per vitamin the active run's profile
+// holds for `speciesId` in that stat. With no run active (or a profile with
+// no vitamins for this species), every stat is just the stock starterBoost —
+// identical to today's plain scalar boost. pokemon.js calls this at instance-
+// build time instead of reading profile.vitamins itself, so it stays free of
+// any import on metaProfile.js/metaSave.js (the established seam: only this
+// module translates "what the player owns" into something gameplay reads).
+//
+// @param {number} speciesId
+// @returns {{ hp: number, attack: number, defense: number, spAtk: number, spDef: number, speed: number }}
+export function getVitaminMultipliers(speciesId) {
+  return vitaminMultipliers(active?.profile, speciesId, getEffectiveBalance().pokemon.starterBoost)
 }

@@ -1,7 +1,8 @@
 import { test, expect } from 'vitest'
 import {
-  modifiersFor, qualifyingSynergyTypes,
+  modifiersFor, qualifyingSynergyTypes, vitaminMultipliers,
   setActiveRunModifiers, clearActiveRunModifiers, getEffectiveBalance, getActiveExtras,
+  getVitaminMultipliers,
 } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -221,6 +222,69 @@ test('empty party qualifies nothing and does not throw', () => {
 
 test('party members with no types array do not throw', () => {
   expect(qualifyingSynergyTypes([{}, { types: ['fire'] }], 3)).toEqual(new Set())
+})
+
+// ── vitaminMultipliers: pure profile + speciesId → per-stat multiplier ──
+
+test('a profile with no vitamins for this species returns baseBoost unchanged on all six stats', () => {
+  const m = vitaminMultipliers(createProfile(), 4, 1.3)
+  expect(m).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
+})
+
+test('a null/undefined profile behaves like owns-nothing (baseBoost on every stat)', () => {
+  expect(vitaminMultipliers(null, 4, 1.3)).toEqual(vitaminMultipliers(createProfile(), 4, 1.3))
+  expect(vitaminMultipliers(undefined, 4, 1.3)).toEqual(vitaminMultipliers(createProfile(), 4, 1.3))
+})
+
+test('one vitamin in a stat adds exactly +0.05 to that stat, others stay at baseBoost', () => {
+  const profile = { ...createProfile(), vitamins: { 4: { attack: 1 } } }
+  const m = vitaminMultipliers(profile, 4, 1.3)
+  expect(m.attack).toBeCloseTo(1.35)
+  expect(m.hp).toBe(1.3)
+  expect(m.defense).toBe(1.3)
+})
+
+test('three vitamins in the same stat stack to +0.15', () => {
+  const profile = { ...createProfile(), vitamins: { 4: { speed: 3 } } }
+  const m = vitaminMultipliers(profile, 4, 1.3)
+  expect(m.speed).toBeCloseTo(1.45)
+})
+
+test('vitamins recorded under a different species id do not affect this lookup', () => {
+  const profile = { ...createProfile(), vitamins: { 5: { attack: 3 } } }
+  const m = vitaminMultipliers(profile, 4, 1.3)
+  expect(m.attack).toBe(1.3)
+})
+
+test('a mixed stat spread applies independently per stat, none dropped or leaked', () => {
+  const profile = { ...createProfile(), vitamins: { 4: { attack: 1, defense: 2 } } }
+  const m = vitaminMultipliers(profile, 4, 1.3)
+  expect(m.attack).toBeCloseTo(1.35)
+  expect(m.defense).toBeCloseTo(1.40)
+  expect(m.spAtk).toBe(1.3)
+  expect(m.spDef).toBe(1.3)
+  expect(m.speed).toBe(1.3)
+})
+
+// ── getVitaminMultipliers: runtime getter reads the active run's profile ──
+
+test('with no active run, getVitaminMultipliers returns the stock starterBoost on every stat', () => {
+  clearActiveRunModifiers()
+  const m = getVitaminMultipliers(4)
+  expect(m).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
+})
+
+test('setActiveRunModifiers makes getVitaminMultipliers reflect the active profile\'s vitamins', () => {
+  setActiveRunModifiers({ ...createProfile(), vitamins: { 4: { attack: 2 } } })
+  expect(getVitaminMultipliers(4).attack).toBeCloseTo(1.4)
+  expect(getVitaminMultipliers(4).defense).toBe(1.3)
+  clearActiveRunModifiers()
+})
+
+test('getVitaminMultipliers keys strictly by species id — a different id sees no bonus', () => {
+  setActiveRunModifiers({ ...createProfile(), vitamins: { 4: { attack: 3 } } })
+  expect(getVitaminMultipliers(7)).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
+  clearActiveRunModifiers()
 })
 
 // ── Runtime layer: setActiveRunModifiers / getEffectiveBalance / getActiveExtras ──
