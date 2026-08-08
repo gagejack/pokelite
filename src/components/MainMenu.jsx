@@ -13,6 +13,7 @@ import { VERSION } from '../game/version'
 import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
+import { getShopOverrides } from '../lib/metaShopBalance.js'
 // The shop pulls in the full trainer-sprite glob (import.meta.glob across all
 // five regions) — same reasoning as NodeMap/EliteFour in App.jsx: load it on
 // demand rather than bloating the main menu's initial chunk with art nobody
@@ -317,7 +318,12 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           rather than this component inventing a second save path. */}
       {shopOpen && (
         <Suspense fallback={null}>
-          <MetaShop profile={profile} onClose={() => setShopOpen(false)} onPurchase={onProfileChange} />
+          <MetaShop
+            profile={profile}
+            onClose={() => setShopOpen(false)}
+            onPurchase={onProfileChange}
+            overrides={getShopOverrides()}
+          />
         </Suspense>
       )}
     </Layout>

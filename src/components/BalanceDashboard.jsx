@@ -10,6 +10,9 @@ import { calcStat, fetchPokemonBase, cachedName } from '../game/pokemon.js'
 import { mapLevelRange } from '../game/battleTeams.js'
 import { getRegionConfig, regionNames } from '../game/regionRegistry.js'
 import { getRegionBalance, saveRegionBalance, defaultsFor, BALANCE_MIN, BALANCE_MAX } from '../lib/regionBalance.js'
+import { getShopPrice, saveShopPrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
+import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
+import { SPRITE_TIERS } from '../game/spriteTiers.js'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 
@@ -85,9 +88,134 @@ function Bar({ label, pct, color, valueLabel, icon, theme }) {
   )
 }
 
+// One editable price row: label, unit-appropriate current value, a numeric
+// text box, and the idle|saving|saved|error status treatment the Difficulty
+// panel uses. `unit` is '$' or 'keys' — key items must never read like a
+// dollar price (spec: key items are priced in KEYS, not dollars).
+function PriceRow({ itemId, label, unit, defaultPrice, theme }) {
+  const { textColor, mutedColor, panelBorder, innerBg, labelWidth } = theme
+  const [draft, setDraft] = useState(() => String(getShopPrice(itemId)))
+  const [status, setStatus] = useState('idle') // idle|saving|saved|error
+
+  // Re-sync the draft if another admin's change (or this session's own
+  // successful save) updated the cache after this row last read it — mirrors
+  // the Difficulty panel's approach of always having a live fallback, though
+  // here it's an explicit effect rather than a per-render read since the
+  // input is uncontrolled-by-cache while being typed.
+  useEffect(() => { setDraft(String(getShopPrice(itemId))) }, [itemId])
+
+  async function commit() {
+    const value = Number(draft)
+    setStatus('saving')
+    const { error } = await saveShopPrice(itemId, value)
+    if (error) {
+      setStatus('error')
+      return
+    }
+    setDraft(String(getShopPrice(itemId))) // reflect the clamped/rounded value
+    setStatus('saved')
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span style={{
+        fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+        width: labelWidth, flexShrink: 0,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {label}
+      </span>
+      <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor, flexShrink: 0 }}>
+        {unit === 'keys' ? '🔑' : '$'}
+      </span>
+      <input
+        type="number"
+        min={PRICE_MIN}
+        max={PRICE_MAX}
+        step={1}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        style={{
+          fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+          backgroundColor: innerBg, border: panelBorder,
+          padding: '4px 6px', width: '90px', flexShrink: 0,
+        }}
+      />
+      <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: mutedColor, flexShrink: 0 }}>
+        default {unit === 'keys' ? `${defaultPrice} 🔑` : `$${defaultPrice.toLocaleString()}`}
+      </span>
+      <span style={{
+        fontFamily: 'Orange Kid', fontSize: '11px', flexShrink: 0, minWidth: '60px',
+        color: status === 'error' ? '#ef4444' : status === 'saved' ? '#22c55e' : 'transparent',
+      }}>
+        {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : status === 'error' ? 'Failed' : '·'}
+      </span>
+    </div>
+  )
+}
+
+// Shop tab — one editable price per catalog item (spec §5a): the 20 metacash
+// upgrades, 3 key items, and 4 sprite tier prices, all reading/writing
+// through metaShopBalance.js so MetaShop and metaProfile.effectivePrice see
+// the same numbers without a deploy.
+function ShopPricesPanel({ theme }) {
+  const { mutedColor } = theme
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <Panel
+        theme={theme}
+        title="Metacash upgrades"
+        subtitle="Prices in $. Saves on blur or Enter. Live for every player immediately — no deploy needed."
+      >
+        {METACASH_ITEMS.map(item => (
+          <PriceRow key={item.id} itemId={item.id} label={item.name} unit="metacash" defaultPrice={item.cost} theme={theme} />
+        ))}
+      </Panel>
+
+      <Panel
+        theme={theme}
+        title="Key items"
+        subtitle="Priced in keys, not dollars — the 🔑 unit is the price."
+      >
+        {KEY_ITEMS.map(item => (
+          <PriceRow key={item.id} itemId={item.id} label={item.name} unit="keys" defaultPrice={item.cost} theme={theme} />
+        ))}
+      </Panel>
+
+      <Panel
+        theme={theme}
+        title="Sprite tier prices"
+        subtitle="One price per cosmetic tier, applied to every sprite that tier matches (spec §5)."
+      >
+        {SPRITE_TIERS.map(tier => (
+          <PriceRow
+            key={tier}
+            itemId={tier}
+            label={tier[0].toUpperCase() + tier.slice(1)}
+            unit="metacash"
+            defaultPrice={SPRITE_TIER_PRICES[tier]}
+            theme={theme}
+          />
+        ))}
+      </Panel>
+      <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor }}>
+        Run supabase/meta_shop_prices.sql once (project owner, manual) before saves here will persist.
+      </span>
+    </div>
+  )
+}
+
 export default function BalanceDashboard() {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
+  // Top-level tab: 'tuning' is everything that existed before Task 10
+  // (difficulty sliders + read-only odds panels), 'shop' is the new
+  // admin price-editing tab. No tab system existed here before — kept to
+  // two flat buttons rather than a generic tab component since this file
+  // has no other multi-tab surface to share one with.
+  const [dashTab, setDashTab] = useState('tuning')
 
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
@@ -193,19 +321,52 @@ export default function BalanceDashboard() {
     backgroundColor: innerBg, border: panelBorder, padding: '4px 6px', cursor: 'pointer',
   }
 
+  // #7c3aed matches MetaShop's own active-tab treatment (spec §6c) — the
+  // dashboard tab that edits the shop's prices borrows the shop's own color
+  // rather than accent() (colors.js reserves accent() for yellow-as-ink, not
+  // as a background fill).
+  const tabButtonStyle = active => ({
+    fontFamily: 'Upheaval', fontSize: '12px',
+    color: active ? '#fff' : textColor,
+    backgroundColor: active ? '#7c3aed' : innerBg,
+    border: panelBorder, padding: '6px 14px', cursor: 'pointer',
+  })
+
+  const header = (
+    <>
+      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
+        Balance Dashboard
+      </span>
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+        <button style={tabButtonStyle(dashTab === 'tuning')} onClick={() => setDashTab('tuning')}>Difficulty &amp; Odds</button>
+        <button style={tabButtonStyle(dashTab === 'shop')} onClick={() => setDashTab('shop')}>Shop</button>
+      </div>
+    </>
+  )
+
+  if (dashTab === 'shop') {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+        <ShopPricesPanel theme={theme} />
+      </div>
+    )
+  }
+
   if (!config) {
     return (
-      <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: mutedColor }}>
-        No playable region configs found.
-      </span>
+      <div className="flex flex-col gap-4">
+        {header}
+        <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: mutedColor }}>
+          No playable region configs found.
+        </span>
+      </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
-        Balance Dashboard
-      </span>
+      {header}
       <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor, textAlign: 'center', lineHeight: 1.4 }}>
         Read-only view of the live tuning values. Percentages are per-slot odds
         for a single weighted draw, so they sum to ~100 within a pool.

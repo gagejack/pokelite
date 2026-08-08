@@ -22,6 +22,7 @@ import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js
 import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
 import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
+import { loadShopPrices } from './lib/metaShopBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
@@ -167,6 +168,12 @@ export default function App() {
   // Shared per-region damage tuning (admin balance dashboard). Fetched once on
   // start; failures are non-fatal — the region configs' own values apply.
   useEffect(() => { loadRegionBalance() }, [])
+
+  // Admin-tunable shop prices (Balance Dashboard "Shop" tab). Fetched once on
+  // start, same non-fatal-failure posture as loadRegionBalance above — a
+  // missing table or offline client just leaves metaCatalog.js's defaults in
+  // effect.
+  useEffect(() => { loadShopPrices() }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
