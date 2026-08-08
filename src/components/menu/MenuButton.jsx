@@ -25,13 +25,23 @@ export default function MenuButton({ def, dark, style }) {
         background: def.background,
         border: borderStyle,
         ...(usesGlow ? { '--btn-shadow': bevel } : { boxShadow: bevel }),
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', alignItems: 'center',
+        // A badge (currently only the Shop bar's balance readout, spec §6a)
+        // pushes the label left and itself right; without one the label stays
+        // centered exactly as before.
+        justifyContent: def.badge ? 'space-between' : 'center',
+        padding: def.badge ? '0 14px' : undefined,
         ...style,
       }}
     >
       <span style={{ fontSize: def.fontSize, color: def.color, letterSpacing: '2px', fontFamily: 'Upheaval' }}>
         {def.label}
       </span>
+      {def.badge && (
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: 'rgba(255,255,255,0.75)' }}>
+          {def.badge}
+        </span>
+      )}
     </button>
   )
 }

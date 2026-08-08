@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useTheme } from '../lib/theme'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import Layout from './Layout'
@@ -13,8 +13,13 @@ import { VERSION } from '../game/version'
 import { REGIONS } from '../game/regions/regionList'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
+// The shop pulls in the full trainer-sprite glob (import.meta.glob across all
+// five regions) — same reasoning as NodeMap/EliteFour in App.jsx: load it on
+// demand rather than bloating the main menu's initial chunk with art nobody
+// sees until SHOP is clicked.
+const MetaShop = lazy(() => import('./MetaShop'))
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile }) {
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile, onProfileChange }) {
   const { dark } = useTheme()
   // profile is null for one frame while App.jsx's initial load is in flight —
   // fall back to "nothing unlocked yet", same fallback RegionSelect uses.
@@ -24,9 +29,11 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   // player may not own.
   const unlockedRegions = profile?.unlockedRegions ?? []
   const keys = profile?.keys ?? 0
+  const metacash = profile?.metacash ?? 0
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [shopOpen, setShopOpen] = useState(false)
   // Desktop only: 'region' swaps the button column in place instead of
   // changing screens, so the background art and logo never unmount.
   // `initialMode` lets Back from starter select reopen the region column
@@ -101,6 +108,14 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
       color: '#fff', fontSize: '22px', onClick: onResume, visible: !!hasSavedRun },
+    // Purple, flat (spec §6a) — the one hue the menu hadn't spent, and flat
+    // rather than gradient because SHOP doesn't start a run the way PLAY/
+    // DAILY SEED do. Fourth in the stack, above the DEX/STATS pair.
+    { id: 'shop', label: 'SHOP', background: '#7c3aed',
+      color: '#fff', fontSize: '22px', onClick: () => setShopOpen(true), visible: true,
+      // Balance readout shown right-aligned on the bar itself (spec §6a) —
+      // MenuButton renders `badge` after the centered label if supplied.
+      badge: `$${metacash.toLocaleString()} · ${keys} 🔑` },
   ].filter(d => d.visible)
 
   // Dex + Stats share one bar's footprint, so they are defined separately.
@@ -279,7 +294,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
-            <CallingCard dark={dark} />
+            <CallingCard dark={dark} profile={profile} />
             {!loggedIn && <LoginForm onAuthSuccess={startRun} />}
           </div>
         </div>
@@ -293,7 +308,18 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       {/* Rendered last so it overlays whichever layout is active. Suppressed
           while the Dex or Stats sheet is open — those are full-screen, and a
           patch note landing on top of one would read as a bug. */}
-      {updateOpen && !pokedexOpen && !statsOpen && <UpdateNotice onClose={closeUpdate} />}
+      {updateOpen && !pokedexOpen && !statsOpen && !shopOpen && <UpdateNotice onClose={closeUpdate} />}
+      {/* MetaShop — full-screen overlay, matching the Pokédex/Stats pattern
+          (spec §6c). profile is passed straight through; every purchase
+          round-trips through App.jsx's onProfileChange so the SAME save/
+          notice handling recordRunEnd and unlockAndEnterRegion already use
+          (saveProfile's `saved || !user` posture) governs shop purchases too,
+          rather than this component inventing a second save path. */}
+      {shopOpen && (
+        <Suspense fallback={null}>
+          <MetaShop profile={profile} onClose={() => setShopOpen(false)} onPurchase={onProfileChange} />
+        </Suspense>
+      )}
     </Layout>
   )
 }

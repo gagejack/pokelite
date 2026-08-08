@@ -1,5 +1,5 @@
 import { test, expect, vi } from 'vitest'
-import { displayNameFromBasename, spritesForRegion, allSprites, SPRITE_REGIONS, buildRegionSprites } from './spriteIndex.js'
+import { displayNameFromBasename, spritesForRegion, allSprites, SPRITE_REGIONS, buildRegionSprites, spriteById } from './spriteIndex.js'
 
 // Pure name-derivation logic, PLUS the glob-backed exports: vitest.config.js
 // registers @vitejs/plugin-react and runs tests through the Vite transform
@@ -106,6 +106,26 @@ test('two files that normalize to the same display name yield ONE sprite, not tw
   expect(warn.mock.calls[0][0]).toContain('Kanto/Lance')
   expect(warn.mock.calls[0][0]).toContain('Lance.png')   // names the offender
   warn.mockRestore()
+})
+
+// ── spriteById (id -> sprite lookup for the shop UI + calling card) ────────
+
+test('spriteById resolves a real id back to its sprite object', () => {
+  const kanto = spritesForRegion('Kanto')
+  const known = kanto[0]
+  expect(spriteById(known.id)).toEqual(known)
+})
+
+test('spriteById returns null for an id that does not resolve, instead of throwing', () => {
+  // Simulates a renamed/deleted asset leaving a stale id in a saved profile.
+  expect(() => spriteById('Kanto/Some Deleted Trainer')).not.toThrow()
+  expect(spriteById('Kanto/Some Deleted Trainer')).toBeNull()
+})
+
+test('spriteById returns null for a missing/empty id rather than throwing', () => {
+  expect(spriteById(null)).toBeNull()
+  expect(spriteById(undefined)).toBeNull()
+  expect(spriteById('')).toBeNull()
 })
 
 test('the same display name in DIFFERENT regions is not a collision', () => {

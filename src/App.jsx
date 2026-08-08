@@ -1050,6 +1050,23 @@ export default function App() {
     return { ok: true, notice }
   }
 
+  // MetaShop's one save path: every purchase (upgrade, vitamin, sprite buy,
+  // sprite equip) already computed its NEXT profile locally (applyPurchase or
+  // the shop's own sprite-purchase branch) and calls this with it, rather
+  // than each shop action separately deciding how to persist. Mirrors
+  // unlockAndEnterRegion immediately above — apply optimistically (a storage
+  // hiccup must not roll back a purchase the player already sees reflected),
+  // then persist and tell the shop whether it reached the account so it can
+  // show the same "saved on this device" notice recordRunEnd/StarterSelect's
+  // unlockNotice already use. `saved || !user` is the same guest-safe
+  // posture: a guest always gets `false` from saveProfile and must not see a
+  // failure message for that expected case.
+  async function handleShopProfileChange(nextProfile) {
+    setProfile(nextProfile)
+    const saved = await saveProfile(nextProfile, user)
+    return { ok: true, notice: (saved || !user) ? undefined : 'Saved on this device — sign in again to bank it' }
+  }
+
   // Shared by RegionSelect (mobile) and MainMenu's desktop region mode.
   async function handleSelectRegion(region) {
     // Clear any notice from a PREVIOUS unlock before this one resolves — a
@@ -1122,6 +1139,7 @@ export default function App() {
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           profile={profile}
+          onProfileChange={handleShopProfileChange}
         />
       )}
       {screen === 'region' && (

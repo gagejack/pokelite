@@ -2,13 +2,19 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import LevelBar from '../LevelBar'
 import { levelForXp, sumSpeedCashEarned } from '../../game/level.js'
+import { spriteById } from '../../game/spriteIndex.js'
 
 // Player profile card for the desktop menu's lower-right corner.
 // Every field comes from the user's OWN rows, which existing RLS already
 // allows (runs_select_own / profiles_select_own).
 // Renders with em-dash placeholders when signed out so the layout never
 // reflows between states.
-export default function CallingCard({ dark }) {
+//
+// `profile` is the meta-progression profile (metacash/keys/equippedSprite/...
+// — see metaProfile.js), passed down from App.jsx via MainMenu. Optional: a
+// caller that doesn't pass one just gets the card as it rendered before this
+// prop existed (no equipped-sprite art), so this stays additive.
+export default function CallingCard({ dark, profile }) {
   const [stats, setStats] = useState(null)
 
   useEffect(() => {
@@ -46,6 +52,14 @@ export default function CallingCard({ dark }) {
     ['SHINY', stats ? stats.shinies : '—'],
   ]
 
+  // The equipped cosmetic sprite — global profile art only, never the in-run
+  // character (spec §5). `spriteById` returns null both for "nothing
+  // equipped" (equippedSprite is null) and for a stale id that no longer
+  // resolves to a real asset (a renamed/deleted sprite file) — either way the
+  // card just renders as it did before this feature existed, rather than
+  // crashing on a missing `.url`.
+  const equippedSprite = spriteById(profile?.equippedSprite)
+
   return (
     <div style={{
       width: '220px',
@@ -60,12 +74,24 @@ export default function CallingCard({ dark }) {
         backgroundColor: '#facc15', padding: '3px 10px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
       }}>
-        <span style={{
-          fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a',
-          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-        }}>
-          {stats ? stats.username.toUpperCase() : 'NOT SIGNED IN'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+          {/* Only rendered once a sprite actually resolves — an equipped id
+              that no longer resolves leaves this slot absent rather than a
+              broken image icon. */}
+          {equippedSprite && (
+            <img
+              src={equippedSprite.url}
+              alt={equippedSprite.name}
+              style={{ width: '28px', height: '28px', objectFit: 'contain', flexShrink: 0 }}
+            />
+          )}
+          <span style={{
+            fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a',
+            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+          }}>
+            {stats ? stats.username.toUpperCase() : 'NOT SIGNED IN'}
+          </span>
+        </div>
         {/* Signed out shows an em-dash like every other field, so the band's
             height and the card's layout never reflow between states. */}
         <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a', flexShrink: 0 }}>

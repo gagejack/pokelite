@@ -150,3 +150,20 @@ export function spritesForRegion(region) {
 export function allSprites() {
   return SPRITE_REGIONS.flatMap(region => SPRITES_BY_REGION[region])
 }
+
+// id -> sprite lookup, built once at module load (same discipline as
+// META_CATALOG_BY_ID in metaCatalog.js) so the shop UI and the calling card
+// don't linear-scan allSprites() on every render.
+const SPRITE_BY_ID = Object.fromEntries(allSprites().map(sprite => [sprite.id, sprite]))
+
+// Resolve a profile's `ownedSprites`/`equippedSprite` id (e.g. "Kanto/Lance
+// 4") back to its sprite object. MUST return null rather than throw for an id
+// that no longer resolves — a renamed or deleted asset leaves a stale owned
+// id sitting in a real player's saved profile, and a card that blindly does
+// `spriteById(id).url` would crash the main menu for anyone still holding it.
+// Callers (CallingCard, the Cosmetics tab) are expected to treat null the
+// same as "nothing equipped/found" rather than rendering a broken image.
+export function spriteById(id) {
+  if (!id) return null
+  return SPRITE_BY_ID[id] ?? null
+}
