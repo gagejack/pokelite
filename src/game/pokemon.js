@@ -3,6 +3,7 @@ import { attackTypeFor, alternateTypeFor } from './attackTypes.js'
 import { slimChain, speciesIdFromUrl, levelUpPathTo, downgradeTarget } from './evolutionChain.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
+import { getEffectiveBalance } from './metaModifiers.js'
 
 const baseCache = new Map()
 
@@ -224,7 +225,15 @@ export async function fetchPokemonBase(idOrName) {
 
 // Shiny encounter rate. Every spawned Pokémon rolls once — so a caught wild or
 // legendary can be shiny (and shiny enemies just look shiny in battle).
-export const SHINY_ODDS = BALANCE.pokemon.shinyOdds
+//
+// Kept as a function, not a module-level constant: Shiny Charm (meta upgrade)
+// overlays BALANCE.pokemon.shinyOdds per-run via metaModifiers.js's runtime
+// getter, and a constant captured at import time would freeze in the stock
+// rate forever, before any run (or its profile) exists. buildPokemonInstance
+// below calls this at roll time instead of reading a captured value.
+export function shinyOdds() {
+  return getEffectiveBalance().pokemon.shinyOdds
+}
 
 // Build a full battle-ready Pokémon instance from base data + level.
 // The move is the Pokémon's primary-type tiered move; tier is set by level on spawn.
@@ -245,7 +254,7 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
   const move = getTypeMove(attackTypeFor(base.pokeId, base.types), tierForLevel(level))
   // Null (not false) means "no opinion, roll it" — so an explicit false can
   // still force a non-shiny without being mistaken for an absent argument.
-  const shiny = forceShiny === null ? rng() < SHINY_ODDS : !!forceShiny
+  const shiny = forceShiny === null ? rng() < shinyOdds() : !!forceShiny
   return {
     pokeId:     base.pokeId,
     name:       base.name,
@@ -514,12 +523,18 @@ export async function evolveInto(instance, speciesId) {
 // Apply a battle victory to the sim's final team: level-ups, the 5% survivor
 // heal, an optional full heal + revive (boss wins), then evolution checks.
 // `maxSpeciesId` gates evolution options to the region's generation.
+// `bonusLevelsForSurvivors` is Bonded's boss-win perk (meta upgrade): extra
+// levels for Pokémon that SURVIVED the fight (fainted !== true going in),
+// stacked on top of the normal `levelsGained` — distinct from earnedLevels
+// above, which is "took part" (survived OR fainted DURING the fight); Bonded
+// specifically rewards not fainting, so it must NOT go to a Pokémon that
+// fought and went down.
 // Returns { roster, evolutionNotices, evolutionChoices }:
 //   notices  — { from, to, pokeId } auto-evolutions (Pokédex "owned"
 //              recording stays at the call site)
 //   choices  — { index, fromId, fromName, sprite, options: [{ id }] } pending
 //              player picks; those Pokémon stay un-evolved until evolveInto.
-export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false, maxSpeciesId = Infinity } = {}) {
+export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false, maxSpeciesId = Infinity, bonusLevelsForSurvivors = 0 } = {}) {
   // Levels are earned by taking part in the win. A Pokémon that fought and
   // fainted during the battle still levels up; only one that was ALREADY fainted
   // when the battle started (`_enteredFainted`) earns nothing — it never
@@ -527,8 +542,18 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
   // Older callers that don't set the flag fall back to the post-battle state.
   const earnedLevels = fp => (fp._enteredFainted !== undefined ? !fp._enteredFainted : !fp.fainted)
   let roster = finalPlayerTeam.map(fp => (fp._base && earnedLevels(fp)) ? levelUp(fp, fp._base, levelsGained) : fp)
-  // Victory heal: every surviving Pokémon recovers a fraction of max HP (capped).
-  const healPct = BALANCE.pokemon.victoryHealPct
+  if (bonusLevelsForSurvivors > 0) {
+    // Survived = still standing after the fight. Checked against the POST-win
+    // state (fp.fainted at call time — this battle's result), not
+    // _enteredFainted (which is about the state BEFORE the fight started).
+    roster = roster.map((p, i) => (finalPlayerTeam[i]?._base && !finalPlayerTeam[i].fainted)
+      ? levelUp(p, finalPlayerTeam[i]._base, bonusLevelsForSurvivors)
+      : p)
+  }
+  // Victory heal: every surviving Pokémon recovers a fraction of max HP
+  // (capped). Reads the effective balance (getEffectiveBalance), not the raw
+  // BALANCE import, so Quick Heal's override applies — see metaModifiers.js.
+  const healPct = getEffectiveBalance().pokemon.victoryHealPct
   roster = roster.map(p =>
     p.fainted ? p
       : { ...p, stats: { ...p.stats, hp: Math.min(p.stats.maxHp, p.stats.hp + Math.round(p.stats.maxHp * healPct)) } }

@@ -29,11 +29,11 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
   // choice detection. Records auto-evolved species as owned, updates the roster,
   // and queues notices/choices. Returns the updated roster so the caller can
   // run its own post-victory branching.
-  async function applyVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false } = {}) {
+  async function applyVictory(finalPlayerTeam, { levelsGained = 2, fullHeal = false, bonusLevelsForSurvivors = 0 } = {}) {
     // Evolution options are gated to species that exist in this region's gen.
     const maxSpeciesId = GEN_MAX_ID[config?.generation] ?? Infinity
     const { roster: updatedRoster, evolutionNotices: notices, evolutionChoices: choices } =
-      await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal, maxSpeciesId })
+      await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal, maxSpeciesId, bonusLevelsForSurvivors })
     // Each evolved form is a new owned species for the Pokédex.
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
     setRoster(updatedRoster)

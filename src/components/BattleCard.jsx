@@ -8,6 +8,7 @@ import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
 import { BALANCE } from '../game/balance.js'
+import { getEffectiveBalance } from '../game/metaModifiers.js'
 import { itemIconUrl } from '../game/items.js'
 import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import { nearestRectAt } from '../game/dragHit.js'
@@ -335,7 +336,12 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   }
 
   // On victory: play the celebration (sprite pop + level popup) and tick each
-  // surviving player Pokémon's HP up 5% (mirrors the persisted heal in NodeMap).
+  // surviving player Pokémon's HP up by the victory heal pct (mirrors the
+  // persisted heal in pokemon.js's applyBattleVictory). Reads the EFFECTIVE
+  // balance (getEffectiveBalance), not a hardcoded 0.05, so Quick Heal's 8%
+  // (meta upgrade — see metaModifiers.js) shows the same number here that
+  // actually lands on the roster; a stale hardcoded value here would make the
+  // animated tick disagree with the real heal for anyone who owns it.
   // Auto-close the battle when the setting is on.
   useEffect(() => {
     if (!battleResult) return
@@ -349,9 +355,10 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       // RosterColumn, which the mobile layout does not render. Playing it there
       // would be a sound with nothing on screen to explain it.
       if (isDesktop) playSound('levelup')
+      const healPct = getEffectiveBalance().pokemon.victoryHealPct
       setPlayerHp(prev => prev.map((hp, i) =>
         playerFainted[i] ? hp
-          : Math.min(battleRoster[i].stats.maxHp, hp + Math.round(battleRoster[i].stats.maxHp * 0.05))
+          : Math.min(battleRoster[i].stats.maxHp, hp + Math.round(battleRoster[i].stats.maxHp * healPct))
       ))
     }
     // On a loss (all player Pokémon fainted), record the run end immediately —

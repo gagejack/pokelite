@@ -9,7 +9,7 @@
 // This module is PURE: no React, no rng, no side effects. Same inputs → same
 // output, so a shop re-render can't reshuffle the shelf.
 import { ITEMS } from './items.js'
-import { BALANCE } from './balance.js'
+import { getEffectiveBalance } from './metaModifiers.js'
 
 // Normalise a pool entry to { id, stock }. An entry is either a bare item id
 // (use the global stock table) or an object carrying an explicit per-map stock.
@@ -27,9 +27,14 @@ function toEntry(entry) {
   const { id, stock } = toRef(entry)
   const item = ITEMS.find(i => i.id === id)
   if (!item) return null
-  const price = BALANCE.economy.prices[id]
+  // Reads the EFFECTIVE balance (getEffectiveBalance), not the raw BALANCE
+  // import, so Bargain Hunter's 15% discount (meta upgrade) applies here —
+  // see metaModifiers.js. No active run / nothing owned falls back to stock
+  // BALANCE.economy.prices unchanged.
+  const balance = getEffectiveBalance()
+  const price = balance.economy.prices[id]
   if (price == null) return null
-  return { item, price, stock: stock ?? BALANCE.economy.shopStock[id] ?? 1 }
+  return { item, price, stock: stock ?? balance.economy.shopStock[id] ?? 1 }
 }
 
 // The shop shelf for `mapIndex` in `config`. Generic entries first, then the

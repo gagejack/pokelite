@@ -1,16 +1,23 @@
 import { getEffectiveness } from './typeChart.js'
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
+import { getEffectiveBalance, getActiveExtras, qualifyingSynergyTypes } from './metaModifiers.js'
 
 // All battle tuning numbers live in game/balance.js (BALANCE.battle).
 const B = BALANCE.battle
-const HI = B.heldItems
+
+// battle.heldItems specifically is read LIVE (not captured at module scope
+// like B above) because Item Expert (meta upgrade) overlays it per-run — see
+// metaModifiers.js. A module-level `const HI = B.heldItems` would freeze in
+// the stock values forever, before any run's profile is known. Every
+// heldItems read in this file goes through this getter instead.
+const heldItems = () => getEffectiveBalance().battle.heldItems
 
 const itemId = p => p?.heldItem?.id ?? null
 
 // Big Root boosts all HP recovery the holder receives.
 const healAmount = (mon, base) =>
-  Math.floor(base * (itemId(mon) === 'big_root' ? HI.bigRootHeal : 1))
+  Math.floor(base * (itemId(mon) === 'big_root' ? heldItems().bigRootHeal : 1))
 
 // Passive per-round heals (Leftovers / Black Sludge) decay as a battle drags on
 // so an over-healing matchup can't loop forever (which the round cap would then
@@ -26,6 +33,7 @@ const passiveHealFactor = round =>
 
 // Effective speed for turn order (Choice Scarf faster, Iron Ball slower).
 function effSpeed(p) {
+  const HI = heldItems()
   let s = p.stats.speed
   const id = itemId(p)
   if (id === 'choice_scarf') s *= HI.choiceScarfSpeed
@@ -41,8 +49,17 @@ function effSpeed(p) {
 // player's or the enemy's depending on who is swinging (see simulateBattle).
 // Asymmetric values are the difficulty knob: a lower enemy multiplier makes the
 // run easier without changing how fast the player's own attacks resolve.
-export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
+// `synergy` (optional): { types: Set<string>, amount: number } — Type
+// Synergy's bonus (meta upgrade — see metaModifiers.js's
+// qualifyingSynergyTypes and simulateBattle below, which computes `types`
+// once per battle from the PLAYER team and passes it down alongside the
+// owned item's `amount`). Only meaningful when `attacker` is on the side
+// that earned it — simulateBattle only ever passes a non-null `synergy` for
+// the player's own attacks, so no side check is needed here; an enemy
+// attack simply never receives one.
+export function calcDamage(attacker, defender, move, damageMultiplier = 2, synergy = null) {
   if (!move || !move.power) return { damage: 0, crit: false }
+  const HI = heldItems()
   const aItem = itemId(attacker)
   const dItem = itemId(defender)
   const isSpecial = move.damageClass === 'special'
@@ -87,6 +104,14 @@ export function calcDamage(attacker, defender, move, damageMultiplier = 2) {
   if (aItem === 'polarity_band') itemDmg *= HI.polarityBand
   // Persistent bonuses granted after a trigger earlier in the battle.
   if (aItem === 'cell_battery' && attacker._cellActive) itemDmg *= HI.cellBattery
+  // Type Synergy (meta upgrade) — no STAB mechanic exists in this codebase,
+  // so this is a genuinely NEW multiplier, not a modification of one. Applies
+  // when the move's type is one of the party's qualifying types (>= threshold
+  // party members sharing that type — see qualifyingSynergyTypes). `amount`
+  // comes from the owned item's catalog effect via extras, not a literal
+  // here, so an admin-tuned amount (future Balance Dashboard work) would
+  // apply without touching this file.
+  if (synergy?.types.has(move.type)) itemDmg *= 1 + synergy.amount
 
   // Bright Powder — chance an incoming hit is halved.
   let defDmg = 1
@@ -119,6 +144,17 @@ function nextAlive(team, from) {
 export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
   const playerDmg = typeof damage === 'number' ? damage : (damage?.player ?? 2)
   const enemyDmg  = typeof damage === 'number' ? damage : (damage?.enemy ?? 2)
+  const HI = heldItems()
+  // Type Synergy (meta upgrade): computed ONCE from the player's whole roster
+  // (not just who's currently active), then applied to every player attack
+  // whose move type qualifies. Fainted party members still count toward the
+  // party-composition threshold — see qualifyingSynergyTypes's own comment.
+  // Never applies to the enemy side (synergy is a player-only ownership
+  // effect), so `synergy` below is only ever passed on player-side attacks.
+  const typeSynergyExtra = getActiveExtras().typeSynergy
+  const synergy = typeSynergyExtra
+    ? { types: qualifyingSynergyTypes(playerTeam, typeSynergyExtra.threshold), amount: typeSynergyExtra.amount }
+    : null
   // Deep-clone teams so original roster isn't mutated (carry heldItem reference).
   // `_enteredFainted` records the pre-battle state: a Pokémon that was already
   // fainted when the battle started never participated, so it earns nothing from
@@ -174,9 +210,11 @@ export function simulateBattle(playerTeam, enemyTeam, damage = 2) {
       if (attacker.fainted || defender.fainted) continue
 
       // Each side swings with its OWN multiplier — this is what makes the
-      // difficulty asymmetric.
+      // difficulty asymmetric. Type Synergy only ever applies to the
+      // player's own attacks (aSide === 'player'); the enemy never receives it.
       const { damage, crit } = calcDamage(attacker, defender, attacker.move,
-        aSide === 'player' ? playerDmg : enemyDmg)
+        aSide === 'player' ? playerDmg : enemyDmg,
+        aSide === 'player' ? synergy : null)
       const effectiveness = getEffectiveness(attacker.move?.type ?? 'normal', defender.types)
 
       const events = []

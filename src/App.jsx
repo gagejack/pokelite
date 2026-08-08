@@ -19,6 +19,7 @@ import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
 import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js'
+import { setActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -248,9 +249,17 @@ export default function App() {
   }
 
   function startRun(starter) {
+    // Compute this run's meta-progression modifiers ONCE, here, before
+    // anything modifier-dependent runs (initRoster below rolls the starter's
+    // shiny odds, which Shiny Charm can affect). A run's modifiers never
+    // change after this point — see metaModifiers.js's runtime-layer comment.
+    setActiveRunModifiers(profile)
     setSelectedStarter(starter)
     setRoster([])
     resetRunStats()
+    // Starting Funds I/II (meta upgrade): run starts with bonus speed cash.
+    // resetRunStats() above just zeroed speedCash; this applies on top.
+    setSpeedCash(getActiveExtras().startingCash)
     // Install the run's RNG. runSeed is set before startRun for seeded modes;
     // a normal run clears back to Math.random.
     // ORDERING: seed here, THEN initRoster (the starter's shiny roll is the
@@ -722,11 +731,15 @@ export default function App() {
     if (!selectedStarter) return
     // The run is already saved at the moment of defeat (BattleCard onDefeat),
     // so restarting just resets state — no save here (avoids a duplicate row).
+    // Recompute the active run's modifiers — see startRun's identical comment.
+    setActiveRunModifiers(profile)
     setResetting(true)
     setRoster([])
     setBag([])
     setMapIndex(0)
     resetRunStats()
+    // Starting Funds I/II (meta upgrade) — same as startRun.
+    setSpeedCash(getActiveExtras().startingCash)
     // Re-seed before initRoster (the first rng consumer) so a seeded run's
     // "Play Again" reproduces the SAME map/offers the seed originally gave —
     // the mulberry32 stream must restart, not continue where the dead run
@@ -744,6 +757,14 @@ export default function App() {
   }
 
   function advanceMap() {
+    // Interest (meta upgrade): unspent speed cash earns a bonus at each map
+    // end, before the next map's earnings arrive. Rounded to the nearest
+    // dollar — this economy is whole-dollar throughout (mirrors
+    // metaProfile.js's roundMoney rule).
+    const interestRate = getActiveExtras().speedCashInterestRate
+    if (interestRate > 0) {
+      setSpeedCash(prev => prev + Math.round(prev * interestRate))
+    }
     setMapIndex(prev => prev + 1)
     // Remount NodeMap so it generates a fresh map with the new index
     setScreen('restarting')

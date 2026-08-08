@@ -26,6 +26,7 @@ import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { BALANCE } from '../game/balance.js'
+import { getEffectiveBalance, getActiveExtras } from '../game/metaModifiers.js'
 import { swapInRoster } from '../game/roster.js'
 // The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
 // a filename can't be imported, since "?" is the query separator in a specifier.)
@@ -688,8 +689,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const catchBands = config.catchLevelRanges ?? config.mapLevelRanges
     const level = pickLevel(mapLevelRange(catchBands, mapIndex), positionWeight)
 
-    // Draw distinct species weighted by rarity tier.
-    const chosen = config.pickCatchOffer(pool, 3, config.catchTierBudget)
+    // Draw distinct species weighted by rarity tier. Collector's Eye (meta
+    // upgrade) raises the offer count from 3 to 4 — see metaModifiers.js.
+    const chosen = config.pickCatchOffer(pool, getActiveExtras().catchOfferCount, config.catchTierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       // Roll which evolution stage of this line to offer. The pool entry names a
@@ -779,8 +781,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const offered = await fetchOfferedPokemon(node)
       setLoadingNode(null)
       // The floor payout — paid for taking the node, whether or not the player
-      // keeps anything. See BALANCE.economy.payouts.node.
-      onEarnCash?.(BALANCE.economy.payouts.node)
+      // keeps anything. See BALANCE.economy.payouts.node. Reads the effective
+      // balance so Side Hustle's +$10 applies (metaModifiers.js).
+      onEarnCash?.(getEffectiveBalance().economy.payouts.node)
       if (offered.length > 0) {
         setPendingPokeball({ node, offered })
       } else {
@@ -788,8 +791,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         setCurrentNode(node.id)
       }
     } else if (node.type === NODE_TYPES.ITEM) {
-      onEarnCash?.(BALANCE.economy.payouts.node)
-      setPendingItem({ node, offered: pickThreeItems() })
+      onEarnCash?.(getEffectiveBalance().economy.payouts.node)
+      // Treasure Map (meta upgrade): item nodes roll +1 extra option.
+      setPendingItem({ node, offered: pickThreeItems(3 + getActiveExtras().itemNodeExtraOptions) })
     } else if (node.type === NODE_TYPES.POKECENTER) {
       setRoster(prev => prev.map(p => ({ ...p, fainted: false, stats: { ...p.stats, hp: p.stats.maxHp } })))
       setClearedNodes(prev => new Set([...prev, node.id]))
@@ -808,7 +812,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         stock: martStock[node.id] ?? null,
       })
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
-      onEarnCash?.(BALANCE.economy.payouts.node)
+      onEarnCash?.(getEffectiveBalance().economy.payouts.node)
       setPendingPower({ node })
     } else {
       setClearedNodes(prev => new Set([...prev, node.id]))
@@ -828,7 +832,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const levelsGained = isRival ? lv.rival : node.type === NODE_TYPES.GRASS ? lv.grass : lv.default
 
     if (won) {
-      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival })
+      // Bonded (meta upgrade): boss-fight survivors gain a bonus level, that
+      // run only. Boss-only per spec — not rival, not grass/trainer.
+      const bonusLevelsForSurvivors = isBoss ? getActiveExtras().bossSurvivorLevelBonus : 0
+      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal: isBoss || isRival, bonusLevelsForSurvivors })
 
       // Speed Cash payout. Mirrors the levelsGained ladder above but inverted:
       // the fights that pay the fewest levels pay the most cash. See
@@ -898,7 +905,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   function rerollItemOffer() {
-    setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems() } : prev)
+    // Mirrors the option count the original offer used (Treasure Map applies
+    // here too) so a reroll can't silently shrink the choice back to 3.
+    setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems(3 + getActiveExtras().itemNodeExtraOptions) } : prev)
   }
 
   function handlePokeballPick({ pokemon, swapIndex }) {
@@ -994,7 +1003,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // Object line reuses the boss tooltip's { type, name, level } row format.
       return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
     }
-    const nodePay = BALANCE.economy.payouts.node
+    const nodePay = getEffectiveBalance().economy.payouts.node
     switch (node.type) {
       case NODE_TYPES.GRASS:         return { title: 'Tall Grass', sub: `+1 LVL · $${BALANCE.economy.payouts.grass}` }
       case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: `Catch a Pokémon · $${nodePay}` }

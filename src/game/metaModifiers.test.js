@@ -1,0 +1,275 @@
+import { test, expect } from 'vitest'
+import {
+  modifiersFor, qualifyingSynergyTypes,
+  setActiveRunModifiers, clearActiveRunModifiers, getEffectiveBalance, getActiveExtras,
+} from './metaModifiers.js'
+import { createProfile } from './metaProfile.js'
+import { BALANCE } from './balance.js'
+import { META_CATALOG_BY_ID } from './metaCatalog.js'
+
+function withUpgrades(...ids) {
+  return { ...createProfile(), ownedUpgrades: ids }
+}
+
+// ── modifiersFor: owns nothing ──────────────────────────────────────────
+
+test('a fresh profile (owns nothing) produces empty overrides and neutral extras', () => {
+  const { balanceOverrides, extras } = modifiersFor(createProfile())
+  expect(balanceOverrides).toEqual({})
+  expect(extras).toEqual({
+    startingCash: 0,
+    bossSurvivorLevelBonus: 0,
+    itemNodeExtraOptions: 0,
+    speedCashInterestRate: 0,
+    shopDiscountRate: 0,
+    typeSynergy: null,
+    catchOfferCount: 3,
+  })
+})
+
+test('null/undefined profile behaves exactly like owns-nothing', () => {
+  expect(modifiersFor(null)).toEqual(modifiersFor(createProfile()))
+  expect(modifiersFor(undefined)).toEqual(modifiersFor(createProfile()))
+})
+
+// ── modifiersFor: each item individually ────────────────────────────────
+
+test('Quick Heal overrides pokemon.victoryHealPct to 0.08', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('quick_heal'))
+  expect(balanceOverrides.pokemon.victoryHealPct).toBe(0.08)
+})
+
+test('Collector\'s Eye raises catchOfferCount extra from 3 to 4', () => {
+  const { extras } = modifiersFor(withUpgrades('collectors_eye'))
+  expect(extras.catchOfferCount).toBe(4)
+})
+
+test('Shiny Charm multiplies pokemon.shinyOdds by 1.25', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('shiny_charm'))
+  expect(balanceOverrides.pokemon.shinyOdds).toBeCloseTo(BALANCE.pokemon.shinyOdds * 1.25)
+})
+
+test('Item Expert multiplies battle.heldItems strength values by 1.15', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('item_expert'))
+  expect(balanceOverrides.battle.heldItems.lifeOrb).toBeCloseTo(BALANCE.battle.heldItems.lifeOrb * 1.15)
+  expect(balanceOverrides.battle.heldItems.muscleBand).toBeCloseTo(BALANCE.battle.heldItems.muscleBand * 1.15)
+  expect(balanceOverrides.battle.heldItems.sitrusHeal).toBeCloseTo(BALANCE.battle.heldItems.sitrusHeal * 1.15)
+})
+
+test('Item Expert does NOT scale ironBallSpeed (a penalty, not a strength)', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('item_expert'))
+  expect(balanceOverrides.battle.heldItems.ironBallSpeed).toBe(BALANCE.battle.heldItems.ironBallSpeed)
+})
+
+test('Item Expert does NOT scale sitrusThreshold (a trigger point, not a strength)', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('item_expert'))
+  expect(balanceOverrides.battle.heldItems.sitrusThreshold).toBe(BALANCE.battle.heldItems.sitrusThreshold)
+})
+
+test('Item Expert does NOT scale brightPowderChance (a probability, not a strength)', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('item_expert'))
+  expect(balanceOverrides.battle.heldItems.brightPowderChance).toBe(BALANCE.battle.heldItems.brightPowderChance)
+})
+
+test('Side Hustle adds 10 to economy.payouts.node', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('side_hustle'))
+  expect(balanceOverrides.economy.payouts.node).toBe(BALANCE.economy.payouts.node + 10)
+})
+
+test('Starting Funds I alone grants +$50 starting cash', () => {
+  const { extras } = modifiersFor(withUpgrades('starting_funds_1'))
+  expect(extras.startingCash).toBe(50)
+})
+
+test('Starting Funds I + II grants $100 TOTAL, not $150 (does not stack additively)', () => {
+  const { extras } = modifiersFor(withUpgrades('starting_funds_1', 'starting_funds_2'))
+  expect(extras.startingCash).toBe(100)
+})
+
+test('Starting Funds II owned without I still yields the II amount (modifiersFor does not enforce the prerequisite — that is a purchase-time-only rule in metaProfile.js)', () => {
+  // applyPurchase in metaProfile.js is what actually prevents buying II without
+  // I; a profile that somehow has II alone should still get the (correct,
+  // single) bonus rather than nothing or a crash.
+  const { extras } = modifiersFor(withUpgrades('starting_funds_2'))
+  expect(extras.startingCash).toBe(100)
+})
+
+test('Bargain Hunter discounts every economy price by 15%, rounded, and sets shopDiscountRate', () => {
+  const { balanceOverrides, extras } = modifiersFor(withUpgrades('bargain_hunter'))
+  expect(extras.shopDiscountRate).toBe(0.15)
+  expect(balanceOverrides.economy.prices.max_heal).toBe(Math.round(BALANCE.economy.prices.max_heal * 0.85))
+  expect(balanceOverrides.economy.prices.mega_revive).toBe(Math.round(BALANCE.economy.prices.mega_revive * 0.85))
+})
+
+test('Interest sets speedCashInterestRate to 0.10', () => {
+  const { extras } = modifiersFor(withUpgrades('interest'))
+  expect(extras.speedCashInterestRate).toBe(0.10)
+})
+
+test('Bonded sets bossSurvivorLevelBonus to 1', () => {
+  const { extras } = modifiersFor(withUpgrades('bonded'))
+  expect(extras.bossSurvivorLevelBonus).toBe(1)
+})
+
+test('Treasure Map sets itemNodeExtraOptions to 1', () => {
+  const { extras } = modifiersFor(withUpgrades('treasure_map'))
+  expect(extras.itemNodeExtraOptions).toBe(1)
+})
+
+test('Type Synergy surfaces its threshold and amount from the catalog', () => {
+  const { extras } = modifiersFor(withUpgrades('type_synergy'))
+  expect(extras.typeSynergy).toEqual({ threshold: 3, amount: 0.10 })
+})
+
+// ── modifiersFor: combinations do not interfere ─────────────────────────
+
+test('owning every item at once produces every override/extra independently, none dropped or double-applied', () => {
+  const allIds = [
+    'quick_heal', 'collectors_eye', 'shiny_charm', 'item_expert', 'side_hustle',
+    'starting_funds_1', 'starting_funds_2', 'bargain_hunter', 'interest',
+    'bonded', 'treasure_map', 'type_synergy',
+  ]
+  const { balanceOverrides, extras } = modifiersFor(withUpgrades(...allIds))
+
+  expect(balanceOverrides.pokemon.victoryHealPct).toBe(0.08)
+  expect(balanceOverrides.pokemon.shinyOdds).toBeCloseTo(BALANCE.pokemon.shinyOdds * 1.25)
+  expect(balanceOverrides.battle.heldItems.lifeOrb).toBeCloseTo(BALANCE.battle.heldItems.lifeOrb * 1.15)
+  // Side Hustle's +10 and Bargain Hunter's 15%-off both touch economy, but
+  // different sub-paths (payouts vs prices) — neither should clobber the other.
+  expect(balanceOverrides.economy.payouts.node).toBe(BALANCE.economy.payouts.node + 10)
+  expect(balanceOverrides.economy.prices.max_heal).toBe(Math.round(BALANCE.economy.prices.max_heal * 0.85))
+
+  expect(extras.catchOfferCount).toBe(4)
+  expect(extras.startingCash).toBe(100) // Funds II total, not I+II summed
+  expect(extras.shopDiscountRate).toBe(0.15)
+  expect(extras.speedCashInterestRate).toBe(0.10)
+  expect(extras.bossSurvivorLevelBonus).toBe(1)
+  expect(extras.itemNodeExtraOptions).toBe(1)
+  expect(extras.typeSynergy).toEqual({ threshold: 3, amount: 0.10 })
+})
+
+test('two unrelated single-item profiles do not leak each other\'s effects', () => {
+  const a = modifiersFor(withUpgrades('quick_heal'))
+  const b = modifiersFor(withUpgrades('shiny_charm'))
+  expect(a.balanceOverrides.pokemon.shinyOdds).toBeUndefined()
+  expect(b.balanceOverrides.pokemon.victoryHealPct).toBeUndefined()
+})
+
+// ── modifiersFor: values match the catalog exactly (no invented numbers) ──
+
+test('every amount used above is read from META_CATALOG_BY_ID, not a hand-typed literal', () => {
+  expect(META_CATALOG_BY_ID.quick_heal.effect.amount).toBe(0.08)
+  expect(META_CATALOG_BY_ID.collectors_eye.effect.amount).toBe(4)
+  expect(META_CATALOG_BY_ID.shiny_charm.effect.amount).toBe(0.25)
+  expect(META_CATALOG_BY_ID.item_expert.effect.amount).toBe(0.15)
+  expect(META_CATALOG_BY_ID.side_hustle.effect.amount).toBe(10)
+  expect(META_CATALOG_BY_ID.starting_funds_1.effect.amount).toBe(50)
+  expect(META_CATALOG_BY_ID.starting_funds_2.effect.amount).toBe(100)
+  expect(META_CATALOG_BY_ID.bargain_hunter.effect.amount).toBe(0.15)
+  expect(META_CATALOG_BY_ID.interest.effect.amount).toBe(0.10)
+  expect(META_CATALOG_BY_ID.bonded.effect.amount).toBe(1)
+  expect(META_CATALOG_BY_ID.treasure_map.effect.amount).toBe(1)
+  expect(META_CATALOG_BY_ID.type_synergy.effect).toEqual({ type: 'type_synergy_damage', threshold: 3, amount: 0.10 })
+})
+
+// ── qualifyingSynergyTypes: pure party-composition rule ─────────────────
+
+test('fewer than the threshold sharing a type qualifies nothing', () => {
+  const party = [{ types: ['fire'] }, { types: ['fire'] }, { types: ['water'] }]
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set())
+})
+
+test('exactly the threshold sharing a type qualifies that type', () => {
+  const party = [{ types: ['fire'] }, { types: ['fire'] }, { types: ['fire'] }]
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set(['fire']))
+})
+
+test('more than the threshold still qualifies (>=, not ===)', () => {
+  const party = Array.from({ length: 5 }, () => ({ types: ['water'] }))
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set(['water']))
+})
+
+test('dual-type Pokémon count toward BOTH of their types', () => {
+  const party = [
+    { types: ['fire', 'flying'] },
+    { types: ['fire', 'flying'] },
+    { types: ['fire', 'flying'] },
+  ]
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set(['fire', 'flying']))
+})
+
+test('two different types can both qualify at once in a 6/7-slot roster', () => {
+  const party = [
+    { types: ['fire'] }, { types: ['fire'] }, { types: ['fire'] },
+    { types: ['water'] }, { types: ['water'] }, { types: ['water'] },
+  ]
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set(['fire', 'water']))
+})
+
+test('fainted party members still count (roster composition, not who can currently fight)', () => {
+  const party = [
+    { types: ['fire'], fainted: true },
+    { types: ['fire'], fainted: true },
+    { types: ['fire'], fainted: false },
+  ]
+  expect(qualifyingSynergyTypes(party, 3)).toEqual(new Set(['fire']))
+})
+
+test('empty party qualifies nothing and does not throw', () => {
+  expect(qualifyingSynergyTypes([], 3)).toEqual(new Set())
+})
+
+test('party members with no types array do not throw', () => {
+  expect(qualifyingSynergyTypes([{}, { types: ['fire'] }], 3)).toEqual(new Set())
+})
+
+// ── Runtime layer: setActiveRunModifiers / getEffectiveBalance / getActiveExtras ──
+
+test('with no active run, getEffectiveBalance returns stock BALANCE unchanged (identity)', () => {
+  clearActiveRunModifiers()
+  expect(getEffectiveBalance()).toBe(BALANCE)
+})
+
+test('with no active run, getActiveExtras returns neutral defaults', () => {
+  clearActiveRunModifiers()
+  const extras = getActiveExtras()
+  expect(extras.startingCash).toBe(0)
+  expect(extras.catchOfferCount).toBe(3)
+  expect(extras.typeSynergy).toBeNull()
+})
+
+test('setActiveRunModifiers(profile-owning-nothing) also returns stock BALANCE unchanged (identity)', () => {
+  setActiveRunModifiers(createProfile())
+  expect(getEffectiveBalance()).toBe(BALANCE)
+  clearActiveRunModifiers()
+})
+
+test('setActiveRunModifiers applies overrides that getEffectiveBalance then reflects, without mutating the original BALANCE', () => {
+  setActiveRunModifiers(withUpgrades('quick_heal'))
+  const effective = getEffectiveBalance()
+  expect(effective.pokemon.victoryHealPct).toBe(0.08)
+  expect(BALANCE.pokemon.victoryHealPct).toBe(0.05) // stock object untouched
+  // Unrelated branches pass through unchanged (same values as stock, even if
+  // not the same object reference after a deep merge).
+  expect(effective.battle.critChance).toBe(BALANCE.battle.critChance)
+  clearActiveRunModifiers()
+})
+
+test('setActiveRunModifiers extras are readable via getActiveExtras', () => {
+  setActiveRunModifiers(withUpgrades('bonded', 'interest'))
+  const extras = getActiveExtras()
+  expect(extras.bossSurvivorLevelBonus).toBe(1)
+  expect(extras.speedCashInterestRate).toBe(0.10)
+  clearActiveRunModifiers()
+})
+
+test('clearActiveRunModifiers resets back to the no-run-active state', () => {
+  setActiveRunModifiers(withUpgrades('quick_heal'))
+  clearActiveRunModifiers()
+  expect(getEffectiveBalance()).toBe(BALANCE)
+  expect(getActiveExtras().startingCash).toBe(0)
+})
+
+test('BALANCE stays deep-frozen after every scenario above (no accidental mutation leaked)', () => {
+  expect(() => { BALANCE.pokemon.victoryHealPct = 0.99 }).toThrow()
+})
