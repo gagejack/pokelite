@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
 import { METACASH_ITEMS, KEY_ITEMS } from '../game/metaCatalog.js'
@@ -355,10 +355,25 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
   // posture as unlockAndEnterRegion/recordRunEnd); component tests that pass
   // a bare `setProfile`-shaped stub still work since awaiting a non-promise
   // is a no-op.
+  // In-flight guard. Every handler below computes its next profile from the
+  // CURRENT `profile` prop, so two clicks landing before App's setProfile
+  // commits would both read the same stale balance and both succeed — the
+  // player pays once but the second write clobbers the first, or a
+  // repeat-buyable item (vitamins, up to 3) charges twice. A ref rather than
+  // state because it has to be readable and writable synchronously within one
+  // click handler; state wouldn't have updated yet, which is the whole bug.
+  const purchasing = useRef(false)
+
   async function runPurchase(nextProfile) {
+    if (purchasing.current) return
+    purchasing.current = true
     setNotice(null)
-    const outcome = await onPurchase(nextProfile)
-    if (outcome?.notice) setNotice(outcome.notice)
+    try {
+      const outcome = await onPurchase(nextProfile)
+      if (outcome?.notice) setNotice(outcome.notice)
+    } finally {
+      purchasing.current = false
+    }
   }
 
   function handleBuyUpgrade(item) {
