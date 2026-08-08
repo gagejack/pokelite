@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'vitest'
-import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest } from './pokemon.js'
+import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, cachedSprite } from './pokemon.js'
 import { setActiveRunModifiers, clearActiveRunModifiers } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -362,4 +362,8 @@ test('resolveEvolutionLine with no level argument resolves from the requested id
   const stages = await resolveEvolutionLine(9002, Infinity)
   expect(stages[0].id).toBe(9002)
   expect(stages.some(s => s.id === 9001)).toBe(false)
+})
+
+test('cachedSprite returns null for a species that was never warmed', () => {
+  expect(cachedSprite(9999)).toBe(null)
 })

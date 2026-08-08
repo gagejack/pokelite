@@ -175,6 +175,13 @@ export function cachedName(id) {
   return baseCache.get(id)?.name ?? null
 }
 
+// Front sprite URL for a prewarmed species, or null if it hasn't been fetched.
+// Used by Safari node rendering, which draws a Pokémon on the map itself and
+// must stay synchronous — a null here falls back to the Classic node icon.
+export function cachedSprite(id) {
+  return baseCache.get(id)?.sprite ?? null
+}
+
 // Hard level ceiling. The stat formulas below are only defined up to 100, and
 // a full run (8 maps + Elite Four at +1/+2/+4 levels per win) overshoots it, so
 // levelUp clamps here.
