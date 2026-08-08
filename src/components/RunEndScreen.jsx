@@ -20,6 +20,14 @@ export default function RunEndScreen({
   onRestart,
   onMainMenu,
   restartLabel = 'Play Again',
+  // Run It Back (key item): undefined by default, so every existing call site
+  // (both EliteFour win screens, and BattleCard's DefeatScreen when the item
+  // isn't owned/available) renders identically to before this prop existed —
+  // same pattern the file's other props already establish (spec §6b:
+  // "Defaulting so existing call sites keep working"). Only BattleCard's
+  // DefeatScreen ever passes a function here, and only when the item is
+  // owned AND this run hasn't used its one offer yet.
+  onRunItBack,
   seedCode,
   cashEarned = 0,
   speedCash = 0,
@@ -210,8 +218,27 @@ export default function RunEndScreen({
           ))}
         </div>
 
-        {(onRestart || onMainMenu) && (
+        {(onRunItBack || onRestart || onMainMenu) && (
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {/* Run It Back (key item): loss-only, offered at most once per run
+                — see BattleCard's DefeatScreen for the gating. Purple matches
+                the key-item/prestige treatment the shop's own bar uses (spec
+                §6a: #7c3aed), so this reads as "spend the thing you paid keys
+                for" rather than another plain exit button. First in the row —
+                it's the one action here that isn't just leaving the result
+                behind. */}
+            {onRunItBack && (
+              <button
+                onClick={onRunItBack}
+                style={{
+                  fontFamily: 'Upheaval', fontSize: '16px', color: '#fff',
+                  border: '2px solid #000', backgroundColor: '#7c3aed',
+                  padding: '10px 40px', cursor: 'pointer',
+                }}
+              >
+                Run It Back
+              </button>
+            )}
             {onRestart && (
               <button
                 onClick={onRestart}

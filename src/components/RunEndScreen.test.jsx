@@ -153,6 +153,26 @@ test('a payout that failed to reach the account tells the player, instead of jus
   expect(container.textContent).toContain('Saved on this device')
 })
 
+// ── Run It Back (key item): the button only appears when explicitly offered ──
+
+test('onRunItBack omitted (the default): no Run It Back button renders, on either ending', () => {
+  const lose = show({ title: 'Defeated...', titleColor: '#ef4444' })
+  expect(lose.queryByText('Run It Back')).toBeNull()
+  lose.unmount()
+
+  const win = show({ title: 'Region Cleared', titleColor: '#3f9d4f' })
+  expect(win.queryByText('Run It Back')).toBeNull()
+})
+
+test('onRunItBack passed on a loss: the button renders and calls it on click', () => {
+  let clicked = false
+  const { getByText } = show({
+    title: 'Defeated...', titleColor: '#ef4444', onRunItBack: () => { clicked = true },
+  })
+  getByText('Run It Back').click()
+  expect(clicked).toBe(true)
+})
+
 test('a normal (saved) payout shows no local-save warning', () => {
   const { container } = show({
     title: 'Region Cleared', titleColor: '#3f9d4f',

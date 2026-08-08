@@ -25,6 +25,8 @@ test('a fresh profile (owns nothing) produces empty overrides and neutral extras
     shopDiscountRate: 0,
     typeSynergy: null,
     catchOfferCount: 3,
+    partySize: 6,
+    ownsRunItBack: false,
   })
 })
 
@@ -120,6 +122,26 @@ test('Treasure Map sets itemNodeExtraOptions to 1', () => {
 test('Type Synergy surfaces its threshold and amount from the catalog', () => {
   const { extras } = modifiersFor(withUpgrades('type_synergy'))
   expect(extras.typeSynergy).toEqual({ threshold: 3, amount: 0.10 })
+})
+
+test('a fresh profile (owns nothing) has partySize 6', () => {
+  const { extras } = modifiersFor(createProfile())
+  expect(extras.partySize).toBe(6)
+})
+
+test('Extra Slot raises partySize from 6 to 7', () => {
+  const { extras } = modifiersFor(withUpgrades('extra_slot'))
+  expect(extras.partySize).toBe(7)
+})
+
+test('a fresh profile (owns nothing) has ownsRunItBack false', () => {
+  const { extras } = modifiersFor(createProfile())
+  expect(extras.ownsRunItBack).toBe(false)
+})
+
+test('Run It Back sets ownsRunItBack true', () => {
+  const { extras } = modifiersFor(withUpgrades('run_it_back'))
+  expect(extras.ownsRunItBack).toBe(true)
 })
 
 // ── modifiersFor: combinations do not interfere ─────────────────────────

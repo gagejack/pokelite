@@ -49,3 +49,44 @@ test('a normal (saved) unlock shows no local-save notice', () => {
   const { container } = show({ unlockNotice: null })
   expect(container.textContent).not.toContain('Saved on this device')
 })
+
+// ── Déjà Vu (key item): a second row for previously-used starters ─────────
+
+test('no profile at all: no Déjà Vu section renders', async () => {
+  const { container } = show({})
+  // Wait for the region row's own load to settle before asserting absence.
+  await screen.findByText('bulbasaur')
+  expect(container.textContent).not.toContain('Déjà Vu')
+})
+
+test('Déjà Vu not owned, even with run history: no section renders', async () => {
+  const profile = { ownedUpgrades: [], usedStarters: [495, 152] }
+  const { container } = show({ profile })
+  await screen.findByText('bulbasaur')
+  expect(container.textContent).not.toContain('Déjà Vu')
+})
+
+test('Déjà Vu owned but no run history yet: no section renders (not an empty box)', async () => {
+  const profile = { ownedUpgrades: ['deja_vu'], usedStarters: [] }
+  const { container } = show({ profile })
+  await screen.findByText('bulbasaur')
+  expect(container.textContent).not.toContain('Déjà Vu')
+})
+
+test('Déjà Vu owned with history from another region: section renders with that starter', async () => {
+  // 495 (Snivy) is a Unova starter, offered here while region is Kanto.
+  const profile = { ownedUpgrades: ['deja_vu'], usedStarters: [495] }
+  show({ profile })
+  await screen.findByText('Déjà Vu')
+  expect(screen.getByText('snivy')).toBeTruthy()
+})
+
+test('Déjà Vu owned with a used starter that is ALSO one of Kanto\'s three: not shown twice', async () => {
+  // 4 (Charmander) is already one of Kanto's own three starters.
+  const profile = { ownedUpgrades: ['deja_vu'], usedStarters: [4] }
+  const { container } = show({ profile })
+  await screen.findByText('bulbasaur')
+  // No Déjà Vu section at all — Charmander is fully absorbed into the region row.
+  expect(container.textContent).not.toContain('Déjà Vu')
+  expect(screen.getAllByText('charmander').length).toBe(1)
+})

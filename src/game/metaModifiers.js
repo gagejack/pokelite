@@ -111,10 +111,11 @@ function startingCashBonus(profile) {
  * `extras` covers effects with no BALANCE knob to overlay: run-start/
  * event-driven amounts the loop reads directly rather than through BALANCE
  * (starting cash, boss-survivor level bonus, item-node extra option count,
- * speed-cash interest rate, shop discount rate, Type Synergy's own amount).
- * Vitamins are explicitly excluded — Task 6 owns makePokemon's per-stat
- * multiplier and reads the profile's `vitamins` map directly there; this
- * function does not produce anything vitamin-shaped.
+ * speed-cash interest rate, shop discount rate, Type Synergy's own amount,
+ * the roster cap Extra Slot raises). Vitamins are explicitly excluded — Task
+ * 6 owns makePokemon's per-stat multiplier and reads the profile's
+ * `vitamins` map directly there; this function does not produce anything
+ * vitamin-shaped.
  *
  * @param {import('./metaProfile.js').MetaProfile | null | undefined} profile
  * @returns {{ balanceOverrides: object, extras: object }}
@@ -129,6 +130,9 @@ export function modifiersFor(profile) {
     shopDiscountRate: 0,
     typeSynergy: null, // { threshold, amount } when owned, else null
     catchOfferCount: 3, // stock offer count; Collector's Eye raises this below
+    partySize: 6, // stock roster cap; Extra Slot raises this below
+    ownsRunItBack: false, // Run It Back (key item) — App.jsx reads this to
+    // decide whether to bother capturing a map-start snapshot at all.
   }
 
   if (!profile) return { balanceOverrides, extras }
@@ -215,6 +219,23 @@ export function modifiersFor(profile) {
   if (owns(profile, 'type_synergy')) {
     const { threshold, amount } = META_CATALOG_BY_ID.type_synergy.effect
     extras.typeSynergy = { threshold, amount }
+  }
+
+  // 12. Extra Slot (key item) → roster cap 6 → 7. Every roster-cap check in
+  // the game (PokeballNode's swap-vs-add gate, NodeMap's two catch-commit
+  // sites) reads this instead of a hardcoded 6, so the cap is a single fact
+  // computed once here rather than re-derived at each call site.
+  if (owns(profile, 'extra_slot')) {
+    extras.partySize = 6 + META_CATALOG_BY_ID.extra_slot.effect.amount
+  }
+
+  // 13. Run It Back (key item) → App.jsx reads this ownership flag to decide
+  // whether to capture a map-start snapshot at all; per-run consumption (one
+  // use even though the item is permanent) is tracked in App.jsx state, not
+  // here — modifiersFor is profile-in/overlay-out and has no notion of "this
+  // run has already used its one offer."
+  if (owns(profile, 'run_it_back')) {
+    extras.ownsRunItBack = true
   }
 
   return { balanceOverrides, extras }
@@ -349,6 +370,8 @@ const NEUTRAL_EXTRAS = {
   shopDiscountRate: 0,
   typeSynergy: null,
   catchOfferCount: 3,
+  partySize: 6,
+  ownsRunItBack: false,
 }
 
 export function getActiveExtras() {

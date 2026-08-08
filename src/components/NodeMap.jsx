@@ -429,7 +429,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -919,7 +919,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // Polarity Band, whose retype depends on the holder's species).
       setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
     } else {
-      setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
+      setRoster(prev => prev.length < getActiveExtras().partySize ? [...prev, pokemon] : prev)
     }
     onPokemonCaught?.(pokemon.pokeId, !!pokemon.shiny)
     onCatchRecorded?.(pokemon)
@@ -937,7 +937,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // Same item transfer as handlePokeballPick — see the note there.
       setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
     } else {
-      setRoster(prev => prev.length < 6 ? [...prev, pokemon] : prev)
+      setRoster(prev => prev.length < getActiveExtras().partySize ? [...prev, pokemon] : prev)
     }
     onPokemonCaught?.(pokemon.pokeId, !!pokemon.shiny)
     onCatchRecorded?.(pokemon)
@@ -1532,6 +1532,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
+            runItBackAvailable={runItBackAvailable}
+            onRunItBack={onRunItBack}
             onMainMenu={onBack}
             seedCode={seedCode}
             cashEarned={cashEarned}

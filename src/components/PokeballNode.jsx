@@ -5,9 +5,11 @@ import PokemonCard from './PokemonCard'
 import { TYPE_COLORS } from '../game/types.js'
 import { itemIconUrl } from '../game/items.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
+import { getActiveExtras } from '../game/metaModifiers.js'
 
 // PokeballNode — shows 3 offered Pokémon, player picks one.
-// If roster is full (6), shows current roster so player can swap.
+// If roster is full (6, or 7 with Extra Slot), shows current roster so the
+// player can swap.
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
 export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false, onReroll = null, rerolling = false }) {
   const { dark } = useTheme()
@@ -25,7 +27,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
     await onReroll()
   }
 
-  const isFull = roster.length >= 6
+  const isFull = roster.length >= getActiveExtras().partySize
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
   const bg = dark ? '#2e2e2e' : '#DBDBDB'

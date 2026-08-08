@@ -24,7 +24,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onBack, onRestart, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -406,6 +406,8 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             onBattleEnd={handleBattleEnd}
             onDefeat={() => onRunEnd?.('loss')}
             onRestart={onRestart}
+            runItBackAvailable={runItBackAvailable}
+            onRunItBack={onRunItBack}
             onMainMenu={onBack}
             seedCode={seedCode}
             cashEarned={cashEarned}

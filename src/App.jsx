@@ -20,6 +20,7 @@ import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
 import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js'
 import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
+import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
@@ -114,6 +115,34 @@ export default function App() {
   // True once the current run has ended (win/loss). A finished run must not be
   // saved as resumable when the player then hits Home.
   const runEnded = useRef(false)
+
+  // Run It Back (key item, spec §4): a snapshot of the run taken at MAP START
+  // (same shape buildRunSnapshot produces for the Home save), held ONLY in
+  // memory — a separate ref from savedRunData/mapProgress above, so it can
+  // never collide with or overwrite the player's actual Home save. A page
+  // refresh loses it, same as any other un-persisted in-memory run state
+  // (battle log, animation state, etc.) — Run It Back is a same-session
+  // insurance policy against a bad map, not a durable save; a player who
+  // wants durability already has Home.
+  //
+  // runItBackSnapshotMapIndex records which mapIndex the current snapshot was
+  // taken for, so the capture effect (below, wired to NodeMap's
+  // onProgressChange) only re-snapshots when a NEW map actually starts —
+  // not on every node cleared within the same map, which would otherwise
+  // overwrite "the start of this map" with "wherever the player currently is."
+  const runItBackSnapshot = useRef(null)
+  const runItBackSnapshotMapIndex = useRef(null)
+  // Per-RUN consumption flag: Run It Back is a permanent item, but its use is
+  // spent once per run even though it's owned forever. Reset at every run
+  // entry point (startRun/restartRun/resumeRun) alongside the snapshot itself.
+  const runItBackUsed = useRef(false)
+  // Mirrors "a snapshot exists AND hasn't been used" as STATE (the two refs
+  // above are read at click-time, where a stale closure is harmless — but the
+  // defeat screen needs to know whether to show the button in the first
+  // place, and a ref mutation alone doesn't trigger that render). Set
+  // wherever the refs change; never read for logic, only for the button's
+  // visibility.
+  const [runItBackReady, setRunItBackReady] = useState(false)
 
   // Guest→account meta-profile migration (spec §7): which user id migration
   // has already run for, so it can never re-fire for the same signed-in
@@ -248,12 +277,48 @@ export default function App() {
     recordSpeciesOwned(instance.pokeId, !!instance.shiny)
   }
 
+  // Déjà Vu (key item, spec §4): add `starterId` to the profile's usedStarters
+  // list, deduped, and persist. Reads/writes the CURRENT profile rather than a
+  // stale closure — App only calls this right before setProfile-affecting
+  // work, so `profile` here is the latest loaded value. A guest with no
+  // profile yet (profile === null) still gets a real profile written, the
+  // same createProfile()-fallback posture recordRunEnd already uses.
+  function recordStarterUsed(starterId) {
+    const current = profile ?? createProfile()
+    if (current.usedStarters.includes(starterId)) return
+    const next = { ...current, usedStarters: [...current.usedStarters, starterId] }
+    setProfile(next)
+    saveProfile(next, user) // fire-and-forget — see startRun's call site comment
+  }
+
+  // Clear Run It Back's snapshot/consumption state. Called from every run
+  // ENTRY point (startRun, restartRun, resumeRun) so a fresh run never
+  // inherits the previous run's snapshot or "already used" flag, and from
+  // clearRunState so leaving to the menu doesn't leave a stale snapshot
+  // sitting in memory pointing at a run that no longer exists.
+  function resetRunItBack() {
+    runItBackSnapshot.current = null
+    runItBackSnapshotMapIndex.current = null
+    runItBackUsed.current = false
+    setRunItBackReady(false)
+  }
+
   function startRun(starter) {
+    resetRunItBack()
     // Compute this run's meta-progression modifiers ONCE, here, before
     // anything modifier-dependent runs (initRoster below rolls the starter's
     // shiny odds, which Shiny Charm can affect). A run's modifiers never
     // change after this point — see metaModifiers.js's runtime-layer comment.
     setActiveRunModifiers(profile)
+    // Déjà Vu (key item): record this starter's species id so a future run can
+    // offer it again regardless of region. Only here, not restartRun/resumeRun
+    // — those reuse a starter already on the list (restartRun: the same run's
+    // starter; resumeRun: recorded when the run originally started), so
+    // writing there too would be a no-op at best. Fire-and-forget, same
+    // posture as persistProgress's saveRun: a run must never block on this
+    // write, and a dropped one just means the species isn't offered back
+    // until the NEXT run that starts with it.
+    recordStarterUsed(starter.id)
     setSelectedStarter(starter)
     setRoster([])
     resetRunStats()
@@ -326,6 +391,35 @@ export default function App() {
     saveRun(snapshot, user) // fire-and-forget
   }
 
+  // Run It Back (key item): capture this run's map-start snapshot, in memory
+  // only. Called from the same onProgressChange wire persistProgress uses,
+  // AFTER mapProgress.current is set — buildRunSnapshot reads mapProgress.
+  //
+  // Guarded to fire at most once per mapIndex: onProgressChange re-fires on
+  // every node cleared within the CURRENT map (clearedNodes/currentNode both
+  // change), and only the very first call for a given mapIndex is "the start
+  // of this map" — every later call within the same map is progress the
+  // player already made that a replay must not restore them past.
+  //
+  // Only captures at all if the item is owned and this run hasn't already
+  // spent its one use — an owned-but-already-used run has nothing left to
+  // offer, and a run that doesn't own the item should carry no snapshot for
+  // recordRunEnd's offer check to find.
+  function captureRunItBackSnapshot() {
+    const should = shouldCaptureSnapshot({
+      ownsRunItBack: getActiveExtras().ownsRunItBack,
+      alreadyUsedThisRun: runItBackUsed.current,
+      snapshotMapIndex: runItBackSnapshotMapIndex.current,
+      currentMapIndex: mapIndex,
+    })
+    if (!should) return
+    const snapshot = buildRunSnapshot()
+    if (!snapshot) return
+    runItBackSnapshot.current = snapshot
+    runItBackSnapshotMapIndex.current = mapIndex
+    setRunItBackReady(isRunItBackAvailable({ hasSnapshot: true, alreadyUsedThisRun: runItBackUsed.current }))
+  }
+
   // Home mid-run: persist a snapshot (account if logged in, else localStorage),
   // then return to the menu where "Resume Run" will appear. A finished run
   // (win/loss) is never saved as resumable.
@@ -356,6 +450,11 @@ export default function App() {
     // future caller that skipped that gate would silently strip the player's
     // paid upgrades for the rest of the run rather than failing visibly.
     if (profile == null) return
+    // A resumed run's Run It Back snapshot cannot have survived — it only
+    // ever lived in memory (see its declaration comment) and resumeRun only
+    // runs after a page load wiped that memory. Reset rather than carry
+    // forward a stale/impossible state.
+    resetRunItBack()
     setSelectedRegion(run.region)
     setSelectedCharacter(run.character ?? DEFAULT_CHARACTER)
     setSelectedStarter(run.starter)
@@ -401,6 +500,80 @@ export default function App() {
     setScreen('nodemap')
   }
 
+  // Run It Back (key item, spec §4): restore the map-start snapshot captured
+  // by captureRunItBackSnapshot and replay that map. Offered once per run,
+  // loss-only, from RunEndScreen's defeat state (App.jsx wires
+  // runItBackAvailable/onRunItBack into BattleCard → DefeatScreen).
+  //
+  // DOUBLE-PAY GUARD: recordRunEnd already ran and paid out for this loss the
+  // moment BattleCard's onDefeat fired — that happened before this screen (and
+  // its Run It Back button) even rendered, on a completely separate code path
+  // this function never calls. Clicking Run It Back does not re-run
+  // recordRunEnd for the loss that already happened; it only restores state
+  // and re-arms runEnded (the exactly-once payout guard) for whatever THIS
+  // replay attempt ends in next — a genuinely new outcome (win or another
+  // loss) that has never been paid for. There is no path through this
+  // function that can pay the same loss twice, because it contains no call
+  // to recordRunEnd at all.
+  //
+  // mapsCleared/pokemonCaught/etc are restored to the snapshot's values (as
+  // of MAP START, not as of the loss) so a second loss on the replay prices
+  // correctly off maps actually cleared on this attempt, not off progress
+  // erased by the restore.
+  function runItBack() {
+    const snapshot = runItBackSnapshot.current
+    if (!snapshot) return
+    // Spend the one use now, unconditionally — even if something below turns
+    // out to be a no-op, the offer was already shown and accepted once.
+    runItBackUsed.current = true
+    runItBackSnapshot.current = null
+    runItBackSnapshotMapIndex.current = null
+    setRunItBackReady(false)
+
+    setSelectedRegion(snapshot.region)
+    setSelectedCharacter(snapshot.character ?? DEFAULT_CHARACTER)
+    setSelectedStarter(snapshot.starter)
+    setRoster(snapshot.roster ?? [])
+    setBag(snapshot.bag ?? [])
+    setMapIndex(snapshot.mapIndex ?? 0)
+    setRunSeed(snapshot.runSeed ?? null)
+    setRunMode(snapshot.runMode ?? 'normal')
+    runStartedAt.current = snapshot.runStartedAt ?? Date.now()
+    dailyDate.current = snapshot.dailyDate ?? null
+    if (snapshot.rngState != null) setRngState(snapshot.rngState)
+    else clearRng()
+    mapsCleared.current = snapshot.stats?.mapsCleared ?? 0
+    pokemonCaught.current = snapshot.stats?.pokemonCaught ?? 0
+    pokemonCaughtIds.current = snapshot.stats?.pokemonCaughtIds ?? []
+    pokemonSeenIds.current = snapshot.stats?.pokemonSeenIds ?? []
+    pokemonSeenShinyIds.current = snapshot.stats?.pokemonSeenShinyIds ?? []
+    setSpeedCash(snapshot.stats?.speedCash ?? 0)
+    setCashEarned(snapshot.stats?.cashEarned ?? 0)
+    setMetacashEarned(0)
+    setKeysEarned(0)
+    setPayoutSaved(true)
+    // Feed the snapshotted map's layout + node progress (map start: node 0
+    // cleared, nothing else) to NodeMap on mount.
+    mapProgress.current = snapshot.map ?? null
+    runEnded.current = false
+    // Same reasoning as resumeRun's identical call — a run's modifiers are
+    // set once per entry point, and this is a new entry point.
+    setActiveRunModifiers(profile)
+    // Force NodeMap to actually remount rather than just re-render. This is
+    // called from WITHIN the 'nodemap' screen (the defeat overlay renders on
+    // top of a live NodeMap), and NodeMap keys off mapIndex — when the
+    // snapshot's mapIndex is the SAME map the player just lost on (the
+    // common case: Run It Back offered on the very map that killed them),
+    // setMapIndex above is a no-op change and setScreen('nodemap') would be
+    // too, since the screen never left 'nodemap' to begin with. Without this
+    // detour NodeMap would keep its current mounted state (mid-battle,
+    // cleared nodes and all) instead of picking up the fresh
+    // initialMapData/initialClearedNodes props from the restored snapshot.
+    // restartRun (Play Again) solves the identical problem the identical way.
+    setScreen('restarting')
+    setTimeout(() => setScreen('nodemap'), 0)
+  }
+
   // Clear only the in-memory run STATE (not the persisted save). Used when
   // leaving to the menu after a save, and by resetRun below.
   function clearRunState() {
@@ -411,6 +584,7 @@ export default function App() {
     // is the exact leak this function exists to prevent, and it makes any
     // future menu-side reader of getEffectiveBalance correct by default.
     clearActiveRunModifiers()
+    resetRunItBack()
     clearRng()
     setRunSeed(null)
     setRunMode('normal')
@@ -433,7 +607,14 @@ export default function App() {
     // must not pay again), and set unconditionally right after so every
     // exit path below — guest or logged-in, win or loss — is covered by one
     // flag rather than one guard per branch.
-    if (runEnded.current) return
+    //
+    // This is also THE double-pay guard for Run It Back: a loss pays out
+    // right here, the moment it happens — runItBack() (below) restores state
+    // and re-arms this same guard for the replay's own eventual outcome, but
+    // never itself calls recordRunEnd. shouldRecordPayout is the pure version
+    // of this exact check, unit-tested in game/runItBack.test.js without
+    // needing to mount this component.
+    if (!shouldRecordPayout(result, runEnded.current)) return
     runEnded.current = true
 
     // Payout runs for EVERYONE, guest or logged-in — metacash/keys are a
@@ -755,6 +936,11 @@ export default function App() {
     // so restarting just resets state — no save here (avoids a duplicate row).
     // Recompute the active run's modifiers — see startRun's identical comment.
     setActiveRunModifiers(profile)
+    // "Play Again" starts a brand-new run (fresh map 0), distinct from Run It
+    // Back's "replay the SAME map from its snapshot" — reset here too so a
+    // leftover snapshot/used-flag from the run that just ended can't leak
+    // into this new one.
+    resetRunItBack()
     setResetting(true)
     setRoster([])
     setBag([])
@@ -961,6 +1147,7 @@ export default function App() {
           }}
           onSelectStarter={starter => { setUnlockNotice(null); startRun(starter) }}
           caughtSet={caughtSet}
+          profile={profile}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           unlockNotice={unlockNotice}
@@ -990,6 +1177,8 @@ export default function App() {
           mapIndex={mapIndex}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
+          runItBackAvailable={runItBackReady}
+          onRunItBack={runItBack}
           onAdvanceMap={advanceMap}
           onEnterEliteFour={() => setScreen('elitefour')}
           onPokemonCaught={handlePokemonCaught}
@@ -1000,7 +1189,7 @@ export default function App() {
           onMapCleared={handleMapCleared}
           onBadgeEarned={recordBadgeEarned}
           onRunEnd={recordRunEnd}
-          onProgressChange={p => { mapProgress.current = p; persistProgress() }}
+          onProgressChange={p => { mapProgress.current = p; persistProgress(); captureRunItBackSnapshot() }}
           initialMapData={mapProgress.current?.mapData}
           initialClearedNodes={mapProgress.current?.clearedNodes}
           initialCurrentNode={mapProgress.current?.currentNode}
@@ -1039,6 +1228,8 @@ export default function App() {
           onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
+          runItBackAvailable={runItBackReady}
+          onRunItBack={runItBack}
           onMapCleared={handleMapCleared}
           onRunEnd={recordRunEnd}
           onSpeciesSeen={recordSpeciesSeen}

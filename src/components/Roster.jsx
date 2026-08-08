@@ -7,6 +7,7 @@ import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS } from '../game/types.js'
 import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import { nearestRectAt } from '../game/dragHit.js'
+import { getActiveExtras } from '../game/metaModifiers.js'
 
 // Darker partner shades. HP uses the same green/yellow/red thresholds as
 // hpColor(); STAT_BAR is the stat bars' blue.
@@ -318,7 +319,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           {...slotProps(i)}
         />
       ))}
-      {Array.from({ length: Math.max(0, 6 - roster.length) }).map((_, i) => (
+      {Array.from({ length: Math.max(0, getActiveExtras().partySize - roster.length) }).map((_, i) => (
         <div
           key={`empty-${i}`}
           style={{
