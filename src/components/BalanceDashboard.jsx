@@ -11,8 +11,10 @@ import { mapLevelRange } from '../game/battleTeams.js'
 import { getRegionConfig, regionNames } from '../game/regionRegistry.js'
 import { getRegionBalance, saveRegionBalance, defaultsFor, BALANCE_MIN, BALANCE_MAX } from '../lib/regionBalance.js'
 import { getShopPrice, saveShopPrice, isCommittablePrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
+import { getGameTuning, saveGameTuning, isCommittableTuning, STARTER_BOOST_MIN, STARTER_BOOST_MAX } from '../lib/gameTuning.js'
 import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { SPRITE_TIERS } from '../game/spriteTiers.js'
+import { BALANCE } from '../game/balance.js'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 
@@ -159,6 +161,99 @@ function PriceRow({ itemId, label, unit, defaultPrice, theme }) {
         {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : status === 'error' ? 'Failed' : '·'}
       </span>
     </div>
+  )
+}
+
+// Global starter stat boost — the ONE knob in the Difficulty tab that is not
+// per-region (src/lib/gameTuning.js's 'starter_boost' key). Deliberately its
+// own Panel, styled with a distinct purple accent (matching ShopPricesPanel's
+// tab color, NOT the per-region green/red damage sliders below it) and a
+// title that says "(all regions)" outright — the brief is explicit that an
+// admin must never mistake this for a per-region control, since it recently
+// became much more impactful (a level-up bug that used to erase it after the
+// starter's first level-up is now fixed, so it applies for the whole run).
+//
+// A text/number box rather than a slider like the per-region damage
+// controls: this ranges 0.5-3 (see gameTuning.js), a much wider span than
+// the damage sliders' 0.25-5-but-tight-in-practice, and a fat-fingered drag
+// here changes EVERY region's runs at once, so precise typed entry is safer
+// than a drag gesture for a value this consequential.
+function GlobalStarterBoostPanel({ theme }) {
+  const { textColor, mutedColor, panelBorder, innerBg, labelWidth } = theme
+  const [draft, setDraft] = useState(() => String(getGameTuning('starter_boost')))
+  const [status, setStatus] = useState('idle') // idle|saving|saved|error
+
+  useEffect(() => { setDraft(String(getGameTuning('starter_boost'))) }, [])
+
+  async function commit() {
+    // See isCommittableTuning: an empty box is mid-edit, not "set to 0" — the
+    // same Number('') === 0 trap isCommittablePrice exists for in
+    // metaShopBalance.js, which already bit this branch once.
+    if (!isCommittableTuning(draft)) {
+      setDraft(String(getGameTuning('starter_boost'))) // put the live value back
+      setStatus('idle')
+      return
+    }
+    const value = Number(draft)
+    setStatus('saving')
+    const { error } = await saveGameTuning('starter_boost', value)
+    if (error) {
+      setStatus('error')
+      return
+    }
+    setDraft(String(getGameTuning('starter_boost'))) // reflect the clamped value
+    setStatus('saved')
+  }
+
+  return (
+    <Panel
+      theme={theme}
+      title="Starter stat boost (ALL REGIONS)"
+      subtitle={`×stats applied to every run's starter, in every region — this is NOT a per-region value. Below 1.0 makes the starter weaker than a wild catch (a valid hard-mode tune). Shipped default: ${BALANCE.pokemon.starterBoost}×. Range ${STARTER_BOOST_MIN}–${STARTER_BOOST_MAX}. Saved to Supabase and applied for everyone.`}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+          width: labelWidth, flexShrink: 0,
+        }}>
+          All regions
+        </span>
+        <input
+          type="number"
+          min={STARTER_BOOST_MIN}
+          max={STARTER_BOOST_MAX}
+          step={0.05}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          style={{
+            fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+            backgroundColor: innerBg, border: panelBorder,
+            padding: '4px 6px', width: '90px', flexShrink: 0,
+          }}
+        />
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor, flexShrink: 0 }}>×</span>
+        <button
+          onClick={() => { setDraft(String(BALANCE.pokemon.starterBoost)); saveGameTuning('starter_boost', BALANCE.pokemon.starterBoost).then(({ error }) => setStatus(error ? 'error' : 'saved')) }}
+          style={{
+            fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
+            backgroundColor: innerBg, border: panelBorder, padding: '5px 12px', cursor: 'pointer',
+          }}
+        >
+          Reset to default
+        </button>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '13px', flexShrink: 0,
+          color: status === 'error' ? '#ef4444' : status === 'saved' ? '#22c55e' : mutedColor,
+        }}>
+          {status === 'saving' ? 'Saving…'
+            : status === 'saved' ? 'Saved — live for all players, all regions'
+            : status === 'error' ? 'Save failed (admin only, or run supabase/game_tuning.sql)'
+            : '·'}
+        </span>
+      </div>
+    </Panel>
   )
 }
 
@@ -377,6 +472,11 @@ export default function BalanceDashboard() {
         Read-only view of the live tuning values. Percentages are per-slot odds
         for a single weighted draw, so they sum to ~100 within a pool.
       </span>
+
+      {/* Global (not per-region) — kept visually first and separate from every
+          region-scoped control below, so it never reads as "this region's
+          setting". See GlobalStarterBoostPanel's own comment for why. */}
+      <GlobalStarterBoostPanel theme={theme} />
 
       {/* 1. Item drop odds */}
       <Panel

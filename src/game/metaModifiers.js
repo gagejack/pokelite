@@ -117,10 +117,29 @@ function startingCashBonus(profile) {
  * `vitamins` map directly there; this function does not produce anything
  * vitamin-shaped.
  *
+ * `tunedStarterBoost` is the admin Balance Dashboard's GLOBAL (all-region)
+ * override for pokemon.starterBoost — src/lib/gameTuning.js's
+ * getGameTuning('starter_boost'), read by the caller (App.jsx) and passed in
+ * rather than imported here, because this file lives in game/ and AGENTS.md
+ * reserves Supabase-backed reads for lib/ (gameTuning.js wraps supabase; this
+ * module must not import it, directly or transitively). Defaults to the
+ * stock BALANCE value so every existing caller/test that passes only
+ * `profile` is unaffected. Applied UNCONDITIONALLY (not gated on `owns` or
+ * even on `profile` existing) — it is a global tuning value, not a
+ * per-player purchase — but only added to balanceOverrides when it actually
+ * differs from stock, so a no-override run still gets the empty-overrides /
+ * BALANCE-identity result every other test here already expects. Because
+ * it's folded into balanceOverrides.pokemon.starterBoost (the SAME BALANCE
+ * branch getVitaminMultipliers reads as its base), a vitamin-boosted starter
+ * composes on top of the tuned base automatically: `getEffectiveBalance()
+ * .pokemon.starterBoost` becomes the tuned number, and vitaminMultipliers
+ * still just adds +0.05 per vitamin on top of whatever base it's handed.
+ *
  * @param {import('./metaProfile.js').MetaProfile | null | undefined} profile
+ * @param {number} [tunedStarterBoost] - admin-tuned global override; defaults to BALANCE.pokemon.starterBoost (no override)
  * @returns {{ balanceOverrides: object, extras: object }}
  */
-export function modifiersFor(profile) {
+export function modifiersFor(profile, tunedStarterBoost = BALANCE.pokemon.starterBoost) {
   const balanceOverrides = {}
   const extras = {
     startingCash: 0,
@@ -133,6 +152,15 @@ export function modifiersFor(profile) {
     partySize: 6, // stock roster cap; Extra Slot raises this below
     ownsRunItBack: false, // Run It Back (key item) — App.jsx reads this to
     // decide whether to bother capturing a map-start snapshot at all.
+  }
+
+  // Global starter boost tune (see this function's doc comment above).
+  // Unconditional — applies with or without a profile — but only written
+  // when it actually changes something, so modifiersFor(profile) with no
+  // second argument (every pre-existing call site/test) still produces
+  // byte-identical output to before this knob existed.
+  if (tunedStarterBoost !== BALANCE.pokemon.starterBoost) {
+    balanceOverrides.pokemon = { ...balanceOverrides.pokemon, starterBoost: tunedStarterBoost }
   }
 
   if (!profile) return { balanceOverrides, extras }
@@ -332,9 +360,10 @@ let active = null // { balanceOverrides, extras, profile } | null
  * vitaminMultipliers's comment above).
  *
  * @param {import('./metaProfile.js').MetaProfile | null | undefined} profile
+ * @param {number} [tunedStarterBoost] - see modifiersFor's doc comment; passed through unchanged
  */
-export function setActiveRunModifiers(profile) {
-  active = { ...modifiersFor(profile), profile }
+export function setActiveRunModifiers(profile, tunedStarterBoost = BALANCE.pokemon.starterBoost) {
+  active = { ...modifiersFor(profile, tunedStarterBoost), profile }
 }
 
 /** Clear the active run's modifiers (e.g. returning to the main menu). Not

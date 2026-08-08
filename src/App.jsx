@@ -23,6 +23,7 @@ import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from 
 import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { loadShopPrices } from './lib/metaShopBalance.js'
+import { loadGameTuning, getGameTuning } from './lib/gameTuning.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
@@ -175,6 +176,13 @@ export default function App() {
   // effect.
   useEffect(() => { loadShopPrices() }, [])
 
+  // Global (all-region) gameplay tuning — currently just the starter stat
+  // boost (Balance Dashboard "Difficulty & Odds" tab). Fetched once on start,
+  // same non-fatal-failure posture as the two loaders above — a missing
+  // table or offline client just leaves BALANCE.pokemon.starterBoost in
+  // effect.
+  useEffect(() => { loadGameTuning() }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -316,7 +324,11 @@ export default function App() {
     // anything modifier-dependent runs (initRoster below rolls the starter's
     // shiny odds, which Shiny Charm can affect). A run's modifiers never
     // change after this point — see metaModifiers.js's runtime-layer comment.
-    setActiveRunModifiers(profile)
+    // getGameTuning('starter_boost') is the admin Balance Dashboard's global
+    // override (src/lib/gameTuning.js); with no override set it returns the
+    // stock BALANCE.pokemon.starterBoost, so this is a no-op for every run
+    // until an admin actually tunes it.
+    setActiveRunModifiers(profile, getGameTuning('starter_boost'))
     // Déjà Vu (key item): record this starter's species id so a future run can
     // offer it again regardless of region. Only here, not restartRun/resumeRun
     // — those reuse a starter already on the list (restartRun: the same run's
@@ -495,7 +507,7 @@ export default function App() {
     // Uses the CURRENT profile rather than a snapshot taken when the run began:
     // upgrades are permanent and a purchase made between saving and resuming
     // should apply, the same way it would to a fresh run.
-    setActiveRunModifiers(profile)
+    setActiveRunModifiers(profile, getGameTuning('starter_boost'))
     // A resumed run is no longer "saved" — it's active again. Clear the store so
     // it doesn't linger if the tab is refreshed mid-run without hitting Home.
     savedRunData.current = null
@@ -565,7 +577,7 @@ export default function App() {
     runEnded.current = false
     // Same reasoning as resumeRun's identical call — a run's modifiers are
     // set once per entry point, and this is a new entry point.
-    setActiveRunModifiers(profile)
+    setActiveRunModifiers(profile, getGameTuning('starter_boost'))
     // Force NodeMap to actually remount rather than just re-render. This is
     // called from WITHIN the 'nodemap' screen (the defeat overlay renders on
     // top of a live NodeMap), and NodeMap keys off mapIndex — when the
@@ -942,7 +954,7 @@ export default function App() {
     // The run is already saved at the moment of defeat (BattleCard onDefeat),
     // so restarting just resets state — no save here (avoids a duplicate row).
     // Recompute the active run's modifiers — see startRun's identical comment.
-    setActiveRunModifiers(profile)
+    setActiveRunModifiers(profile, getGameTuning('starter_boost'))
     // "Play Again" starts a brand-new run (fresh map 0), distinct from Run It
     // Back's "replay the SAME map from its snapshot" — reset here too so a
     // leftover snapshot/used-flag from the run that just ended can't leak

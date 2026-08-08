@@ -359,3 +359,64 @@ test('clearActiveRunModifiers resets back to the no-run-active state', () => {
 test('BALANCE stays deep-frozen after every scenario above (no accidental mutation leaked)', () => {
   expect(() => { BALANCE.pokemon.victoryHealPct = 0.99 }).toThrow()
 })
+
+// ── Global starter boost tune (Balance Dashboard Difficulty section) ─────
+//
+// tunedStarterBoost is the admin-tuned value from src/lib/gameTuning.js,
+// read by App.jsx and passed into modifiersFor/setActiveRunModifiers — see
+// modifiersFor's doc comment for why it can't be imported directly here.
+
+test('modifiersFor with no tunedStarterBoost argument leaves balanceOverrides exactly as before (default = stock, no override written)', () => {
+  const { balanceOverrides } = modifiersFor(createProfile())
+  expect(balanceOverrides).toEqual({})
+})
+
+test('a tunedStarterBoost equal to the stock value produces no override, even passed explicitly', () => {
+  const { balanceOverrides } = modifiersFor(createProfile(), BALANCE.pokemon.starterBoost)
+  expect(balanceOverrides).toEqual({})
+})
+
+test('a tunedStarterBoost different from stock overrides pokemon.starterBoost', () => {
+  const { balanceOverrides } = modifiersFor(createProfile(), 1.6)
+  expect(balanceOverrides.pokemon.starterBoost).toBe(1.6)
+})
+
+test('the tune applies even with NO profile at all (global, not a purchase)', () => {
+  const { balanceOverrides } = modifiersFor(null, 1.6)
+  expect(balanceOverrides.pokemon.starterBoost).toBe(1.6)
+})
+
+test('the tune composes with a profile-owned override on a DIFFERENT pokemon.* key (Quick Heal), neither clobbers the other', () => {
+  const { balanceOverrides } = modifiersFor(withUpgrades('quick_heal'), 1.6)
+  expect(balanceOverrides.pokemon.starterBoost).toBe(1.6)
+  expect(balanceOverrides.pokemon.victoryHealPct).toBe(0.08)
+})
+
+test('getEffectiveBalance().pokemon.starterBoost reflects the tuned value once setActiveRunModifiers installs it', () => {
+  setActiveRunModifiers(createProfile(), 1.6)
+  expect(getEffectiveBalance().pokemon.starterBoost).toBe(1.6)
+  clearActiveRunModifiers()
+})
+
+test('setActiveRunModifiers with no tunedStarterBoost argument (existing call sites) still returns stock BALANCE by identity', () => {
+  setActiveRunModifiers(createProfile())
+  expect(getEffectiveBalance()).toBe(BALANCE)
+  clearActiveRunModifiers()
+})
+
+test('a vitamin-boosted starter composes on top of the TUNED base, not the stock 1.3 — the bug this feature exists to avoid reintroducing', () => {
+  const profile = { ...createProfile(), vitamins: { 4: { attack: 2 } } }
+  setActiveRunModifiers(profile, 1.6)
+  // Base is the tuned 1.6, not stock 1.3, plus +0.05 per vitamin (2 here).
+  expect(getVitaminMultipliers(4).attack).toBeCloseTo(1.6 + 0.05 * 2)
+  // Untouched stats sit at the tuned base with zero vitamins added.
+  expect(getVitaminMultipliers(4).defense).toBeCloseTo(1.6)
+  clearActiveRunModifiers()
+})
+
+test('with no admin tune (default argument), vitamins still compose on the stock 1.3 exactly as before', () => {
+  const profile = { ...createProfile(), vitamins: { 4: { speed: 1 } } }
+  setActiveRunModifiers(profile)
+  expect(getVitaminMultipliers(4).speed).toBeCloseTo(1.3 + 0.05)
+  clearActiveRunModifiers()
+})
