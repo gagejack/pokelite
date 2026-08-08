@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
 import { METACASH_ITEMS, KEY_ITEMS } from '../game/metaCatalog.js'
-import { applyPurchase } from '../game/metaProfile.js'
+import { applyPurchase, effectivePrice } from '../game/metaProfile.js'
 import { rowState, rowPrice, starterPickerRows } from '../game/metaShopUi.js'
 import { spritesForRegion, SPRITE_REGIONS } from '../game/spriteIndex.js'
 import { dailyOffers } from '../game/spriteRotation.js'
@@ -218,11 +218,25 @@ function CosmeticsRegionPanel({ region, profile, dark, overrides, onBuy, onEquip
   // for catalog items, so a Task 10 override object with common/uncommon/
   // elite/champion keys takes effect here with no changes to this component.
   const tierPrices = useMemo(() => ({ ...SPRITE_TIER_PRICES, ...overrides }), [overrides])
+  // Bargain Hunter is "15% off ALL shop prices" (spec §2 item 9), and the
+  // cosmetics tab is a shop price. Sprites aren't catalog rows, so the
+  // discount can't reach them the way it reaches an item id — route the tier
+  // price through effectivePrice as a synthetic metacash item instead, so
+  // there is still exactly ONE place the discount is applied and the display
+  // here can't drift from what handleBuySprite charges.
+  const spritePrice = useMemo(() => name => {
+    const tierCost = priceForDisplayName(name, tierPrices)
+    // Empty overrides: the admin override already landed in `tierPrices`
+    // above, and passing it again would let a catalog item id collide with a
+    // tier key. Only the discount is wanted from effectivePrice here.
+    return effectivePrice({ id: `sprite:${name}`, currency: 'metacash', cost: tierCost }, profile, {})
+  }, [tierPrices, profile])
+
   const offers = useMemo(
     () => dailyOffers(todayUtc(), region, spriteList, owned)
-      .map(sprite => ({ ...sprite, price: priceForDisplayName(sprite.name, tierPrices) })),
+      .map(sprite => ({ ...sprite, price: spritePrice(sprite.name) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [region, spriteList, profile?.ownedSprites, tierPrices]
+    [region, spriteList, profile?.ownedSprites, spritePrice]
   )
   const [msLeft, setMsLeft] = useState(() => msUntilNextUtcDay())
   useEffect(() => {

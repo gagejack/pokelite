@@ -211,3 +211,29 @@ test('a funds race during confirm keeps the picker open and shows the reason inl
   expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
   expect(screen.getByText('Not enough metacash')).toBeTruthy()
 })
+
+test('Bargain Hunter discounts sprite prices, not just catalog items', () => {
+  // Spec §2 item 9 is "15% off ALL shop prices". Sprites aren't catalog rows,
+  // so the discount can't reach them by item id the way it reaches Quick Heal
+  // — and for a while it didn't reach them at all, silently excluding the
+  // whole Cosmetics tab from a $500 perk. Compares the SAME card with and
+  // without the upgrade owned, so it can't pass by coincidence of tiering.
+  const base = { ...createProfile(), metacash: 99999 }
+  const { unmount } = show({ profile: base })
+  fireEvent.click(screen.getByText('COSMETICS'))
+  const plain = screen.getAllByText(/^\$[\d,]+$/).map(el => el.textContent)
+  unmount()
+
+  const withBh = { ...base, ownedUpgrades: ['bargain_hunter'] }
+  show({ profile: withBh })
+  fireEvent.click(screen.getByText('COSMETICS'))
+  const discounted = screen.getAllByText(/^\$[\d,]+$/).map(el => el.textContent)
+
+  expect(plain.length).toBeGreaterThan(0)
+  expect(discounted.length).toBe(plain.length)
+  // Every price must be strictly lower once Bargain Hunter is owned.
+  const toNum = s => Number(s.replace(/[$,]/g, ''))
+  for (let i = 0; i < plain.length; i++) {
+    expect(toNum(discounted[i])).toBe(Math.round(toNum(plain[i]) * 0.85))
+  }
+})
