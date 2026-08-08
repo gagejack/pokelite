@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'vitest'
-import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat } from './pokemon.js'
+import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, _seedChainCacheForTest } from './pokemon.js'
 import { setActiveRunModifiers, clearActiveRunModifiers } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -237,4 +237,72 @@ test('the per-stat multiplier math has no opinion on the 3-per-starter cap — i
   setActiveRunModifiers(profileWithVitamins(4, { attack: 4 }))
   const instance = buildPokemonInstance(CHARMANDER, 5, true)
   expect(instance.stats.attack).toBe(Math.floor(calcStat(CHARMANDER.baseStats.attack, 5) * (STARTER_BOOST + 0.20)))
+})
+
+// ── rollStageForLevelSync: sync twin of rollStageForLevel, reads only the
+// already-warmed chainCache (Safari's map bake cannot await a fetch) ──────
+
+// A minimal two-stage line: 10 → 11 at level 7. Shape matches slimChain()'s
+// output — { id, minLevel, levelUp, evolvesTo }.
+const TWO_STAGE_LINE = {
+  id: 10,
+  minLevel: 1,
+  levelUp: true,
+  evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+}
+
+test('rollStageForLevelSync returns the id unchanged when the line is not cached', () => {
+  // 9999 was never warmed, so there is nothing to roll against.
+  expect(rollStageForLevelSync(9999, 50)).toBe(9999)
+})
+
+test('rollStageForLevelSync returns the base form when the level is below the evolution', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // Level 5 is under the stage-2 minLevel of 7, so only stage 1 is eligible.
+  expect(rollStageForLevelSync(10, 5)).toBe(10)
+})
+
+test('rollStageForLevelSync can return the evolved form once the level allows it', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // Both stages are eligible at level 50 and the roll is weighted, so sample
+  // repeatedly and assert both forms appear rather than asserting one result.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(rollStageForLevelSync(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+})
+
+test('rollStageForLevelSync respects the generation ceiling', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // maxSpeciesId 10 drops the stage-2 branch entirely, so only 10 can come back.
+  const seen = new Set()
+  for (let i = 0; i < 50; i++) seen.add(rollStageForLevelSync(10, 50, 10))
+  expect(seen).toEqual(new Set([10]))
+})
+
+// ── Characterization test: pins rollStageForLevel's (async) CURRENT behavior
+// so the Step 6 stagesFromRoot extraction can be proven not to change it ──
+
+test('rollStageForLevel (async) is unchanged by the stagesFromRoot extraction', async () => {
+  const LINE = {
+    id: 10,
+    minLevel: 1,
+    levelUp: true,
+    evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+  }
+  _seedChainCacheForTest(10, LINE)
+
+  // Below the evolution level, only the base form is reachable.
+  await expect(rollStageForLevel(10, 5)).resolves.toBe(10)
+
+  // Above it, both stages are reachable — sample until both appear.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(await rollStageForLevel(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+
+  // The generation ceiling drops the evolved branch entirely.
+  const capped = new Set()
+  for (let i = 0; i < 50; i++) capped.add(await rollStageForLevel(10, 50, 10))
+  expect(capped).toEqual(new Set([10]))
 })
