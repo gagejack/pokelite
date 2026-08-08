@@ -92,6 +92,16 @@ export default function App() {
   // see the comment at its call site in recordRunEnd for why this can't be
   // discarded the way it was before.
   const [payoutSaved, setPayoutSaved] = useState(true)
+  // Set only when a logged-in player's region unlock (unlockAndEnterRegion,
+  // below) spent a key but the save didn't reach their account — mirrors
+  // payoutSaved's role, but there is no reward band on RegionSelect/MainMenu
+  // to show it in, and by the time the save resolves the screen has already
+  // moved on to Starter Select (setScreen('starter') right after). So this is
+  // read there instead: the one screen the player is guaranteed to land on
+  // right after the unlock, still close enough to the action to be legible as
+  // "about what I just did." Cleared on every fresh unlock attempt and on
+  // leaving Starter Select, so it can never linger onto an unrelated screen.
+  const [unlockNotice, setUnlockNotice] = useState(null)
 
   // "Resume Run" feature. `hasSavedRun` gates the menu button; `mapProgress`
   // holds the live NodeMap snapshot (layout + cleared nodes + position) so Home
@@ -758,11 +768,21 @@ export default function App() {
   // regardless of keys, because it would crash at config.maps[0]. That check
   // stays first and is never overridden by owning a key.
   //
-  // Returns { ok: true } on success (region already unlocked, or just
-  // unlocked here) or { ok: false, reason } — same shape as
-  // metaProfile.js's applyPurchase/unlockRegion, so callers don't have to
-  // learn a second failure convention.
-  function unlockAndEnterRegion(regionName) {
+  // Returns { ok: true, notice? } on success (region already unlocked, or
+  // just unlocked here) or { ok: false, reason } — same `ok`/`reason` shape
+  // as metaProfile.js's applyPurchase/unlockRegion, so callers don't have to
+  // learn a second failure convention. `notice` is new: set only when a
+  // logged-in player's just-spent key didn't reach their account (see the
+  // saveProfile await below) — a caller that ignores it loses nothing it
+  // previously had, since unlock still succeeds either way.
+  //
+  // async/awaited (unlike persistProgress's fire-and-forget saveRun): this
+  // fires once per click, not per frame or per keystroke, and it gates a
+  // screen transition the player is already waiting on — awaiting one more
+  // network round-trip before showing Starter Select is not a perceptible
+  // stall, and it's what makes `notice` possible to compute before the
+  // caller needs it.
+  async function unlockAndEnterRegion(regionName) {
     const config = getRegionConfig(regionName)
     if (!config || (config.maps?.length ?? 0) === 0) {
       return { ok: false, reason: 'Region not available yet' }
@@ -778,14 +798,36 @@ export default function App() {
     }
     const result = unlockRegion(current, regionName)
     if (!result.ok) return result
+    // The unlock ALWAYS proceeds from here — a storage hiccup must not
+    // block a player from entering a region they just paid a key for. The
+    // local profile (and localStorage, via saveProfile's own fallback) has
+    // already got the new unlockedRegions/keys either way.
     setProfile(result.profile)
-    saveProfile(result.profile, user) // fire-and-forget, mirrors persistProgress
-    return { ok: true }
+    // Same reasoning as recordRunEnd's payout save (see the comment there):
+    // saveProfile's return says whether this reached the account (`true`)
+    // or only the localStorage fallback (`false`). Discarding it here would
+    // be worse than discarding it there — a failed payout risks an unspent
+    // reward, but a failed unlock means the player has ALREADY spent the
+    // key and is about to start playing a region their account doesn't
+    // show as bought. On next load (still signed in, key never migrated
+    // back in) Kanto would be locked again with no key to show for it.
+    // `saved || !user` mirrors recordRunEnd's payoutSaved: a guest always
+    // gets `false` from saveProfile (no account to write to) and must not
+    // see a failure message for that expected case.
+    const saved = await saveProfile(result.profile, user)
+    const notice = (saved || !user)
+      ? undefined
+      : 'Saved on this device — sign in again to bank it'
+    return { ok: true, notice }
   }
 
   // Shared by RegionSelect (mobile) and MainMenu's desktop region mode.
-  function handleSelectRegion(region) {
-    const gate = unlockAndEnterRegion(region.name)
+  async function handleSelectRegion(region) {
+    // Clear any notice from a PREVIOUS unlock before this one resolves — a
+    // stale "saved on this device" from an earlier region must never survive
+    // onto a new pick that saved fine.
+    setUnlockNotice(null)
+    const gate = await unlockAndEnterRegion(region.name)
     if (!gate.ok) return gate
     setRunSeed(null)        // normal run
     setRunMode('normal')
@@ -793,7 +835,11 @@ export default function App() {
     const config = getRegionConfig(region.name)
     if (config) prewarmCache(config)
     setScreen('starter')
-    return { ok: true }
+    // Set AFTER setScreen so it's applied to the screen the player is about
+    // to see, not the one they're leaving — RegionSelect/MainMenu's region
+    // column is on its way out and would never render this notice anyway.
+    if (gate.notice) setUnlockNotice(gate.notice)
+    return { ok: true, notice: gate.notice }
   }
 
   function handleCustomSeed(code) {
@@ -859,13 +905,15 @@ export default function App() {
           onBack={() => {
             // Desktop's region picker lives inside the menu; mobile's is the
             // standalone screen. Send Back to whichever one the player used.
+            setUnlockNotice(null)
             if (isDesktop) { setMenuMode('region'); setScreen('menu') }
             else setScreen('region')
           }}
-          onSelectStarter={startRun}
+          onSelectStarter={starter => { setUnlockNotice(null); startRun(starter) }}
           caughtSet={caughtSet}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
+          unlockNotice={unlockNotice}
         />
       )}
       {screen === 'nodemap' && (

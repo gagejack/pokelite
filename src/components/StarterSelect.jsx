@@ -5,7 +5,7 @@ import PokemonCard from './PokemonCard'
 import { fetchPokemonBase, buildPokemonInstance } from '../game/pokemon.js'
 import { REGION_STARTERS } from '../game/starters.js'
 
-export default function StarterSelect({ region, onBack, onSelectStarter, caughtSet, pokedexOpen, setPokedexOpen }) {
+export default function StarterSelect({ region, onBack, onSelectStarter, caughtSet, pokedexOpen, setPokedexOpen, unlockNotice }) {
   const { dark } = useTheme()
   const [starters, setStarters] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +39,22 @@ export default function StarterSelect({ region, onBack, onSelectStarter, caughtS
         <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: dark ? '#DBDBDB' : '#333333' }}>
           Choose your Starter!
         </span>
+
+        {/* Only shown when the region unlock that brought the player here
+            spent a key but the save didn't reach their account (App.jsx's
+            unlockAndEnterRegion) — same non-blocking, non-alarming posture
+            as RunEndScreen's payoutSaved line, the closest existing
+            precedent. The unlock itself already succeeded (this screen only
+            renders after it did); this just tells the player it isn't safe
+            on their account yet and names the real recovery path. */}
+        {unlockNotice && (
+          <span style={{
+            fontFamily: 'Orange Kid', fontSize: '13px', fontStyle: 'italic',
+            color: dark ? '#9ca3af' : '#6b7280', textAlign: 'center', maxWidth: '320px',
+          }}>
+            {unlockNotice}
+          </span>
+        )}
 
         {loading ? (
           <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: dark ? '#DBDBDB' : '#333333' }}>
