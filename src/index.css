@@ -27,10 +27,53 @@
 }
 
 /* Type/move chips. The one non-pixel face in the app: the chip labels are read
-   as words at 6-12px, where the pixel faces stop resolving and turn to mush.
-   A variable font, so the weight axis is pinned to 400 at the call sites —
-   without font-weight the browser renders the axis default, which is not
-   guaranteed to be Regular. */
+   as words at 5-12px, where the pixel faces stop resolving and turn to mush.
+
+   A variable font, so both axes are pinned at the call sites — without an
+   explicit value the browser renders the axis default, which is not guaranteed
+   to be the one we want.
+
+   Chips are set at weight 600, width 112%. Regular (400) was too thin at the
+   sizes that matter: the smallest chips are 5-6px on the map nodes. At that size
+   Regular's stems fall below a pixel and the chip goes muddy. 700 overcorrects —
+   it starts closing the counters on a/e/g, so "dragon" reads as a blob and
+   legibility drops again. 600 thickens the stem without filling the aperture.
+
+   The weight is doing more work now that the sizes came down a step: at 5-6px
+   the stem weight is the only thing keeping these words from dissolving, which
+   is why the size reduction did not come with a matching drop to 500.
+
+   The ink is WHITE with a 1px black text-stroke, not the flat #1a1a1a it used
+   to be. That inverts how contrast works here: the label no longer depends on
+   its fill being light enough, because the stroke supplies the dark edge on
+   every one of the eighteen type colors. It fixes the five fills colors.js
+   flags as under AA (dark, ghost, dragon, fighting, poison) without needing a
+   per-type ink, which is the uniformity that file deliberately chose.
+
+   paintOrder: 'stroke fill' is load-bearing. Without it the stroke is painted
+   OVER the fill, so a 1px stroke eats half a 5px glyph from both sides and the
+   counters close entirely. Painting stroke first puts it behind the white.
+
+   The glow belongs to the BOX, not the type: an inset box-shadow that lays
+   white light around the inside of the chip's edge, under the black border. It
+   lifts the fill away from a flat rectangle and gives the rounded corners
+   something to catch, while leaving the glyphs to the stroke alone — a glow on
+   both would be two competing light sources on an element 5px tall.
+
+   Inset rather than an outer shadow because the chip sits on backgrounds that
+   are themselves busy (map art, card fills), where an outer halo would read as
+   a rendering artifact instead of a material. */
+
+   The width axis does the rest: at 112% the letterforms get the spacing that
+   makes a 6px word resolve, and the chip reads as a deliberate label rather
+   than shrunken body text. Both come free from the file already loaded.
+
+   Labels are set in CAPS. At these sizes it is the more legible case: caps have
+   no descenders and a single consistent height, so a 5px word is one clean band
+   of letterforms instead of a ragged line with x-height dips. It also suits what
+   these are — a fixed vocabulary of eighteen types, read as tokens rather than
+   as prose. The chips size to their content in flex rows, so the extra width
+   caps bring grows the chip rather than clipping the word. */
 @font-face {
   font-family: 'Mona Sans';
   src: url('./assets/MonaSans-VariableFont_wdth,wght.ttf') format('truetype-variations');

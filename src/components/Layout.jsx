@@ -66,7 +66,7 @@ function NavButtons({ row = false, onHome, setPokedexOpen, setStatsOpen, autoClo
   )
 }
 
-export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen, showTutorial, mobileFooter = false, statsOpen: statsOpenProp, setStatsOpen: setStatsOpenProp }) {
+export default function Layout({ children, onHome, onRestart, onSkipMap, pokedexOpen, setPokedexOpen, showTutorial, mobileFooter = false, statsOpen: statsOpenProp, setStatsOpen: setStatsOpenProp, statsInitialTab = 'profile' }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { autoClose, setAutoClose } = useSettings()
@@ -189,7 +189,11 @@ export default function Layout({ children, onHome, onRestart, onSkipMap, pokedex
       )}
       <Suspense fallback={null}>
         {pokedexOpen && <Pokedex onClose={() => setPokedexOpen(false)} />}
-        {statsOpen && <Stats onClose={() => setStatsOpen(false)} role={role} />}
+        {/* `key` remounts Stats when the requested tab changes, so opening
+            LEADERBOARD after STATS lands on the board rather than reusing the
+            mounted sheet's own tab state. initialStatsTab is only an initial
+            value — without the remount it would be ignored on the second open. */}
+        {statsOpen && <Stats key={statsInitialTab} onClose={() => setStatsOpen(false)} role={role} initialStatsTab={statsInitialTab} />}
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} username={username} onRestart={onRestart} />}
         {showTutorial && <TutorialOverlay />}
       </Suspense>

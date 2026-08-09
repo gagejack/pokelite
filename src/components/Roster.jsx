@@ -64,10 +64,12 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
         <div style={{ display: 'flex', gap: s(4) }}>
           {pokemon.types.map(t => (
             <span key={t} style={{
-              fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: sf(7), color: '#1a1a1a',
+              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: '#fff',
               backgroundColor: TYPE_COLORS[t] || '#888',
-              border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-              padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
+              border: '1px solid #000', borderRadius: '5px',
+              boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+              padding: `${s(2)} ${s(5)}`, textTransform: 'uppercase',
+              WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
             }}>
               {t}
             </span>
@@ -167,10 +169,12 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
                 {move.name.replace(/-/g, ' ')}
               </span>
               <span style={{
-                fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: sf(7), color: '#1a1a1a',
+                fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: '#fff',
                 backgroundColor: TYPE_COLORS[move.type] || '#888',
-                border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                padding: `${s(2)} ${s(5)}`, textTransform: 'capitalize',
+                border: '1px solid #000', borderRadius: '5px',
+                boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                padding: `${s(2)} ${s(5)}`, textTransform: 'uppercase',
+                WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
               }}>
                 {move.type}
               </span>

@@ -50,6 +50,15 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   const isDesktop = useIsDesktop()
   const [loggedIn, setLoggedIn] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  // Which tab the Stats sheet lands on. STATS and LEADERBOARD open the SAME
+  // sheet — the board already lives there, so a separate screen would be a
+  // second copy of it to keep in step.
+  const [statsTab, setStatsTab] = useState('profile')
+  const openStats = (tab = 'profile') => { setStatsTab(tab); setStatsOpen(true) }
+  // The nav bar's stats icon opens the sheet through this setter, and it always
+  // means "my profile" — without the reset it would reopen on whichever tab the
+  // LEADERBOARD button last asked for.
+  const setStatsOpenFromNav = next => { if (next) setStatsTab('profile'); setStatsOpen(next) }
   const [shopOpen, setShopOpen] = useState(false)
   // Desktop only: 'region' swaps the button column in place instead of
   // changing screens, so the background art and logo never unmount.
@@ -139,36 +148,54 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
 
   // Single source of truth for the menu bars. Both layouts map over this, so
   // adding a mode or changing a size happens in exactly one place.
+  //
+  // The three game modes used to sit here as three top-level bars. They now
+  // live behind PLAY, which takes Classic's green and its top slot: PLAY is the
+  // action that starts a run, so it inherits the color that has always meant
+  // that. The main menu is now four destinations — play, spend, collect,
+  // measure — and nothing on it starts a run directly.
   const buttonDefs = [
-    // PLAY split into the two game modes (Safari Mode, spec §Entry). Classic
-    // keeps PLAY's green and its top slot so the default path is unchanged;
-    // Safari takes a distinct amber so the two never read as one button with a
-    // toggle. Both funnel through startRun, which is the only place either
-    // mode's routing is decided.
-    { id: 'play',  label: 'CLASSIC',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
-      color: '#fff', fontSize: '26px', onClick: () => startRun('classic'), visible: true },
-    { id: 'safari', label: 'SAFARI', background: 'linear-gradient(to top, #b45309, #f59e0b)',
-      color: '#fff', fontSize: '26px', onClick: () => startRun('safari'), visible: true },
-    { id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)',
-      color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
+    { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
+      color: '#fff', fontSize: '26px', onClick: () => changeMode('play'), visible: true },
+    // RESUME stays on the main menu rather than moving behind PLAY. It does not
+    // start a run, it returns to one already in progress — burying a run the
+    // player is mid-way through, behind a button that offers to start a new
+    // one, is the one grouping that would cost them something.
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
       color: '#fff', fontSize: '22px', onClick: onResume, visible: !!hasSavedRun },
     // Purple, flat (spec §6a) — the one hue the menu hadn't spent, and flat
-    // rather than gradient because SHOP doesn't start a run the way PLAY/
-    // DAILY SEED do. Fourth in the stack, above the DEX/STATS pair.
+    // rather than gradient because SHOP doesn't start a run the way PLAY does.
     { id: 'shop', label: 'SHOP', background: '#7c3aed',
       color: '#fff', fontSize: '22px', onClick: () => setShopOpen(true), visible: true,
       // Balance readout shown right-aligned on the bar itself (spec §6a) —
       // MenuButton renders `badge` after the centered label if supplied.
       badge: `$${metacash.toLocaleString()} · ${keys} 🔑` },
+    // Points into the Stats sheet's Leaderboards tab. A full-width bar rather
+    // than a third half-width chip beside DEX/STATS: at 16px in a three-up row
+    // "LEADERBOARD" is the one label that would have to truncate.
+    { id: 'leaderboard', label: 'LEADERBOARD', background: '#0891b2',
+      color: '#fff', fontSize: '20px', onClick: () => openStats('leaderboards'), visible: true },
   ].filter(d => d.visible)
+
+  // The three game modes, shown only on the PLAY page. Classic keeps the green
+  // it has always had — PLAY above is a doorway, these are the runs themselves,
+  // and the two screens never appear together, so the shared hue reads as
+  // continuity rather than a collision.
+  const modeDefs = [
+    { id: 'classic', label: 'CLASSIC', background: 'linear-gradient(to top, #16a34a, #4ade80)',
+      color: '#fff', fontSize: '26px', onClick: () => startRun('classic') },
+    { id: 'safari', label: 'SAFARI', background: 'linear-gradient(to top, #b45309, #f59e0b)',
+      color: '#fff', fontSize: '26px', onClick: () => startRun('safari') },
+    { id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)',
+      color: '#fff', fontSize: '22px', onClick: onOpenDaily, className: 'daily-glow' },
+  ]
 
   // Dex + Stats share one bar's footprint, so they are defined separately.
   const halfDefs = [
     { id: 'dex',   label: 'DEX',   background: '#facc15', color: '#1a1a1a', fontSize: '16px',
       onClick: () => setPokedexOpen(true), visible: true },
     { id: 'stats', label: 'STATS', background: '#6b7280', color: '#fff', fontSize: '16px',
-      onClick: () => setStatsOpen(true), visible: true },
+      onClick: () => openStats('profile'), visible: true },
   ]
 
   const mobileLayout = (
@@ -199,22 +226,42 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         style={{ width: '320px', maxWidth: '100%', height: 'auto', display: 'block' }}
       />
 
-      {buttonDefs.map(def => (
-        <MenuButton key={def.id} def={def} dark={dark} />
-      ))}
+      {/* PLAY page: the three modes and Back, nothing else. Same swap-in-place
+          approach desktop uses, so the logo above never unmounts and the two
+          layouts stay one mental model. */}
+      {mode === 'play' ? (
+        <>
+          {modeDefs.map(def => (
+            <MenuButton key={def.id} def={def} dark={dark} />
+          ))}
+          <div style={{ width: '320px', maxWidth: '100%', display: 'flex' }}>
+            <MenuButton
+              def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => changeMode('menu') }}
+              dark={dark}
+              style={{ flex: 1, width: 'auto' }}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {buttonDefs.map(def => (
+            <MenuButton key={def.id} def={def} dark={dark} />
+          ))}
 
-      {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
-          Same border/shadow/bevel language as the bars above. */}
-      <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
-        {halfDefs.map(def => (
-          <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
-        ))}
-      </div>
+          {/* Dex + Stats — two half-width buttons sharing one bar's footprint.
+              Same border/shadow/bevel language as the bars above. */}
+          <div style={{ width: '320px', maxWidth: '100%', display: 'flex', gap: '8px' }}>
+            {halfDefs.map(def => (
+              <MenuButton key={def.id} def={def} dark={dark} style={{ flex: 1, width: 'auto' }} />
+            ))}
+          </div>
 
-      {/* Auth card — hidden once logged in. Above the version tag: it is a
-          control, and the version is a footnote, so burying the only way to
-          sign in under the footnote read as an afterthought. */}
-      {!loggedIn && <LoginForm onAuthSuccess={() => startRun('classic')} />}
+          {/* Auth card — hidden once logged in. Above the version tag: it is a
+              control, and the version is a footnote, so burying the only way to
+              sign in under the footnote read as an afterthought. */}
+          {!loggedIn && <LoginForm onAuthSuccess={() => startRun('classic')} />}
+        </>
+      )}
 
       {/* Version tag — closes the column, with the patch-notes badge beside it. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -231,9 +278,29 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     </div>
   )
 
+  // The PLAY page: the three game modes and a way back, nothing else. No shop,
+  // dex or stats — this screen asks one question, and every control on it is an
+  // answer to that question.
+  const playColumn = (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+      <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
+      {modeDefs.map(def => (
+        <MenuButton key={def.id} def={def} dark={dark} />
+      ))}
+      <div style={{ width: '320px', display: 'flex' }}>
+        <MenuButton
+          def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => changeMode('menu') }}
+          dark={dark}
+          style={{ flex: 1, width: 'auto' }}
+        />
+      </div>
+    </div>
+  )
+
   // Region mode's column: Daily moves up into PLAY's slot, the five regions
   // become bars, and Back + the seed input share one row like DEX/STATS.
-  const dailyDef = buttonDefs.find(d => d.id === 'daily')
+  // Daily is sourced from modeDefs now that the game modes live behind PLAY.
+  const dailyDef = modeDefs.find(d => d.id === 'daily')
   const regionColumn = (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
       <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
@@ -346,7 +413,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         padding: '32px 40px', overflowY: 'auto',
       }}>
         {/* Upper-left: logo + button stack over the night sky */}
-        {mode === 'region' ? regionColumn : mode === 'safariRegion' ? safariRegionColumn : (
+        {mode === 'play' ? playColumn : mode === 'region' ? regionColumn : mode === 'safariRegion' ? safariRegionColumn : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
             <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
             {buttonDefs.map(def => (
@@ -381,7 +448,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   )
 
   return (
-    <Layout onHome={() => { setPokedexOpen(false); setSafariError(null); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+    <Layout onHome={() => { setPokedexOpen(false); setSafariError(null); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpenFromNav} statsInitialTab={statsTab}>
       {isDesktop ? desktopLayout : mobileLayout}
       {/* Rendered last so it overlays whichever layout is active. Suppressed
           while the Dex or Stats sheet is open — those are full-screen, and a

@@ -25,11 +25,13 @@ export default function MenuButton({ def, dark, style }) {
         background: def.background,
         border: borderStyle,
         ...(usesGlow ? { '--btn-shadow': bevel } : { boxShadow: bevel }),
-        display: 'flex', alignItems: 'center',
-        // A badge (currently only the Shop bar's balance readout, spec §6a)
-        // pushes the label left and itself right; without one the label stays
-        // centered exactly as before.
-        justifyContent: def.badge ? 'space-between' : 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        // `relative` so a badge can be positioned against this bar. The badge
+        // is taken OUT of flow rather than sharing the row via space-between:
+        // that made SHOP the one bar whose label sat left of every other bar's,
+        // and a label's position shouldn't depend on whether it happens to
+        // carry a readout.
+        position: 'relative',
         padding: def.badge ? '0 14px' : undefined,
         ...style,
       }}
@@ -38,7 +40,14 @@ export default function MenuButton({ def, dark, style }) {
         {def.label}
       </span>
       {def.badge && (
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: 'rgba(255,255,255,0.75)' }}>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '15px', color: 'rgba(255,255,255,0.75)',
+          position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+          // The label is centered on the BAR, so a long balance would run under
+          // it before it ran off the edge. pointer-events stay off so the whole
+          // bar remains one click target.
+          pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
           {def.badge}
         </span>
       )}

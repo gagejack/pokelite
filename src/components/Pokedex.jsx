@@ -273,10 +273,12 @@ export default function Pokedex({ onClose }) {
                       <div style={{ display: 'flex', gap: '2px', marginTop: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {p.types.map(type => (
                           <span key={type} style={{
-                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: isDesktop ? '12px' : '9px', color: '#1a1a1a',
+                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: isDesktop ? '11px' : '8px', color: '#fff',
                             backgroundColor: TYPE_COLORS[type] || '#888',
-                            border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                            padding: isDesktop ? '1px 4px' : '1px 3px', textTransform: 'capitalize',
+                            border: '1px solid #000', borderRadius: '5px',
+                            boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                            padding: isDesktop ? '1px 4px' : '1px 3px', textTransform: 'uppercase',
+                            WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                           }}>
                             {type}
                           </span>

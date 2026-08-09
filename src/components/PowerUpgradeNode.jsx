@@ -78,10 +78,12 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
-                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '9px', color: '#1a1a1a',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '8px', color: '#fff',
                       backgroundColor: TYPE_COLORS[move?.type] || '#888',
-                      border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                      padding: '1px 4px', textTransform: 'capitalize', flexShrink: 0,
+                      border: '1px solid #000', borderRadius: '5px',
+                      boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                      padding: '1px 4px', textTransform: 'uppercase',
+                      WebkitTextStroke: '1px #000', paintOrder: 'stroke fill', flexShrink: 0,
                     }}>
                       T{tier}
                     </span>

@@ -4,6 +4,18 @@ import { accent } from '../lib/colors'
 import { itemIconUrl, tierColor } from '../game/items'
 import { UPDATE, updateItems } from '../game/updates'
 
+// Left-edge color per feature row, keyed by name so a reorder in updates.js
+// can't silently swap two rows' colors. Picked to sit apart from the item
+// rows' rarity edges in the same popup (blue=rare, purple=epic, yellow=
+// legendary in TIER_COLORS) so a feature never reads as a rarity tier it
+// doesn't have. Falls back to the old neutral edge for any name not listed,
+// so a future feature is never left uncolored by omission.
+const FEATURE_COLORS = {
+  'Safari Mode': '#34d399',           // teal-green — a place, not a system
+  'Meta Progression Shop': '#fb923c', // orange — matches the shop/cash register feel
+  'Leaderboards': '#f472b6',          // pink — stands apart from cash green and podium gold
+}
+
 // Patch notes for the main menu — shown once per device per UPDATE.id, and
 // reopenable from the menu's NEW badge afterwards (see MainMenu).
 //
@@ -116,11 +128,11 @@ export default function UpdateNotice({ onClose }) {
                       display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px',
                       backgroundColor: rowBg,
                       border,
-                      // Neutral edge: the item rows spend their left edge on
-                      // rarity, and a feature has no tier to declare. Keeping
-                      // the edge (rather than dropping it) holds both row kinds
-                      // on one left margin.
-                      borderLeft: `6px solid ${mutedColor}`,
+                      // Each feature gets its own edge color (FEATURE_COLORS)
+                      // rather than the neutral edge item rows fall back to —
+                      // three unrelated features read better as three distinct
+                      // things than as one undifferentiated list.
+                      borderLeft: `6px solid ${FEATURE_COLORS[feature.name] ?? mutedColor}`,
                     }}
                   >
                     <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: textColor }}>{feature.name}</span>

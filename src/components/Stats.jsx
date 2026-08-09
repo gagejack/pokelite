@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { allLegendaryIds } from '../game/regionRegistry'
 import LoginModal from './LoginModal'
 import BalanceDashboard from './BalanceDashboard'
+import Leaderboard from './Leaderboard'
 import LevelBar from './LevelBar'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 import { TYPE_COLORS } from '../game/types.js'
@@ -44,7 +45,7 @@ function fmtRunTime(ms) {
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
 
-export default function Stats({ onClose, role = null }) {
+export default function Stats({ onClose, role = null, initialStatsTab = 'profile' }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -56,6 +57,13 @@ export default function Stats({ onClose, role = null }) {
   // Which detail popup is open: null | 'legendary' | 'shiny'
   const [detail, setDetail] = useState(null)
   const [tab, setTab] = useState('stats')
+  // Sub-tab within Stats: 'profile' | 'leaderboards'. Separate state from
+  // `tab` so switching out to Hall of Fame and back returns you to the Stats
+  // view you were last on.
+  // Which sub-tab opens first. The menu's LEADERBOARD button is the same sheet
+  // as STATS with a different landing tab, so it passes 'leaderboards' rather
+  // than being a second screen that duplicates the board.
+  const [statsTab, setStatsTab] = useState(initialStatsTab)
   const isAdmin = role === 'admin'
   // If the role resolves late (or the user logs out), never leave the admin
   // tab selected.
@@ -253,9 +261,56 @@ export default function Stats({ onClose, role = null }) {
           </button>
         </div>
 
+        {/* Sub-tabs, shown only under Stats. Hall of Fame and Balance are their
+            own destinations, so a second tab row under them would suggest a
+            division they don't have.
+
+            These sit above the scroll container, not inside it: a player who
+            has scrolled to the bottom of a long profile still needs one tap to
+            reach the board. */}
+        {tab === 'stats' && (
+          <div className="flex px-5" style={{ gap: '18px', borderBottom: panelBorder }}>
+            {[
+              { key: 'profile', label: 'My Profile' },
+              { key: 'leaderboards', label: 'Leaderboards' },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setStatsTab(t.key)}
+                style={{
+                  fontFamily: 'Upheaval',
+                  // Deliberately smaller than the 22px top row. The size step
+                  // is what says these are nested inside Stats rather than
+                  // peers of it — without it, two equal tab rows read as one
+                  // confused navigation.
+                  fontSize: isDesktop ? '15px' : '14px',
+                  color: statsTab === t.key ? textColor : mutedColor,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '9px 0',
+                  borderBottom: statsTab === t.key ? `2px solid ${accent(dark)}` : '2px solid transparent',
+                  // The underline sits on the container's own border, so it
+                  // reads as the tab claiming that edge rather than a second
+                  // line beneath it.
+                  marginBottom: '-2px',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
-          {loading ? (
+          {/* The leaderboard is public — it reads a SECURITY DEFINER RPC that
+              anonymous callers may execute. So it renders BEFORE the login
+              gate below: a logged-out visitor seeing the ladder is a reason to
+              sign up, and gating it would show them a login prompt for data
+              that isn't theirs. It also owns its own loading state, so it
+              doesn't wait on the profile query above. */}
+          {tab === 'stats' && statsTab === 'leaderboards' ? (
+            <Leaderboard />
+          ) : loading ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>Loading...</span>
             </div>
@@ -374,10 +429,12 @@ export default function Stats({ onClose, role = null }) {
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {(p.types ?? []).map(t => (
                                 <span key={t} style={{
-                                  fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '14px', color: '#1a1a1a',
+                                  fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '12px', color: '#fff',
                                   backgroundColor: TYPE_COLORS[t] ?? '#888',
-                                  border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                                  padding: '0 5px', textTransform: 'capitalize',
+                                  border: '1px solid #000', borderRadius: '5px',
+                                  boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                                  padding: '0 5px', textTransform: 'uppercase',
+                                  WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                                 }}>
                                   {t}
                                 </span>

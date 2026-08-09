@@ -188,10 +188,12 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                         <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                           {pokemon.types?.map(t => (
                             <span key={t} style={{
-                              fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '7px', color: '#1a1a1a',
+                              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '6px', color: '#fff',
                               backgroundColor: TYPE_COLORS[t] || '#888',
-                              border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                              padding: '2px 5px', textTransform: 'capitalize',
+                              border: '1px solid #000', borderRadius: '5px',
+                              boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                              padding: '2px 5px', textTransform: 'uppercase',
+                              WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                             }}>
                               {t}
                             </span>
@@ -498,10 +500,12 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {pokemon.types?.map(t => (
                     <span key={t} style={{
-                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 400, fontSize: '10px', color: '#1a1a1a',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: '#fff',
                       backgroundColor: TYPE_COLORS[t] || '#888',
-                      border: '1px solid #000', boxShadow: '2px 2px 0 #000',
-                      padding: '1px 4px', textTransform: 'capitalize',
+                      border: '1px solid #000', borderRadius: '5px',
+                      boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
+                      padding: '1px 4px', textTransform: 'uppercase',
+                      WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                     }}>
                       {t}
                     </span>
