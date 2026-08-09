@@ -19,7 +19,7 @@ import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
@@ -242,6 +242,47 @@ function MapSvg({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          {/* Safari: a WILD Pokémon (grass node) — you fight it and do not keep
+              it. Red replaces the white dilation ring so the outline reads as
+              danger at node size, and the gold reachability glow is kept so
+              Safari nodes still show whether the player can walk there. Same
+              structure as #white-outline-sm; only the flood colour differs. */}
+          <filter id="safari-wild-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Safari: a Master Ball's legendary stays hidden until clicked.
+              feColorMatrix with all-zero RGB rows collapses the sprite to solid
+              black while preserving its alpha, so the silhouette keeps the
+              species' exact shape. The white ring and glow are kept so the node
+              still reads as reachable. */}
+          <filter id="safari-silhouette-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
         </defs>
 
         {edges.map(([fromId, toId], i) => {
@@ -299,15 +340,30 @@ function MapSvg({
                 // a fork between those two, and one looking bigger reads as
                 // one being more important.
                 const ICON_SCALE = { [NODE_TYPES.GRASS]: 0.7, [NODE_TYPES.POKEMART]: 0.9 }
-                const scale = ICON_SCALE[node.type] ?? 1
+                // Pokémon sprites have more transparent padding than the node
+                // icons, so a baked Safari sprite is scaled up slightly to sit
+                // at the same visual weight as its Classic neighbours.
+                const SAFARI_ICON_SCALE = 0.85
+                const scale = node.species?.id ? SAFARI_ICON_SCALE : (ICON_SCALE[node.type] ?? 1)
                 const size = NODE_SIZE * scale
                 // Shrunk icons stay centered on the node point rather than
                 // hanging off its top-left corner.
                 const offset = (NODE_SIZE - size) / 2
+                // Safari nodes carry their own filter: a red ring for wild
+                // (grass) Pokémon, a black silhouette for an unrevealed
+                // legendary. Hover still takes precedence so pointing at a
+                // Safari node gives the same feedback as any other node.
+                const safariFilter =
+                  node.species?.id && node.type === NODE_TYPES.GRASS ? 'url(#safari-wild-sm)'
+                  : node.species?.id && node.type === NODE_TYPES.MASTER_BALL ? 'url(#safari-silhouette-sm)'
+                  : null
+                const nodeFilter = isHovered
+                  ? 'url(#hover-outline-sm)'
+                  : safariFilter ?? (reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)')
                 return (
                   <image href={icon} x={offset} y={offset}
                     width={size} height={size}
-                    filter={isHovered ? 'url(#hover-outline-sm)' : reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)'}
+                    filter={nodeFilter}
                     style={{ imageRendering: 'pixelated', opacity }}
                   />
                 )
@@ -948,6 +1004,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function getIcon(node, isCurrentNode) {
     if (isCurrentNode && character) return character.sprite
+    // Safari: a baked node draws its actual Pokémon. A cache miss (species not
+    // prewarmed) falls through to the Classic icon — the node stays playable,
+    // only the preview is lost.
+    if (node.species?.id) {
+      const sprite = cachedSprite(node.species.id)
+      if (sprite) return sprite
+    }
     if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL) {
       return config.trainerSprites[node.trainer] || ITEM_ICONS[NODE_TYPES.POKEBALL]
     }
@@ -1002,6 +1065,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const lvl = lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
       // Object line reuses the boss tooltip's { type, name, level } row format.
       return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
+    }
+    // Safari: a baked node names what it holds. Master Ball is the deliberate
+    // exception — naming it would defeat the silhouette.
+    if (node.species?.id && node.type !== NODE_TYPES.MASTER_BALL) {
+      const nodePayout = getEffectiveBalance().economy.payouts.node
+      const name = cachedName(node.species.id) ?? '???'
+      const row = { type: cachedType(node.species.id), name, level: node.species.level }
+      if (node.type === NODE_TYPES.GRASS) {
+        return { title: 'Tall Grass', sub: [row, `+1 LVL · $${BALANCE.economy.payouts.grass}`] }
+      }
+      if (node.type === NODE_TYPES.POKEBALL) {
+        return { title: 'Wild Pokémon', sub: [row, `Catch it · $${nodePayout}`] }
+      }
     }
     const nodePay = getEffectiveBalance().economy.payouts.node
     switch (node.type) {
