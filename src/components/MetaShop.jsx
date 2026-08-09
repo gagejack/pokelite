@@ -38,7 +38,6 @@ function formatCountdown(ms) {
 function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
   const state = rowState(profile, item, overrides)
   const price = rowPrice(profile, item, overrides)
-  const dimmed = state === 'owned' || state === 'too_expensive'
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -48,7 +47,12 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: '12px', padding: '10px 12px', borderBottom: borderStyle,
-      opacity: dimmed ? 0.6 : 1,
+      // The row itself never dims. Fading the name, description and icon of
+      // everything unaffordable greys out nearly the whole catalog for a
+      // player who has just started earning — which reads as "this shop is
+      // broken", not "you can't afford this yet". Only the Buy button carries
+      // the affordability state; the merchandise stays legible so the player
+      // can see what they're saving toward.
     }}>
       {/* Icon leads the row. The name/description block is what gets scanned,
           so a fixed-width cell on the left gives the eye a straight rail to run
@@ -81,9 +85,11 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
             Requires Starting Funds I
           </span>
         ) : (
+          // Price keeps its money color whether or not you can afford it — it
+          // is a fact about the item, not about your wallet, and greying it
+          // made the whole right column read as disabled.
           <span style={{
-            fontFamily: 'Orange Kid', fontSize: '18px',
-            color: state === 'affordable' ? cash(dark) : mutedColor,
+            fontFamily: 'Orange Kid', fontSize: '18px', color: cash(dark),
           }}>
             {item.currency === 'keys' ? `${price} 🔑` : `$${price.toLocaleString()}`}
           </span>

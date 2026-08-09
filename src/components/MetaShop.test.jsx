@@ -237,3 +237,25 @@ test('Bargain Hunter discounts sprite prices, not just catalog items', () => {
     expect(toNum(discounted[i])).toBe(Math.round(toNum(plain[i]) * 0.85))
   }
 })
+
+test('an unaffordable row stays full opacity — only the Buy button greys out', () => {
+  // Regression: the row used to fade to 0.6 whenever the item was unaffordable
+  // or owned, which greyed the name, description and icon of nearly the whole
+  // catalog for a player who had just started earning. That reads as "the shop
+  // is broken", not "you can't afford this yet". The merchandise stays legible;
+  // only the button carries affordability.
+  const broke = { ...createProfile(), metacash: 0 }
+  const { container } = show({ profile: broke })
+
+  // Side Hustle is $300, so at $0 it is unaffordable.
+  const label = screen.getByText('Side Hustle')
+  const row = label.closest('div[style*="border-bottom"]')
+  expect(row).toBeTruthy()
+  // No row-level fade.
+  expect(row.style.opacity === '' || row.style.opacity === '1').toBe(true)
+
+  // The Buy button in that row is genuinely disabled.
+  const buy = [...row.querySelectorAll('button')].find(b => b.textContent === 'Buy')
+  expect(buy).toBeTruthy()
+  expect(buy.disabled).toBe(true)
+})
