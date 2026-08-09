@@ -120,3 +120,41 @@ test('bakes nothing on a pokeball node when the catch pool is empty', () => {
   bakeSafariSpecies(rows, { config: emptyPool, mapIndex: 0, maxSpeciesId: 151 })
   expect(rows[0][0].species).toBeUndefined()
 })
+
+import { buildRows } from './nodeMap.js'
+
+const anyNode = rows => rows.flat()
+
+test('buildRows in classic mode bakes nothing', () => {
+  const rows = buildRows([1, 4, 7], 'Brock', 0)
+  expect(anyNode(rows).every(n => n.species === undefined)).toBe(true)
+})
+
+test('buildRows in safari mode bakes every bakeable node', () => {
+  const rows = buildRows([1, 4, 7], 'Brock', 0, {
+    mode: 'safari', config: CONFIG, maxSpeciesId: 151,
+  })
+  const bakeable = anyNode(rows).filter(n =>
+    n.type === NODE_TYPES.GRASS || n.type === NODE_TYPES.POKEBALL || n.type === NODE_TYPES.MASTER_BALL
+  )
+  // The pools in CONFIG are non-empty, so every bakeable node gets a species.
+  expect(bakeable.length).toBeGreaterThan(0)
+  expect(bakeable.every(n => n.species?.id)).toBe(true)
+})
+
+test('buildRows in safari mode leaves non-bakeable nodes clean', () => {
+  const rows = buildRows([1, 4, 7], 'Brock', 0, {
+    mode: 'safari', config: CONFIG, maxSpeciesId: 151,
+  })
+  const others = anyNode(rows).filter(n =>
+    n.type !== NODE_TYPES.GRASS && n.type !== NODE_TYPES.POKEBALL && n.type !== NODE_TYPES.MASTER_BALL
+  )
+  expect(others.every(n => n.species === undefined)).toBe(true)
+})
+
+test('buildRows in safari mode bakes nothing without a config', () => {
+  // Defensive: a caller that forgets to pass config must produce a playable
+  // Classic-looking map rather than crashing on config.catchPools.
+  const rows = buildRows([1, 4, 7], 'Brock', 0, { mode: 'safari' })
+  expect(anyNode(rows).every(n => n.species === undefined)).toBe(true)
+})

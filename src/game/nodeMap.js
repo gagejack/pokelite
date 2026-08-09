@@ -1,5 +1,6 @@
 import { BALANCE } from './balance.js'
 import { rng } from './rng.js'
+import { bakeSafariSpecies } from './safariBake.js'
 
 export const NODE_TYPES = {
   GRASS: 'grass',
@@ -109,7 +110,10 @@ function randomNode(id, trainerPool, mapIndex = 0) {
 }
 
 // Row layout: 1→2→3→4→3→4→3→2(pokecenter)→1(boss)
-export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
+// `options` carries Safari Mode's needs: the mode itself, the region config
+// (the bake reads catch/legendary pools and level bands from it), and the
+// generation ceiling. Classic callers omit it entirely and are unaffected.
+export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) {
   const ROW_WIDTHS = BALANCE.map.rowWidths
   let id = 0
   const rows = ROW_WIDTHS.map(width =>
@@ -143,5 +147,14 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0) {
 
   // Boss node always last
   rows.push([{ id: id, type: NODE_TYPES.BOSS, trainer: bossTrainer }])
+
+  // Safari: attach each bakeable node's species now that the rows are final.
+  // This must stay AFTER every structural fixup above — see safariBake.js.
+  // Region post-processing (e.g. Kanto's rival) happens in the region's
+  // generate(), which calls bakeSafariSpecies itself after its own fixups.
+  const { mode = 'classic', config = null, maxSpeciesId = Infinity } = options
+  if (mode === 'safari' && config) {
+    bakeSafariSpecies(rows, { config, mapIndex, maxSpeciesId })
+  }
   return rows
 }
