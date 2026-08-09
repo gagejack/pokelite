@@ -70,13 +70,26 @@ export function playSound(name, { volume = getVolume() } = {}) {
   }
 }
 
+// Minimum gap between two plays of the SAME clip. A Pokémon keeps one move for
+// a whole battle, so consecutive attacks resolve to the same URL — and the
+// cache below holds one Audio element per URL. Without this floor, each attack
+// rewinds a clip that is still playing, so a long sound (Thunderbolt is 2.7s,
+// against a 750ms gap between attacks at 1x) never gets past its opening
+// transient and the battle turns into a stutter. Below the floor the repeat is
+// dropped rather than restarted: re-attacking the same instant is better
+// represented by one clean sound than by a chopped one.
+const MIN_REPLAY_GAP_MS = 120
+
+// Last play time per URL, for the gap check above.
+const lastPlayedAt = new Map()
+
 /**
  * Play a sound by resolved URL. For callers that already hold a bundled asset
  * URL (move SFX) rather than a key in the SOUNDS registry.
  *
- * Shares the same cache as playSound, keyed by URL, so a sound retriggering
- * before it finished rewinds instead of layering. That is deliberate: one
- * attack should make one audible sound even at 3x battle speed.
+ * Shares the same cache as playSound, keyed by URL. A repeat of the same clip
+ * within MIN_REPLAY_GAP_MS is ignored so the clip can ring out; a repeat after
+ * that rewinds and plays again. Distinct URLs never suppress each other.
  *
  * @param {string} url
  * @param {{ volume?: number }} [opts] volume 0–1, default 0.6
@@ -85,6 +98,11 @@ export function playSoundUrl(url, { volume = getVolume() } = {}) {
   if (!url || isMuted()) return
 
   try {
+    const now = Date.now()
+    const last = lastPlayedAt.get(url)
+    if (last !== undefined && now - last < MIN_REPLAY_GAP_MS) return
+    lastPlayedAt.set(url, now)
+
     let audio = cache.get(url)
     if (!audio) {
       audio = new Audio(url)
