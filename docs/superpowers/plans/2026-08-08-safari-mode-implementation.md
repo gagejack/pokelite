@@ -1277,13 +1277,19 @@ git commit -m "feat(safari): render baked species with wild outline and legendar
 
 ---
 
-### Task 8: Single-Pokémon Pokéball flow
+### Task 8: Baked-species battles and the single-Pokémon Pokéball flow
 
-In Safari a Pokéball holds one Pokémon, taken on click. The modal only appears when the roster is full and a swap decision is needed.
+Two halves of the same idea — the click path must consume what generation baked, never re-draw.
+
+1. **Battles fight the baked species.** Grass and Master Ball nodes build their enemy team from `node.species` instead of drawing fresh. Without this the map lies.
+2. **A Pokéball holds one Pokémon**, taken on click. The modal appears only when the roster is full and a swap decision is needed.
 
 **Files:**
-- Modify: `src/components/NodeMap.jsx` — `fetchOfferedPokemon` (~line 676), the click dispatch (~line 777), `resolveMysteryNode` (~line 719)
+- Modify: `src/components/NodeMap.jsx` — `fetchEnemyTeam` (~line 663, both the grass and legendary branches), `fetchOfferedPokemon` (~line 734), the Pokéball click dispatch (~line 835), `handlePokeballPick` (~line 969), the `PokeballNode` call site (~line 1078)
 - Modify: `src/components/PokeballNode.jsx` — single-Pokémon variant
+- Test: `src/game/safariBake.test.js`
+
+Line numbers are approximate — Task 7 shifted this file. Locate by function name.
 
 **Interfaces:**
 - Consumes: `node.species` from Task 3, `getActiveExtras().partySize` (existing).
@@ -1293,7 +1299,51 @@ In Safari a Pokéball holds one Pokémon, taken on click. The modal only appears
 
 Read `src/components/NodeMap.jsx` lines 676–740 (`fetchOfferedPokemon`, `resolveMysteryNode`) and 777–800 (the Pokéball dispatch). Read `src/components/PokeballNode.jsx` in full — it is 207 lines and handles the offer grid, the roster-full swap panel, and the Mystery reroll.
 
-- [ ] **Step 2: Build the offer from the baked species**
+- [ ] **Step 2: Make the grass battle fight the baked species**
+
+**This is the most important step in the task.** Without it a grass node shows one Pokémon and the player fights a different one — the single failure the whole mode exists to prevent. The bake and the render are already done; this is the third leg.
+
+In `fetchEnemyTeam`, the grass branch (~line 706) currently draws fresh at click time:
+
+```js
+    } else {
+      // Grass: one wild Pokémon from this map's catch pool, a few levels below
+      // the map's trainers, scaled by node position. Grass ignores rarity —
+      // it's a forced fight, not a reward — so pick a species uniformly.
+      const pool = config.catchPools?.[mapIndex] ?? []
+      const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
+    }
+```
+
+Replace that block with:
+
+```js
+    } else if (node.species?.id) {
+      // Safari: the species was drawn at map generation and is already on
+      // screen. Fight exactly that — drawing again here would make the sprite
+      // the player walked toward a lie, which is the one thing this mode
+      // cannot do.
+      specs = [{ id: node.species.id, level: node.species.level }]
+    } else {
+      // Grass: one wild Pokémon from this map's catch pool, a few levels below
+      // the map's trainers, scaled by node position. Grass ignores rarity —
+      // it's a forced fight, not a reward — so pick a species uniformly.
+      const pool = config.catchPools?.[mapIndex] ?? []
+      const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
+    }
+```
+
+Note the new branch goes BEFORE the existing `else`, and is reached only when a species was baked — Classic nodes have no `species`, so they take the original path unchanged.
+
+A Master Ball node also carries `node.species`, and it flows through a different branch of `fetchEnemyTeam`. Read how the legendary branch picks its species and give it the same treatment: when `node.species?.id` is present, fight that exact legendary at that exact level rather than re-drawing from `config.legendaryPools`. Otherwise the silhouette on the map can reveal a different legendary than the one baked.
+
+- [ ] **Step 3: Build the offer from the baked species**
 
 In `fetchOfferedPokemon`, add at the top:
 
@@ -1312,7 +1362,7 @@ In `fetchOfferedPokemon`, add at the top:
     // ...existing body unchanged...
 ```
 
-- [ ] **Step 3: Take the Pokémon directly when the roster has room**
+- [ ] **Step 4: Take the Pokémon directly when the roster has room**
 
 In the click dispatch, replace the `else if (node.type === NODE_TYPES.POKEBALL)` branch:
 
@@ -1371,7 +1421,7 @@ Then update the modal's call site at line 1561 to pass the node:
           onPick={pick => handlePokeballPick(pick, pendingPokeball.node)}
 ```
 
-- [ ] **Step 4: Keep the reroll on Mystery-resolved Pokéballs**
+- [ ] **Step 5: Keep the reroll on Mystery-resolved Pokéballs**
 
 A Mystery node bakes nothing, so a Mystery that resolves into a Pokéball has no `node.species`. In Safari it must still draw **one** species, not three, and must keep its reroll — the reroll is the Mystery node's entire bonus.
 
@@ -1389,7 +1439,7 @@ In `resolveMysteryNode`, thread the mode through so the resolved node knows to d
 
 `mode` reaches `NodeMap` as a prop in Task 9. Until then, add the prop with a `'classic'` default so this task is testable on its own.
 
-- [ ] **Step 5: Add the single-Pokémon variant to `PokeballNode`**
+- [ ] **Step 6: Add the single-Pokémon variant to `PokeballNode`**
 
 In `src/components/PokeballNode.jsx`, add `single = false` to the props, and use it for the header and the grid:
 
@@ -1412,7 +1462,7 @@ Change the header copy so the single case does not tell the player to choose:
 
 The existing offer grid already renders whatever `offered` contains, so a one-element array renders one card with no further change. Leave `handleSelectPokemon` alone: with a full roster it opens the swap panel, which is exactly what the single case needs.
 
-- [ ] **Step 6: Pass `single` at the call site**
+- [ ] **Step 7: Pass `single` at the call site**
 
 In `NodeMap.jsx`, where `PokeballNode` is rendered (~line 1559), add:
 
@@ -1422,24 +1472,52 @@ In `NodeMap.jsx`, where `PokeballNode` is rendered (~line 1559), add:
 
 Leave the existing `onReroll={pendingPokeball.node.fromMystery ? rerollPokeballOffer : null}` untouched — that is what keeps the Mystery bonus alive.
 
-- [ ] **Step 7: Verify in the browser**
+- [ ] **Step 8: Add a test proving the battle fights the baked species**
+
+The truth property deserves a test, not just a browser glance. `fetchEnemyTeam` lives inside the React component and is hard to call directly, so assert the property at the seam that matters: a baked grass node's `species` is what the battle spec is built from.
+
+Add to `src/game/safariBake.test.js`:
+
+```js
+test('a baked grass node carries the exact id and level the battle will use', () => {
+  // NodeMap.fetchEnemyTeam builds its grass spec as
+  //   [{ id: node.species.id, level: node.species.level }]
+  // when a species is baked, so these two fields ARE the battle. If this
+  // shape changes, the sprite on the map stops matching the fight.
+  const rows = rowsWith(NODE_TYPES.GRASS)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  const { species } = rows[0][0]
+  expect(typeof species.id).toBe('number')
+  expect(typeof species.level).toBe('number')
+  expect(species.level).toBeGreaterThan(0)
+  expect([1, 4, 7]).toContain(species.id)
+})
+```
+
+- [ ] **Step 9: Verify in the browser**
 
 Run: `npm run dev`
 
-Temporarily force Safari again as in Task 7. Confirm: clicking a Pokéball node with roster space adds that exact Pokémon with no modal and pays the node cash; clicking one with a full roster opens the swap panel showing a single Pokémon; a Mystery node that resolves into a Pokéball shows one Pokémon with a working reroll button.
+Temporarily force Safari again as in Task 7. Confirm:
+
+- **A grass node's battle is against the species shown on the node.** Note the Pokémon on a grass node, click it, and check the battle opponent matches. This is the mode's core promise — check it before anything else.
+- A Master Ball's revealed legendary matches the silhouette that was there.
+- Clicking a Pokéball node with roster space adds that exact Pokémon with no modal, and pays the node cash.
+- Clicking one with a full roster opens the swap panel showing a single Pokémon.
+- A Mystery node resolving into a Pokéball shows one Pokémon with a working reroll.
 
 **Revert the temporary change before committing.**
 
-- [ ] **Step 8: Run tests and lint**
+- [ ] **Step 10: Run tests and lint**
 
 Run: `npm test && npm run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add src/components/NodeMap.jsx src/components/PokeballNode.jsx
-git commit -m "feat(safari): single-Pokemon pokeball flow"
+git add src/components/NodeMap.jsx src/components/PokeballNode.jsx src/game/safariBake.test.js
+git commit -m "feat(safari): single-Pokemon pokeball flow and baked-species battles"
 ```
 
 ---
