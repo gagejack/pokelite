@@ -222,13 +222,21 @@ in the same style — no cache-shape change. The render path stays synchronous,
 with no loading states on the map. A cache miss falls back to the Classic icon
 rather than rendering a hole; the node stays playable, only the preview is lost.
 
-**Red outline (grass).** Four stacked `drop-shadow` filters at ~1.5px, offset
-N/S/E/W, red. Traces the transparent PNG's actual silhouette, holds at small
-sizes against busy backgrounds. Grass only.
+**Red outline (grass).** Map nodes are SVG `<image>` elements whose `filter`
+attribute already drives hover, reachability, and shadow states, and those
+states are mutually exclusive — a CSS filter cannot compose with them, and
+overwriting the attribute would destroy hover feedback. So the treatment is a
+new SVG filter (`#safari-wild-sm`) built on the existing `#white-outline-sm`:
+the same dilate-and-composite ring, flooded red instead of white, keeping the
+gold reachability glow. Grass only.
 
-**Silhouette (Master Ball).** `brightness(0)` collapses the sprite to solid
-black while keeping shape and alpha, combined with the existing Master Ball
-styling so it still reads as the rare node.
+**Silhouette (Master Ball).** A second SVG filter (`#safari-silhouette-sm`)
+using `feColorMatrix` with zeroed RGB rows to collapse the sprite to solid black
+while preserving its alpha, so the silhouette keeps the species' exact shape.
+Retains the white ring and glow so the node still reads as reachable.
+
+Hover takes precedence over both, so pointing at a Safari node gives the same
+feedback as any other node.
 
 **Plain (Pokéball).** No treatment. Absence of the red outline is the signal
 that this one joins your team.

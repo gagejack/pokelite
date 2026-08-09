@@ -1136,44 +1136,97 @@ In `getIcon`, insert a branch **before** the existing type checks, so a baked no
   }
 ```
 
-- [ ] **Step 4: Add the visual treatments**
+- [ ] **Step 4: Add the visual treatments as SVG filters**
 
-Add near `ICON_SCALE` (~line 301):
+**Read this before writing any code — the obvious approach does not work here.**
 
-```js
-  // Safari node treatments. Grass is a WILD Pokémon — you fight it and do not
-  // keep it — so it gets a red outline; a Pokéball's Pokémon joins your team
-  // and renders plain. Four stacked drop-shadows trace the sprite's actual
-  // silhouette, which survives small sizes and busy map backgrounds far better
-  // than a blur would.
-  const SAFARI_WILD_OUTLINE = [
-    'drop-shadow(1.5px 0 0 #e23b3b)',
-    'drop-shadow(-1.5px 0 0 #e23b3b)',
-    'drop-shadow(0 1.5px 0 #e23b3b)',
-    'drop-shadow(0 -1.5px 0 #e23b3b)',
-  ].join(' ')
+Map nodes are SVG `<image>` elements, not HTML `<img>`. Their `filter` **attribute** is already in use and is mutually exclusive:
 
-  // Master Ball keeps its legendary hidden until clicked: brightness(0)
-  // collapses the sprite to solid black while preserving shape and alpha.
-  const SAFARI_SILHOUETTE = 'brightness(0)'
-
-  function safariFilter(node) {
-    if (!node.species?.id) return undefined
-    if (node.type === NODE_TYPES.GRASS) return SAFARI_WILD_OUTLINE
-    if (node.type === NODE_TYPES.MASTER_BALL) return SAFARI_SILHOUETTE
-    return undefined
-  }
+```jsx
+filter={isHovered ? 'url(#hover-outline-sm)' : reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)'}
 ```
 
-Find where the node icon `<img>` is rendered (search for `ICON_SCALE` usage) and add `filter: safariFilter(node)` to its inline `style` object. Also give baked nodes their own scale entry, since Pokémon sprites carry different padding than the grass icon:
+So a CSS `filter` in the `style` prop will not compose with it, and replacing the attribute would destroy hover and reachability feedback. Instead, define Safari's treatments as **new SVG filters that layer on top of the existing effects**, and pick among them in the same ternary.
 
-```js
-  const SAFARI_ICON_SCALE = 0.85
+Add these two filters inside the existing `<defs>`, immediately after `#white-outline-sm` (~line 244). They follow that filter's structure exactly — shadow, dilate, flood, composite, merge — with the flood colour changed to red:
+
+```jsx
+          {/* Safari: a WILD Pokémon (grass node) — you fight it and do not keep
+              it. Red replaces the white dilation ring so the outline reads as
+              danger at node size, and the gold reachability glow is kept so
+              Safari nodes still show whether the player can walk there. Same
+              structure as #white-outline-sm; only the flood colour differs. */}
+          <filter id="safari-wild-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Safari: a Master Ball's legendary stays hidden until clicked.
+              feColorMatrix with all-zero RGB rows collapses the sprite to solid
+              black while preserving its alpha, so the silhouette keeps the
+              species' exact shape. The white ring and glow are kept so the node
+              still reads as reachable. */}
+          <filter id="safari-silhouette-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
 ```
 
-Use it in place of the `ICON_SCALE` lookup when `node.species?.id` is set.
+Then select them at the render site (~line 308). Hover must still win, so it stays first in the chain — a Safari node the player is pointing at should light up like any other:
 
-- [ ] **Step 5: Name the species in tooltips**
+```jsx
+                // Safari nodes carry their own filter: a red ring for wild
+                // (grass) Pokémon, a black silhouette for an unrevealed
+                // legendary. Hover still takes precedence so pointing at a
+                // Safari node gives the same feedback as any other node.
+                const safariFilter =
+                  node.species?.id && node.type === NODE_TYPES.GRASS ? 'url(#safari-wild-sm)'
+                  : node.species?.id && node.type === NODE_TYPES.MASTER_BALL ? 'url(#safari-silhouette-sm)'
+                  : null
+                const nodeFilter = isHovered
+                  ? 'url(#hover-outline-sm)'
+                  : safariFilter ?? (reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)')
+```
+
+and change the element's attribute to `filter={nodeFilter}`.
+
+Note a Pokéball node gets no Safari filter at all — plain rendering is the signal that this one joins your team.
+
+- [ ] **Step 5: Scale baked sprites to match the other icons**
+
+Pokémon sprites carry different internal padding than the grass icon, so a baked node needs its own scale. At the `ICON_SCALE` lookup (~line 301):
+
+```js
+                // Pokémon sprites have more transparent padding than the node
+                // icons, so a baked Safari sprite is scaled up slightly to sit
+                // at the same visual weight as its Classic neighbours.
+                const SAFARI_ICON_SCALE = 0.85
+                const scale = node.species?.id ? SAFARI_ICON_SCALE : (ICON_SCALE[node.type] ?? 1)
+```
+
+- [ ] **Step 6: Name the species in tooltips**
 
 In `getNodeLabel`, add before the existing `switch`:
 
@@ -1195,20 +1248,27 @@ In `getNodeLabel`, add before the existing `switch`:
 
 The `{ type, name, level }` row shape matches the boss and rival tooltips, so it renders a colored type chip with no new tooltip code.
 
-- [ ] **Step 6: Verify in the browser**
+- [ ] **Step 7: Verify in the browser**
 
 Run: `npm run dev`
 
-There is no Safari entry point yet (Task 8), so force one temporarily: in `NodeMap.jsx`'s `useMemo` that calls `mapConfig.generate(starter)`, pass `{ mode: 'safari' }`. Start a Kanto run and confirm: grass nodes show Pokémon with a red outline, Pokéball nodes show Pokémon with no outline, any Master Ball shows a black silhouette, tooltips name the species with a type chip, and the Master Ball tooltip still reads `???`.
+There is no Safari entry point yet (Task 9), so force one temporarily: in `NodeMap.jsx`'s `useMemo` that calls `mapConfig.generate(starter)`, pass `{ mode: 'safari' }`. Start a Kanto run and confirm:
+
+- grass nodes show a Pokémon with a **red** ring
+- Pokéball nodes show a Pokémon with the normal white ring (no red)
+- a Master Ball, if one spawns, shows a solid black silhouette
+- **hovering a Safari node still shows the gold hover treatment** — this is the regression the SVG-filter approach exists to prevent
+- unreachable Safari nodes still look unreachable
+- tooltips name the species with a type chip; the Master Ball tooltip still reads `???`
 
 **Revert the temporary change before committing.**
 
-- [ ] **Step 7: Run tests and lint**
+- [ ] **Step 8: Run tests and lint**
 
 Run: `npm test && npm run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add src/components/NodeMap.jsx
