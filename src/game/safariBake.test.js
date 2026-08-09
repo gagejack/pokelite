@@ -158,3 +158,31 @@ test('buildRows in safari mode bakes nothing without a config', () => {
   const rows = buildRows([1, 4, 7], 'Brock', 0, { mode: 'safari' })
   expect(anyNode(rows).every(n => n.species === undefined)).toBe(true)
 })
+
+import { getRegionConfig } from './regionRegistry.js'
+
+test('kanto generate bakes in safari mode and skips the rival node', () => {
+  const kanto = getRegionConfig('Kanto')
+  // Map index 2 is the map where Kanto overwrites a node with its rival.
+  const { rows } = kanto.maps[2].generate({ id: 1 }, { mode: 'safari' })
+  const rival = rows.flat().find(n => n.type === 'rival')
+  expect(rival).toBeTruthy()
+  // The rival replaced whatever was there, so it must carry no baked species.
+  expect(rival.species).toBeUndefined()
+  // ...and the surviving bakeable nodes still got baked.
+  const grass = rows.flat().filter(n => n.type === 'grass')
+  expect(grass.every(n => n.species?.id)).toBe(true)
+})
+
+test('kanto generate bakes nothing in classic mode', () => {
+  const kanto = getRegionConfig('Kanto')
+  const { rows } = kanto.maps[0].generate({ id: 1 })
+  expect(rows.flat().every(n => n.species === undefined)).toBe(true)
+})
+
+test('unova generate bakes in safari mode', () => {
+  const unova = getRegionConfig('Unova')
+  const { rows } = unova.maps[0].generate({ id: 495 }, { mode: 'safari' })
+  const grass = rows.flat().filter(n => n.type === 'grass')
+  expect(grass.every(n => n.species?.id)).toBe(true)
+})
