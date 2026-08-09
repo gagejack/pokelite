@@ -519,6 +519,13 @@ export function _seedChainCacheForTest(id, root) {
   chainCache.set(id, root)
 }
 
+// Test seam: clears chainCache so a later test's real species ids (e.g.
+// Caterpie's line, 10/11) can't collide with an earlier test's seeded fake
+// data. Not used by application code.
+export function _clearChainCacheForTest() {
+  chainCache.clear()
+}
+
 // Rebuild an instance as its evolved form: fresh stats at the same level with
 // the HP ratio preserved, plus move tier, shininess, held item, and fainted
 // state carried over (buildPokemonInstance omits them).

@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'vitest'
-import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, cachedSprite } from './pokemon.js'
+import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, _clearChainCacheForTest, cachedSprite } from './pokemon.js'
 import { setActiveRunModifiers, clearActiveRunModifiers } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -49,6 +49,7 @@ function profileWithVitamins(speciesId, statCounts) {
 
 afterEach(() => {
   clearActiveRunModifiers()
+  _clearChainCacheForTest()
 })
 
 // ── No active run / no profile: byte-identical to today's plain scalar boost ──

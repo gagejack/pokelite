@@ -283,6 +283,41 @@ function MapSvg({
               <feMergeNode in="black" />
             </feMerge>
           </filter>
+          {/* Dim counterpart to #safari-wild-sm: the gold glow IS the
+              reachability signal, so an unreachable/cleared Safari node must
+              not carry it — otherwise every wild node glows regardless of
+              whether the player can actually walk there. Same red ring and
+              shadow, glow layer removed. */}
+          <filter id="safari-wild-dim-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Dim counterpart to #safari-silhouette-sm — see #safari-wild-dim-sm
+              for why the glow must be conditional. The silhouette itself (the
+              hidden-legendary point) is unaffected; only the glow is gone. */}
+          <filter id="safari-silhouette-dim-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
         </defs>
 
         {edges.map(([fromId, toId], i) => {
@@ -353,9 +388,16 @@ function MapSvg({
                 // (grass) Pokémon, a black silhouette for an unrevealed
                 // legendary. Hover still takes precedence so pointing at a
                 // Safari node gives the same feedback as any other node.
-                const safariFilter =
-                  node.species?.id && node.type === NODE_TYPES.GRASS ? 'url(#safari-wild-sm)'
-                  : node.species?.id && node.type === NODE_TYPES.MASTER_BALL ? 'url(#safari-silhouette-sm)'
+                // The gold glow is the map's reachability signal everywhere
+                // else, so it must stay conditional on `reachable` here too —
+                // the "dim" variants are identical minus the glow layer. Without
+                // this, every Safari node would glow regardless of whether the
+                // player could actually walk there.
+                const safariFilter = !node.species?.id ? null
+                  : node.type === NODE_TYPES.GRASS
+                    ? (reachable ? 'url(#safari-wild-sm)' : 'url(#safari-wild-dim-sm)')
+                  : node.type === NODE_TYPES.MASTER_BALL
+                    ? (reachable ? 'url(#safari-silhouette-sm)' : 'url(#safari-silhouette-dim-sm)')
                   : null
                 const nodeFilter = isHovered
                   ? 'url(#hover-outline-sm)'
@@ -785,7 +827,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (node.species?.id) {
       const base = await fetchPokemonBase(node.species.id)
       const instance = buildPokemonInstance(base, node.species.level)
-      return [{ ...instance, rarity: node.species.rarity }]
+      const offered = [{ ...instance, rarity: node.species.rarity }]
+      // Seen-on-offer, same as the Classic path below: a Pokémon the player
+      // was shown counts for the Pokédex even if they decline it.
+      offered.forEach(p => onSpeciesSeen?.(p.pokeId, !!p.shiny))
+      return offered
     }
     const pool = config.catchPools?.[mapIndex] ?? []
     if (pool.length === 0) return []
@@ -913,11 +959,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       }
       // Safari with room to spare: there is no choice to present — the player
       // already made it by walking here — so take the Pokémon and move on. A
-      // full roster still needs the swap panel, and a Mystery-resolved node
-      // still needs its reroll button, so both keep the modal.
+      // full roster still needs the swap panel. A Mystery-resolved Pokéball
+      // also still needs the modal, but not via a check here: resolving a
+      // Mystery into a Pokéball sets `safariSingle`, not `species` (the bake
+      // never bakes a Mystery node), so `isSafariSingle` is already false for
+      // it and it falls through to the modal on its own.
       const isSafariSingle = !!node.species?.id
       const hasRoom = roster.length < getActiveExtras().partySize
-      if (isSafariSingle && hasRoom && !node.fromMystery) {
+      if (isSafariSingle && hasRoom) {
         handlePokeballPick({ pokemon: offered[0], swapIndex: null }, node)
         return
       }
@@ -1140,13 +1189,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const levels = pool.map(l => l.level)
       const lo = levels.length ? Math.min(...levels) : null
       const hi = levels.length ? Math.max(...levels) : null
-      const lvl = lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
+      // Safari bakes the exact legendary and its level, so show that rather
+      // than the pool-wide range. The species stays '???' — the silhouette is
+      // the point — but the level is known and revealing it gives nothing away.
+      const lvl = node.species?.level != null ? `${node.species.level}`
+        : lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
       // Object line reuses the boss tooltip's { type, name, level } row format.
       return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
     }
     // Safari: a baked node names what it holds. Master Ball is the deliberate
-    // exception — naming it would defeat the silhouette.
-    if (node.species?.id && node.type !== NODE_TYPES.MASTER_BALL) {
+    // exception — naming it would defeat the silhouette — and is handled
+    // above (that branch always returns first, so it can never reach here).
+    if (node.species?.id) {
       const nodePayout = getEffectiveBalance().economy.payouts.node
       const name = cachedName(node.species.id) ?? '???'
       const row = { type: cachedType(node.species.id), name, level: node.species.level }
