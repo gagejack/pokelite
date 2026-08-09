@@ -186,3 +186,17 @@ test('unova generate bakes in safari mode', () => {
   const grass = rows.flat().filter(n => n.type === 'grass')
   expect(grass.every(n => n.species?.id)).toBe(true)
 })
+
+test('a baked grass node carries the exact id and level the battle will use', () => {
+  // NodeMap.fetchEnemyTeam builds its grass spec as
+  //   [{ id: node.species.id, level: node.species.level }]
+  // when a species is baked, so these two fields ARE the battle. If this
+  // shape changes, the sprite on the map stops matching the fight.
+  const rows = rowsWith(NODE_TYPES.GRASS)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  const { species } = rows[0][0]
+  expect(typeof species.id).toBe('number')
+  expect(typeof species.level).toBe('number')
+  expect(species.level).toBeGreaterThan(0)
+  expect([1, 4, 7]).toContain(species.id)
+})

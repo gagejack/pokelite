@@ -11,7 +11,7 @@ import { getActiveExtras } from '../game/metaModifiers.js'
 // If roster is full (6, or 7 with Extra Slot), shows current roster so the
 // player can swap.
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
-export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false, onReroll = null, rerolling = false }) {
+export default function PokeballNode({ offered, roster, onPick, onClose, caughtSet, isLegendary = false, onReroll = null, rerolling = false, single = false }) {
   const { dark } = useTheme()
   const [selected, setSelected] = useState(null)
   const [swapTarget, setSwapTarget] = useState(null)
@@ -68,7 +68,9 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
             Wild Pokémon Found!
           </span>
           <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor }}>
-            Choose one to add to your team
+            {single
+              ? (isFull ? 'Your team is full — swap someone out?' : 'Add it to your team')
+              : 'Choose one to add to your team'}
           </span>
         </div>
 

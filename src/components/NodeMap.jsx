@@ -485,7 +485,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic' }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -676,10 +676,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // plus the rival's own starter (counters the player's pick) as the ace.
       specs = rivalTeamSpecs(config, node, starter)
     } else if (isMasterBall) {
-      // Master Ball: a single legendary from this map's pool, at its fixed level
-      // (not position-scaled). Empty pool → no legendary (caller clears the node).
-      const pool = config.legendaryPools?.[mapIndex] ?? []
-      specs = pool.length > 0 ? [pick(pool)] : []
+      if (node.species?.id) {
+        // Safari: the legendary was drawn at map generation and its silhouette
+        // is already on screen. Fight exactly that one — re-drawing here could
+        // reveal a different legendary than the one the player walked toward.
+        specs = [{ id: node.species.id, level: node.species.level }]
+      } else {
+        // Master Ball: a single legendary from this map's pool, at its fixed
+        // level (not position-scaled). Empty pool → no legendary (caller
+        // clears the node).
+        const pool = config.legendaryPools?.[mapIndex] ?? []
+        specs = pool.length > 0 ? [pick(pool)] : []
+      }
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
       const band = mapLevelRange(config.mapLevelRanges, mapIndex)
@@ -703,6 +711,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level, maxSpeciesId) }))
         )
       }
+    } else if (node.species?.id) {
+      // Safari: the species was drawn at map generation and is already on
+      // screen. Fight exactly that — drawing again here would make the sprite
+      // the player walked toward a lie, which is the one thing this mode
+      // cannot do.
+      specs = [{ id: node.species.id, level: node.species.level }]
     } else {
       // Grass: one wild Pokémon from this map's catch pool, a few levels below
       // the map's trainers, scaled by node position. Grass ignores rarity —
@@ -732,6 +746,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   async function fetchOfferedPokemon(node) {
+    // Safari: the species was drawn at map generation and is already on screen.
+    // Rebuild that exact Pokémon rather than drawing again — one draw, one
+    // truth. Returns a single-element array so every downstream consumer
+    // (the modal, the swap panel, onPick) keeps its existing shape.
+    if (node.species?.id) {
+      const base = await fetchPokemonBase(node.species.id)
+      const instance = buildPokemonInstance(base, node.species.level)
+      return [{ ...instance, rarity: node.species.rarity }]
+    }
     const pool = config.catchPools?.[mapIndex] ?? []
     if (pool.length === 0) return []
 
@@ -747,7 +770,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     // Draw distinct species weighted by rarity tier. Collector's Eye (meta
     // upgrade) raises the offer count from 3 to 4 — see metaModifiers.js.
-    const chosen = config.pickCatchOffer(pool, getActiveExtras().catchOfferCount, config.catchTierBudget)
+    // Safari draws ONE species on every path, including a Mystery that
+    // resolved into a Pokéball — the mode has no multi-Pokémon offer anywhere,
+    // which is why Collector's Eye is inert here.
+    const offerCount = (node.safariSingle || mode === 'safari')
+      ? 1
+      : getActiveExtras().catchOfferCount
+    const chosen = config.pickCatchOffer(pool, offerCount, config.catchTierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       // Roll which evolution stage of this line to offer. The pool entry names a
@@ -778,6 +807,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // node would appear to do nothing.
     const hasLegendary = (config.legendaryPools?.[mapIndex]?.length ?? 0) > 0
     const type = resolveMysteryType({ allowLegendary: hasLegendary })
+    // A Mystery node bakes nothing, so a Mystery that resolves into a Pokéball
+    // has no node.species. In Safari it must still draw only one species (not
+    // three) — safariSingle tells fetchOfferedPokemon to draw singly even
+    // though there's no baked species to rebuild.
+    const safariSingle = mode === 'safari' && type === NODE_TYPES.POKEBALL
     // Tag the resolved node so the item / catch offer screens enable the
     // reroll button (MYSTERY_REROLLS uses) — the mystery bonus.
     if (type === NODE_TYPES.TRAINER) {
@@ -788,7 +822,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         ?? Object.keys(config.trainerSprites ?? {})[0]
       return { ...node, type, trainer, fromMystery: true }
     }
-    return { ...node, type, fromMystery: true }
+    return { ...node, type, fromMystery: true, ...(safariSingle ? { safariSingle: true } : {}) }
   }
 
   const handleNodeClick = async (rawNode) => {
@@ -840,12 +874,22 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // keeps anything. See BALANCE.economy.payouts.node. Reads the effective
       // balance so Side Hustle's +$10 applies (metaModifiers.js).
       onEarnCash?.(getEffectiveBalance().economy.payouts.node)
-      if (offered.length > 0) {
-        setPendingPokeball({ node, offered })
-      } else {
+      if (offered.length === 0) {
         setClearedNodes(prev => new Set([...prev, node.id]))
         setCurrentNode(node.id)
+        return
       }
+      // Safari with room to spare: there is no choice to present — the player
+      // already made it by walking here — so take the Pokémon and move on. A
+      // full roster still needs the swap panel, and a Mystery-resolved node
+      // still needs its reroll button, so both keep the modal.
+      const isSafariSingle = !!node.species?.id
+      const hasRoom = roster.length < getActiveExtras().partySize
+      if (isSafariSingle && hasRoom && !node.fromMystery) {
+        handlePokeballPick({ pokemon: offered[0], swapIndex: null }, node)
+        return
+      }
+      setPendingPokeball({ node, offered })
     } else if (node.type === NODE_TYPES.ITEM) {
       onEarnCash?.(getEffectiveBalance().economy.payouts.node)
       // Treasure Map (meta upgrade): item nodes roll +1 extra option.
@@ -966,9 +1010,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems(3 + getActiveExtras().itemNodeExtraOptions) } : prev)
   }
 
-  function handlePokeballPick({ pokemon, swapIndex }) {
-    if (!pendingPokeball) return
-    const node = pendingPokeball.node
+  // Takes `node` explicitly rather than reading pendingPokeball, because
+  // Safari's direct-take path never opens the modal — there is no pending
+  // state to read. The modal caller passes pendingPokeball.node.
+  function handlePokeballPick({ pokemon, swapIndex }, node) {
+    if (!node) return
     if (swapIndex !== null) {
       // swapIntoRoster, not a bare replace: the outgoing Pokémon's held item
       // transfers to the newcomer (and its move is rebuilt if that item is a
@@ -1634,7 +1680,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           caughtSet={caughtSet}
           onReroll={pendingPokeball.node.fromMystery ? rerollPokeballOffer : null}
           rerolling={rerolling}
-          onPick={handlePokeballPick}
+          single={!!pendingPokeball.node.species?.id || !!pendingPokeball.node.safariSingle}
+          onPick={pick => handlePokeballPick(pick, pendingPokeball.node)}
           onClose={() => {
             setClearedNodes(prev => new Set([...prev, pendingPokeball.node.id]))
             setCurrentNode(pendingPokeball.node.id)
