@@ -14,6 +14,8 @@
 // @property {number} metacash
 // @property {number} keys
 // @property {string[]} unlockedRegions
+// @property {string[]} safariUnlockedRegions - Safari Mode's own unlock list, separate from unlockedRegions
+// @property {boolean} safariFirstRegionClaimed - has the one free Safari region been claimed?
 // @property {string[]} ownedUpgrades       - catalog item ids owned
 // @property {Object<string, Object<string, number>>} vitamins - speciesId -> stat -> count
 // @property {string[]} ownedSprites
@@ -37,7 +39,10 @@ const STARTING_REGION = 'Kanto'
  *
  * The one exception is `unlockedRegions`, which starts with Kanto. See
  * STARTING_REGION above for why a profile can't start with nothing unlocked.
- * Every OTHER region — Unova included — costs 1 key.
+ * Every OTHER region — Unova included — costs 1 key. Safari Mode's own list,
+ * `safariUnlockedRegions`, starts empty by design instead: Safari's first
+ * region is free and player-chosen (see claimFirstSafariRegion) rather than
+ * forced to Kanto, so there is nothing to seed it with up front.
  *
  * @returns {MetaProfile}
  */
@@ -46,6 +51,12 @@ export function createProfile() {
     metacash: 0,
     keys: 0,
     unlockedRegions: [STARTING_REGION],
+    // Safari Mode's unlock list, tracked separately from Classic's: unlocking
+    // a region in one mode does not unlock it in the other. Empty on a fresh
+    // profile because Safari's FIRST region is free and player-chosen (see
+    // claimFirstSafariRegion) rather than forced to Kanto the way Classic is.
+    safariUnlockedRegions: [],
+    safariFirstRegionClaimed: false,
     ownedUpgrades: [],
     vitamins: {},
     ownedSprites: [],
@@ -306,6 +317,60 @@ export function unlockRegion(profile, regionName) {
       ...profile,
       keys: profile.keys - REGION_UNLOCK_COST,
       unlockedRegions: [...profile.unlockedRegions, regionName],
+    },
+  }
+}
+
+/**
+ * Claim Safari Mode's one free region. Unlike Classic — which forces a new
+ * profile into Kanto because keys come only from wins — Safari lets the player
+ * choose which region they start in, at no cost. Once.
+ *
+ * Same `{ ok, profile, reason? }` contract as unlockRegion: reject rather than
+ * silently no-op, and never mutate the input.
+ *
+ * @param {MetaProfile} profile
+ * @param {string} regionName
+ * @returns {{ ok: boolean, profile: MetaProfile, reason?: string }}
+ */
+export function claimFirstSafariRegion(profile, regionName) {
+  if (profile.safariFirstRegionClaimed) {
+    return { ok: false, profile, reason: 'Free region already claimed' }
+  }
+  return {
+    ok: true,
+    profile: {
+      ...profile,
+      safariUnlockedRegions: [...(profile.safariUnlockedRegions ?? []), regionName],
+      safariFirstRegionClaimed: true,
+    },
+  }
+}
+
+/**
+ * Spend a key to unlock `regionName` in Safari Mode. The key comes from the
+ * SHARED wallet (profile.keys) — Safari and Classic have separate unlock lists
+ * but one currency, and Safari wins pay keys on the same terms as Classic wins,
+ * so neither mode is a dead end.
+ *
+ * @param {MetaProfile} profile
+ * @param {string} regionName
+ * @returns {{ ok: boolean, profile: MetaProfile, reason?: string }}
+ */
+export function unlockSafariRegion(profile, regionName) {
+  const unlocked = profile.safariUnlockedRegions ?? []
+  if (unlocked.includes(regionName)) {
+    return { ok: false, profile, reason: 'Region already unlocked' }
+  }
+  if (profile.keys < REGION_UNLOCK_COST) {
+    return { ok: false, profile, reason: 'Not enough keys' }
+  }
+  return {
+    ok: true,
+    profile: {
+      ...profile,
+      keys: profile.keys - REGION_UNLOCK_COST,
+      safariUnlockedRegions: [...unlocked, regionName],
     },
   }
 }

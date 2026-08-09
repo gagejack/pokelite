@@ -19,7 +19,7 @@ import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
-import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
+import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
@@ -242,6 +242,82 @@ function MapSvg({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          {/* Safari: a WILD Pokémon (grass node) — you fight it and do not keep
+              it. Red replaces the white dilation ring so the outline reads as
+              danger at node size, and the gold reachability glow is kept so
+              Safari nodes still show whether the player can walk there. Same
+              structure as #white-outline-sm; only the flood colour differs. */}
+          <filter id="safari-wild-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Safari: a Master Ball's legendary stays hidden until clicked.
+              feColorMatrix with all-zero RGB rows collapses the sprite to solid
+              black while preserving its alpha, so the silhouette keeps the
+              species' exact shape. The white ring and glow are kept so the node
+              still reads as reachable. */}
+          <filter id="safari-silhouette-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
+          {/* Dim counterpart to #safari-wild-sm: the gold glow IS the
+              reachability signal, so an unreachable/cleared Safari node must
+              not carry it — otherwise every wild node glows regardless of
+              whether the player can actually walk there. Same red ring and
+              shadow, glow layer removed. */}
+          <filter id="safari-wild-dim-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Dim counterpart to #safari-silhouette-sm — see #safari-wild-dim-sm
+              for why the glow must be conditional. The silhouette itself (the
+              hidden-legendary point) is unaffected; only the glow is gone. */}
+          <filter id="safari-silhouette-dim-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
         </defs>
 
         {edges.map(([fromId, toId], i) => {
@@ -299,15 +375,41 @@ function MapSvg({
                 // a fork between those two, and one looking bigger reads as
                 // one being more important.
                 const ICON_SCALE = { [NODE_TYPES.GRASS]: 0.7, [NODE_TYPES.POKEMART]: 0.9 }
-                const scale = ICON_SCALE[node.type] ?? 1
+                // Pokémon sprites carry far more transparent padding than the
+                // node icons, and the species IS the information a Safari node
+                // exists to convey — it has to be readable at a glance, not
+                // merely present. Scaled past 1 so the sprite overflows the
+                // node box; `offset` below goes negative to keep it centered on
+                // the node point. Note this stacks with NODE_SCALE on the
+                // parent <g>, so the on-screen size is NODE_SIZE * this * 1.3.
+                const SAFARI_ICON_SCALE = 1.7
+                const scale = node.species?.id ? SAFARI_ICON_SCALE : (ICON_SCALE[node.type] ?? 1)
                 const size = NODE_SIZE * scale
                 // Shrunk icons stay centered on the node point rather than
                 // hanging off its top-left corner.
                 const offset = (NODE_SIZE - size) / 2
+                // Safari nodes carry their own filter: a red ring for wild
+                // (grass) Pokémon, a black silhouette for an unrevealed
+                // legendary. Hover still takes precedence so pointing at a
+                // Safari node gives the same feedback as any other node.
+                // The gold glow is the map's reachability signal everywhere
+                // else, so it must stay conditional on `reachable` here too —
+                // the "dim" variants are identical minus the glow layer. Without
+                // this, every Safari node would glow regardless of whether the
+                // player could actually walk there.
+                const safariFilter = !node.species?.id ? null
+                  : node.type === NODE_TYPES.GRASS
+                    ? (reachable ? 'url(#safari-wild-sm)' : 'url(#safari-wild-dim-sm)')
+                  : node.type === NODE_TYPES.MASTER_BALL
+                    ? (reachable ? 'url(#safari-silhouette-sm)' : 'url(#safari-silhouette-dim-sm)')
+                  : null
+                const nodeFilter = isHovered
+                  ? 'url(#hover-outline-sm)'
+                  : safariFilter ?? (reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)')
                 return (
                   <image href={icon} x={offset} y={offset}
                     width={size} height={size}
-                    filter={isHovered ? 'url(#hover-outline-sm)' : reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)'}
+                    filter={nodeFilter}
                     style={{ imageRendering: 'pixelated', opacity }}
                   />
                 )
@@ -429,7 +531,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -453,13 +555,29 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // reproducible regardless of how many shared-stream rng() calls happened
   // before (the starter's async shiny roll, prior battles, etc.). Unseeded runs
   // generate straight off the shared Math.random stream as before.
+  //
+  // SAFARI ORDERING GATE — do not simplify `prewarmReady` out of this.
+  // Safari's generate() bakes a species onto every grass node, and that bake
+  // rolls each species' evolution stage with rollStageForLevelSync, which
+  // reads pokemon.js's chainCache SYNCHRONOUSLY. prewarmCache fills that cache
+  // asynchronously (App.jsx's beginPrewarm). If generation wins the race,
+  // every stage roll misses the cache and silently falls back to the base
+  // form: no crash, no warning, just a map quietly full of the wrong Pokémon.
+  // That is why this returns null and waits, and why `prewarmReady` is in the
+  // dependency array — it is what rebuilds the map the instant the cache is
+  // warm. It looks like a redundant dependency. It is the whole gate.
+  //
+  // Classic never touches that cache at generation time, so it never waits:
+  // the guard is scoped to `mode === 'safari'` and Classic's timing, rng
+  // ordering and output are byte-for-byte unchanged.
   const mapData = useMemo(
     () => {
       if (initialMapData && initialMapData.mapIndex === mapIndex) return initialMapData
-      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter))
-      return mapConfig.generate(starter)
+      if (mode === 'safari' && !prewarmReady) return null
+      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter, { mode }))
+      return mapConfig.generate(starter, { mode })
     },
-    [mapConfig] // eslint-disable-line react-hooks/exhaustive-deps
+    [mapConfig, prewarmReady] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const edges = mapConfig.edges
 
@@ -486,7 +604,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   // Keep the parent's snapshot of this map's progress current, so hitting Home
   // can save exactly where the player is (layout + cleared nodes + position).
+  //
+  // Skipped while mapData is null — the Safari prewarm gate above holds it
+  // there for the frames before the evolution cache is warm. Publishing a
+  // null-layout snapshot would overwrite App's mapProgress with a run whose
+  // map cannot be rebuilt, and persistProgress would then WRITE that to the
+  // save. The very next commit (gate opens, mapData populates) re-fires this
+  // effect with the real layout, so nothing is lost by waiting.
   useEffect(() => {
+    if (!mapData) return
     onProgressChange?.({
       mapData,
       clearedNodes: [...clearedNodes],
@@ -560,8 +686,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
 
+  // `mapData?.rows ?? []` rather than `mapData.rows`: the Safari prewarm gate
+  // above holds mapData at null for the frames before the evolution cache is
+  // warm, and the loading early-return that handles that cannot sit here —
+  // there are still hooks below (the notice timer, useBagTouchDrag), and
+  // returning before them would change the hook order between the waiting and
+  // ready renders. So the layout math degrades to an empty map for those
+  // frames and the early return happens just above the JSX instead.
+  const rows = mapData?.rows ?? []
   const nodePositions = {}
-  mapData.rows.forEach((row, rowIndex) => {
+  rows.forEach((row, rowIndex) => {
     const totalCols = row.length
     const spread = ROW_SPREAD[rowIndex] ?? 1
     row.forEach((node, colIndex) => {
@@ -571,7 +705,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     })
   })
 
-  const totalRows = mapData.rows.length
+  const totalRows = rows.length
   const svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 60
   const svgWidth = 4 * COL_WIDTH + NODE_SIZE * 2
 
@@ -620,10 +754,18 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // plus the rival's own starter (counters the player's pick) as the ace.
       specs = rivalTeamSpecs(config, node, starter)
     } else if (isMasterBall) {
-      // Master Ball: a single legendary from this map's pool, at its fixed level
-      // (not position-scaled). Empty pool → no legendary (caller clears the node).
-      const pool = config.legendaryPools?.[mapIndex] ?? []
-      specs = pool.length > 0 ? [pick(pool)] : []
+      if (node.species?.id) {
+        // Safari: the legendary was drawn at map generation and its silhouette
+        // is already on screen. Fight exactly that one — re-drawing here could
+        // reveal a different legendary than the one the player walked toward.
+        specs = [{ id: node.species.id, level: node.species.level }]
+      } else {
+        // Master Ball: a single legendary from this map's pool, at its fixed
+        // level (not position-scaled). Empty pool → no legendary (caller
+        // clears the node).
+        const pool = config.legendaryPools?.[mapIndex] ?? []
+        specs = pool.length > 0 ? [pick(pool)] : []
+      }
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
       const band = mapLevelRange(config.mapLevelRanges, mapIndex)
@@ -647,6 +789,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level, maxSpeciesId) }))
         )
       }
+    } else if (node.species?.id) {
+      // Safari: the species was drawn at map generation and is already on
+      // screen. Fight exactly that — drawing again here would make the sprite
+      // the player walked toward a lie, which is the one thing this mode
+      // cannot do.
+      specs = [{ id: node.species.id, level: node.species.level }]
     } else {
       // Grass: one wild Pokémon from this map's catch pool, a few levels below
       // the map's trainers, scaled by node position. Grass ignores rarity —
@@ -676,6 +824,19 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   async function fetchOfferedPokemon(node) {
+    // Safari: the species was drawn at map generation and is already on screen.
+    // Rebuild that exact Pokémon rather than drawing again — one draw, one
+    // truth. Returns a single-element array so every downstream consumer
+    // (the modal, the swap panel, onPick) keeps its existing shape.
+    if (node.species?.id) {
+      const base = await fetchPokemonBase(node.species.id)
+      const instance = buildPokemonInstance(base, node.species.level)
+      const offered = [{ ...instance, rarity: node.species.rarity }]
+      // Seen-on-offer, same as the Classic path below: a Pokémon the player
+      // was shown counts for the Pokédex even if they decline it.
+      offered.forEach(p => onSpeciesSeen?.(p.pokeId, !!p.shiny))
+      return offered
+    }
     const pool = config.catchPools?.[mapIndex] ?? []
     if (pool.length === 0) return []
 
@@ -691,7 +852,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     // Draw distinct species weighted by rarity tier. Collector's Eye (meta
     // upgrade) raises the offer count from 3 to 4 — see metaModifiers.js.
-    const chosen = config.pickCatchOffer(pool, getActiveExtras().catchOfferCount, config.catchTierBudget)
+    // Safari draws ONE species on every path, including a Mystery that
+    // resolved into a Pokéball — the mode has no multi-Pokémon offer anywhere,
+    // which is why Collector's Eye is inert here.
+    const offerCount = (node.safariSingle || mode === 'safari')
+      ? 1
+      : getActiveExtras().catchOfferCount
+    const chosen = config.pickCatchOffer(pool, offerCount, config.catchTierBudget)
 
     const offered = await Promise.all(chosen.map(async ({ id, rarity }) => {
       // Roll which evolution stage of this line to offer. The pool entry names a
@@ -722,6 +889,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // node would appear to do nothing.
     const hasLegendary = (config.legendaryPools?.[mapIndex]?.length ?? 0) > 0
     const type = resolveMysteryType({ allowLegendary: hasLegendary })
+    // A Mystery node bakes nothing, so a Mystery that resolves into a Pokéball
+    // has no node.species. In Safari it must still draw only one species (not
+    // three) — safariSingle tells fetchOfferedPokemon to draw singly even
+    // though there's no baked species to rebuild.
+    const safariSingle = mode === 'safari' && type === NODE_TYPES.POKEBALL
     // Tag the resolved node so the item / catch offer screens enable the
     // reroll button (MYSTERY_REROLLS uses) — the mystery bonus.
     if (type === NODE_TYPES.TRAINER) {
@@ -732,7 +904,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         ?? Object.keys(config.trainerSprites ?? {})[0]
       return { ...node, type, trainer, fromMystery: true }
     }
-    return { ...node, type, fromMystery: true }
+    return { ...node, type, fromMystery: true, ...(safariSingle ? { safariSingle: true } : {}) }
   }
 
   const handleNodeClick = async (rawNode) => {
@@ -784,12 +956,25 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // keeps anything. See BALANCE.economy.payouts.node. Reads the effective
       // balance so Side Hustle's +$10 applies (metaModifiers.js).
       onEarnCash?.(getEffectiveBalance().economy.payouts.node)
-      if (offered.length > 0) {
-        setPendingPokeball({ node, offered })
-      } else {
+      if (offered.length === 0) {
         setClearedNodes(prev => new Set([...prev, node.id]))
         setCurrentNode(node.id)
+        return
       }
+      // Safari with room to spare: there is no choice to present — the player
+      // already made it by walking here — so take the Pokémon and move on. A
+      // full roster still needs the swap panel. A Mystery-resolved Pokéball
+      // also still needs the modal, but not via a check here: resolving a
+      // Mystery into a Pokéball sets `safariSingle`, not `species` (the bake
+      // never bakes a Mystery node), so `isSafariSingle` is already false for
+      // it and it falls through to the modal on its own.
+      const isSafariSingle = !!node.species?.id
+      const hasRoom = roster.length < getActiveExtras().partySize
+      if (isSafariSingle && hasRoom) {
+        handlePokeballPick({ pokemon: offered[0], swapIndex: null }, node)
+        return
+      }
+      setPendingPokeball({ node, offered })
     } else if (node.type === NODE_TYPES.ITEM) {
       onEarnCash?.(getEffectiveBalance().economy.payouts.node)
       // Treasure Map (meta upgrade): item nodes roll +1 extra option.
@@ -910,9 +1095,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     setPendingItem(prev => prev ? { ...prev, offered: pickThreeItems(3 + getActiveExtras().itemNodeExtraOptions) } : prev)
   }
 
-  function handlePokeballPick({ pokemon, swapIndex }) {
-    if (!pendingPokeball) return
-    const node = pendingPokeball.node
+  // Takes `node` explicitly rather than reading pendingPokeball, because
+  // Safari's direct-take path never opens the modal — there is no pending
+  // state to read. The modal caller passes pendingPokeball.node.
+  function handlePokeballPick({ pokemon, swapIndex }, node) {
+    if (!node) return
     if (swapIndex !== null) {
       // swapIntoRoster, not a bare replace: the outgoing Pokémon's held item
       // transfers to the newcomer (and its move is rebuilt if that item is a
@@ -948,6 +1135,13 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   function getIcon(node, isCurrentNode) {
     if (isCurrentNode && character) return character.sprite
+    // Safari: a baked node draws its actual Pokémon. A cache miss (species not
+    // prewarmed) falls through to the Classic icon — the node stays playable,
+    // only the preview is lost.
+    if (node.species?.id) {
+      const sprite = cachedSprite(node.species.id)
+      if (sprite) return sprite
+    }
     if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL) {
       return config.trainerSprites[node.trainer] || ITEM_ICONS[NODE_TYPES.POKEBALL]
     }
@@ -999,9 +1193,27 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const levels = pool.map(l => l.level)
       const lo = levels.length ? Math.min(...levels) : null
       const hi = levels.length ? Math.max(...levels) : null
-      const lvl = lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
+      // Safari bakes the exact legendary and its level, so show that rather
+      // than the pool-wide range. The species stays '???' — the silhouette is
+      // the point — but the level is known and revealing it gives nothing away.
+      const lvl = node.species?.level != null ? `${node.species.level}`
+        : lo == null ? '?' : lo === hi ? `${lo}` : `${lo}–${hi}`
       // Object line reuses the boss tooltip's { type, name, level } row format.
       return { title: 'Master Ball', sub: [{ type: null, name: '???', level: lvl }, `$${BALANCE.economy.payouts.legendary}`] }
+    }
+    // Safari: a baked node names what it holds. Master Ball is the deliberate
+    // exception — naming it would defeat the silhouette — and is handled
+    // above (that branch always returns first, so it can never reach here).
+    if (node.species?.id) {
+      const nodePayout = getEffectiveBalance().economy.payouts.node
+      const name = cachedName(node.species.id) ?? '???'
+      const row = { type: cachedType(node.species.id), name, level: node.species.level }
+      if (node.type === NODE_TYPES.GRASS) {
+        return { title: 'Tall Grass', sub: [row, `+1 LVL · $${BALANCE.economy.payouts.grass}`] }
+      }
+      if (node.type === NODE_TYPES.POKEBALL) {
+        return { title: 'Wild Pokémon', sub: [row, `Catch it · $${nodePayout}`] }
+      }
     }
     const nodePay = getEffectiveBalance().economy.payouts.node
     switch (node.type) {
@@ -1160,6 +1372,36 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     : config.eliteFour
       ? () => { onMapCleared?.(); onEnterEliteFour?.() }
       : null
+
+  // Safari's prewarm gate (see the mapData useMemo) holds the layout at null
+  // until the evolution cache is warm. Placed AFTER every hook above so the
+  // hook order is identical on the waiting and ready renders — React would
+  // throw on the transition otherwise. Reuses the node spinner's `nodeSpin`
+  // keyframes so this reads as the same app, not a bare fallback — but those
+  // keyframes are declared inside MapSvg, which is NOT rendered on this
+  // branch, so the rule has to be re-emitted here or the spinner sits frozen.
+  if (!mapData) {
+    return (
+      <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+        <style>{`@keyframes nodeSpin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '14px',
+        }}>
+          <div style={{
+            width: '38px', height: '38px',
+            border: '4px solid rgba(0,0,0,0.25)',
+            borderTopColor: '#facc15',
+            borderRadius: '50%',
+            animation: 'nodeSpin 0.7s linear infinite',
+          }} />
+          <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: dark ? '#DBDBDB' : '#333333' }}>
+            Loading map…
+          </span>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} showTutorial>
@@ -1558,7 +1800,8 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           caughtSet={caughtSet}
           onReroll={pendingPokeball.node.fromMystery ? rerollPokeballOffer : null}
           rerolling={rerolling}
-          onPick={handlePokeballPick}
+          single={!!pendingPokeball.node.species?.id || !!pendingPokeball.node.safariSingle}
+          onPick={pick => handlePokeballPick(pick, pendingPokeball.node)}
           onClose={() => {
             setClearedNodes(prev => new Set([...prev, pendingPokeball.node.id]))
             setCurrentNode(pendingPokeball.node.id)

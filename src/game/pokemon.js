@@ -175,6 +175,13 @@ export function cachedName(id) {
   return baseCache.get(id)?.name ?? null
 }
 
+// Front sprite URL for a prewarmed species, or null if it hasn't been fetched.
+// Used by Safari node rendering, which draws a Pokémon on the map itself and
+// must stay synchronous — a null here falls back to the Classic node icon.
+export function cachedSprite(id) {
+  return baseCache.get(id)?.sprite ?? null
+}
+
 // Hard level ceiling. The stat formulas below are only defined up to 100, and
 // a full run (8 maps + Elite Four at +1/+2/+4 levels per win) overshoots it, so
 // levelUp clamps here.
@@ -362,46 +369,35 @@ export async function allSpeciesInLine(pokeId) {
   return ids
 }
 
-// Resolve a species' full evolutionary line as an ordered list of stages, from
-// the base form forward. Each stage is { id, minLevel } where minLevel is the
-// cumulative level a caught Pokémon must be to legitimately be at that stage
-// (base = 1). Branches are followed randomly, matching the "random branch"
-// catch-node design. Returns [] on failure (caller falls back to the pool's
-// own id). Used only by catch nodes — grass/trainers are untouched.
+// The pure stage walk shared by resolveEvolutionLine (async) and
+// rollStageForLevelSync (sync). Given a resolved chain root, walk forward from
+// `id` (or, if `level` requires downgrading, from the reachable stage below
+// it — see the UNDER-LEVELED note on resolveEvolutionLine) and produce the
+// ordered stages as [{ id, minLevel }], minLevel being the cumulative level a
+// caught Pokémon must be to legitimately be at that stage (base = 1).
 //
-// `maxSpeciesId` gates branches to the run region's generation, exactly as
-// checkEvolution does. Without it a Gen-1 pool species can walk into a regional
-// form from a later gen (PokéAPI files every form under one species id, so
-// Meowth's chain lists both Persian and Galarian Perrserker as level-up
-// branches, and Mr. Mime's ONLY level-up branch is Gen-8 Mr. Rime).
+// Start at the REQUESTED (or downgraded) species, not the chain root. A pool
+// entry partway up a line (e.g. Pikachu, whose root is Pichu) is a deliberate
+// floor — walking from the root would offer the pre-evolution the pool didn't
+// ask for, and for non-level-up steps like Pichu→Pikachu the walk below would
+// stop dead there and *only* ever yield Pichu.
 //
-// `level`, when given, self-corrects an UNDER-LEVELED request: if pokeId's own
-// cumulative level-up requirement exceeds `level` (e.g. a themed pool names
-// Palpitoad, which needs L25, on an early map whose band tops out at L10),
-// walk DOWN pokeId's level-up path to the most-evolved stage that level can
-// legitimately reach, and resolve forward from THERE instead. This only fires
-// when pokeId is reachable by a pure level-up path from its line's root —
-// species behind a trade/stone/friendship step (Escavalier from Karrablast,
-// Pikachu from Pichu) have no such path and are left exactly where the pool
-// named them, at any level: that is the existing deliberate-floor case (see
-// below) and downgrading it would silently swap a trade-evolution mon for its
-// pre-evolution, which is wrong at every level, not just low ones.
-export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity, level) {
-  const root = await loadEvolutionChain(pokeId)
-  if (!root) return []
-
-  let effectiveId = pokeId
+// Extracted so the async and sync callers cannot drift — the only difference
+// between them is how they obtain `root` (await a fetch vs. read the warm
+// cache).
+function stagesFromRoot(root, id, level, maxSpeciesId) {
+  let effectiveId = id
+  // Guard on `level`, NOT on `root` — both callers have already checked root,
+  // so `if (root)` would be vacuously true and would run the downgrade even
+  // when no level was supplied. downgradeTarget compares `minLevel <= level`,
+  // which is false for every stage when level is undefined, collapsing the
+  // result to the chain root and silently changing what resolveEvolutionLine
+  // returns for its level-less callers.
   if (level != null) {
-    const path = levelUpPathTo(root, pokeId)
+    const path = levelUpPathTo(root, id)
     if (path) effectiveId = downgradeTarget(path, level)
   }
 
-  // Start at the REQUESTED (or, if downgraded, the reachable) species, not the
-  // chain root. A pool entry partway up a line (e.g. Pikachu, whose root is
-  // Pichu) is a deliberate floor — walking from the root would offer the
-  // pre-evolution the pool didn't ask for, and for non-level-up steps like
-  // Pichu→Pikachu the walk below would stop dead there and *only* ever yield
-  // Pichu.
   const findNode = node => {
     if (node.id === effectiveId) return node
     for (const child of node.evolvesTo ?? []) {
@@ -432,6 +428,36 @@ export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity, leve
   return stages
 }
 
+// Resolve a species' full evolutionary line as an ordered list of stages, from
+// the base form forward. Each stage is { id, minLevel } where minLevel is the
+// cumulative level a caught Pokémon must be to legitimately be at that stage
+// (base = 1). Branches are followed randomly, matching the "random branch"
+// catch-node design. Returns [] on failure (caller falls back to the pool's
+// own id). Used only by catch nodes — grass/trainers are untouched.
+//
+// `maxSpeciesId` gates branches to the run region's generation, exactly as
+// checkEvolution does. Without it a Gen-1 pool species can walk into a regional
+// form from a later gen (PokéAPI files every form under one species id, so
+// Meowth's chain lists both Persian and Galarian Perrserker as level-up
+// branches, and Mr. Mime's ONLY level-up branch is Gen-8 Mr. Rime).
+//
+// `level`, when given, self-corrects an UNDER-LEVELED request: if pokeId's own
+// cumulative level-up requirement exceeds `level` (e.g. a themed pool names
+// Palpitoad, which needs L25, on an early map whose band tops out at L10),
+// walk DOWN pokeId's level-up path to the most-evolved stage that level can
+// legitimately reach, and resolve forward from THERE instead. This only fires
+// when pokeId is reachable by a pure level-up path from its line's root —
+// species behind a trade/stone/friendship step (Escavalier from Karrablast,
+// Pikachu from Pichu) have no such path and are left exactly where the pool
+// named them, at any level: that is the existing deliberate-floor case (see
+// stagesFromRoot) and downgrading it would silently swap a trade-evolution mon
+// for its pre-evolution, which is wrong at every level, not just low ones.
+export async function resolveEvolutionLine(pokeId, maxSpeciesId = Infinity, level) {
+  const root = await loadEvolutionChain(pokeId)
+  if (!root) return []
+  return stagesFromRoot(root, pokeId, level, maxSpeciesId)
+}
+
 // Given a base-form species id and a level, return the id of the evolution stage
 // to actually use. Resolves the full line, keeps stages whose evolution level is
 // ≤ level, and picks one weighted toward the most-evolved (weight = stage index
@@ -456,6 +482,48 @@ export async function rollStageForLevel(id, level, maxSpeciesId = Infinity) {
     if (roll <= 0) return eligible[i].id
   }
   return eligible[eligible.length - 1].id
+}
+
+// Synchronous twin of rollStageForLevel, for callers that cannot await —
+// specifically Safari's map-generation bake, which runs inside the synchronous
+// withRng(). Reads ONLY the already-warmed chainCache: prewarmCache() warms the
+// full evolution line of every catch-pool species (via allSpeciesInLine) before
+// a map renders, so the data is in memory by the time a bake runs.
+//
+// On a cache miss this returns `id` unchanged rather than fetching — the same
+// fallback the async version uses when resolution fails. A miss means the
+// previewed sprite is a base form; the map is still valid, just less varied.
+export function rollStageForLevelSync(id, level, maxSpeciesId = Infinity) {
+  const root = chainCache.get(id)
+  if (!root) return id
+
+  const stages = stagesFromRoot(root, id, level, maxSpeciesId)
+  if (!stages || stages.length === 0) return id
+  const eligible = stages.filter(s => s.minLevel <= level)
+  if (eligible.length === 0) return stages[0].id
+
+  // Same weighting as rollStageForLevel: weight = index + 1, biasing toward
+  // the most-evolved eligible stage.
+  const total = eligible.reduce((s, _, i) => s + (i + 1), 0)
+  let roll = rng() * total
+  for (let i = 0; i < eligible.length; i++) {
+    roll -= i + 1
+    if (roll <= 0) return eligible[i].id
+  }
+  return eligible[eligible.length - 1].id
+}
+
+// Test seam: lets a test populate chainCache without a network round-trip.
+// Not used by application code.
+export function _seedChainCacheForTest(id, root) {
+  chainCache.set(id, root)
+}
+
+// Test seam: clears chainCache so a later test's real species ids (e.g.
+// Caterpie's line, 10/11) can't collide with an earlier test's seeded fake
+// data. Not used by application code.
+export function _clearChainCacheForTest() {
+  chainCache.clear()
 }
 
 // Rebuild an instance as its evolved form: fresh stats at the same level with

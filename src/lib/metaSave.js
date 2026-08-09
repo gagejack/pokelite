@@ -152,10 +152,16 @@ export async function migrateMetaProfile(signedInUser) {
  *  - metacash, keys: SUM. Losing progress feels worse than a small windfall
  *    (guest $800 + account $2,000 = $2,800) — an overwrite in either
  *    direction would destroy real progress on one side.
- *  - ownedUpgrades, ownedSprites, unlockedRegions, usedStarters: UNION
- *    (dedupe). These are "do you have it" flags, not counters — owning an
- *    item on both sides isn't double progress, it's the same fact observed
- *    twice.
+ *  - ownedUpgrades, ownedSprites, unlockedRegions, safariUnlockedRegions,
+ *    usedStarters: UNION (dedupe). These are "do you have it" flags, not
+ *    counters — owning an item on both sides isn't double progress, it's the
+ *    same fact observed twice. safariUnlockedRegions is Safari Mode's own
+ *    list, unioned the same way and independently of unlockedRegions — the
+ *    two modes' unlocks never leak into each other, merge included.
+ *  - safariFirstRegionClaimed: OR, not "prefer account". Safari grants its
+ *    first region free exactly once per profile; if EITHER side already
+ *    claimed it, the merged profile must stay claimed, or the merge itself
+ *    becomes a way to launder a second free region.
  *  - vitamins: union per starter per stat, but the cap from Task 1
  *    (VITAMIN_CAP_PER_STARTER, 3 total per starter across all six stats)
  *    still applies to the MERGED result. Two independent purchase histories
@@ -193,6 +199,7 @@ export function migrateGuestProfile(localProfile, accountProfile) {
   if (!accountProfile) return localProfile
 
   const unlockedRegions = union(accountProfile.unlockedRegions, localProfile.unlockedRegions)
+  const safariUnlockedRegions = union(accountProfile.safariUnlockedRegions, localProfile.safariUnlockedRegions)
   const ownedUpgrades = union(accountProfile.ownedUpgrades, localProfile.ownedUpgrades)
   const ownedSprites = union(accountProfile.ownedSprites, localProfile.ownedSprites)
   const usedStarters = union(accountProfile.usedStarters, localProfile.usedStarters)
@@ -201,6 +208,13 @@ export function migrateGuestProfile(localProfile, accountProfile) {
     metacash: (accountProfile.metacash ?? 0) + (localProfile.metacash ?? 0),
     keys: (accountProfile.keys ?? 0) + (localProfile.keys ?? 0),
     unlockedRegions,
+    safariUnlockedRegions,
+    // OR, not "prefer account": if EITHER side already claimed the free
+    // region, the merged profile must stay claimed, or the merge silently
+    // hands out a second free region.
+    safariFirstRegionClaimed: Boolean(
+      accountProfile.safariFirstRegionClaimed || localProfile.safariFirstRegionClaimed
+    ),
     ownedUpgrades,
     vitamins: mergeVitamins(accountProfile.vitamins, localProfile.vitamins),
     ownedSprites,

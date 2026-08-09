@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'vitest'
-import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat } from './pokemon.js'
+import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, _clearChainCacheForTest, cachedSprite } from './pokemon.js'
 import { setActiveRunModifiers, clearActiveRunModifiers } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -49,6 +49,7 @@ function profileWithVitamins(speciesId, statCounts) {
 
 afterEach(() => {
   clearActiveRunModifiers()
+  _clearChainCacheForTest()
 })
 
 // ── No active run / no profile: byte-identical to today's plain scalar boost ──
@@ -237,4 +238,133 @@ test('the per-stat multiplier math has no opinion on the 3-per-starter cap — i
   setActiveRunModifiers(profileWithVitamins(4, { attack: 4 }))
   const instance = buildPokemonInstance(CHARMANDER, 5, true)
   expect(instance.stats.attack).toBe(Math.floor(calcStat(CHARMANDER.baseStats.attack, 5) * (STARTER_BOOST + 0.20)))
+})
+
+// ── rollStageForLevelSync: sync twin of rollStageForLevel, reads only the
+// already-warmed chainCache (Safari's map bake cannot await a fetch) ──────
+
+// A minimal two-stage line: 10 → 11 at level 7. Shape matches slimChain()'s
+// output — { id, minLevel, levelUp, evolvesTo }.
+const TWO_STAGE_LINE = {
+  id: 10,
+  minLevel: 1,
+  levelUp: true,
+  evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+}
+
+test('rollStageForLevelSync returns the id unchanged when the line is not cached', () => {
+  // 9999 was never warmed, so there is nothing to roll against.
+  expect(rollStageForLevelSync(9999, 50)).toBe(9999)
+})
+
+test('rollStageForLevelSync returns the base form when the level is below the evolution', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // Level 5 is under the stage-2 minLevel of 7, so only stage 1 is eligible.
+  expect(rollStageForLevelSync(10, 5)).toBe(10)
+})
+
+test('rollStageForLevelSync can return the evolved form once the level allows it', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // Both stages are eligible at level 50 and the roll is weighted, so sample
+  // repeatedly and assert both forms appear rather than asserting one result.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(rollStageForLevelSync(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+})
+
+test('rollStageForLevelSync respects the generation ceiling', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  // maxSpeciesId 10 drops the stage-2 branch entirely, so only 10 can come back.
+  const seen = new Set()
+  for (let i = 0; i < 50; i++) seen.add(rollStageForLevelSync(10, 50, 10))
+  expect(seen).toEqual(new Set([10]))
+})
+
+// A 3-stage line: 9001 → 9002 at 7 → 9003 at 16. Ids are well outside the real
+// Pokédex range (unlike the earlier 10/11/12 examples, which are Caterpie's
+// real line) so a cache-key mismatch can't silently fall through to
+// ensureLocalData()'s bundled evolutions.json and mask a broken test. Seeded
+// under EVERY id in the line, matching how loadEvolutionChain really
+// registers a fetched chain — seeding only the root would make
+// rollStageForLevelSync(9002, ...) a cache miss for the wrong reason (no
+// entry for 9002) rather than exercising the downgrade guard at all.
+const THREE_STAGE_LINE = {
+  id: 9001,
+  minLevel: 1,
+  levelUp: true,
+  evolvesTo: [{
+    id: 9002,
+    minLevel: 7,
+    levelUp: true,
+    evolvesTo: [{ id: 9003, minLevel: 16, levelUp: true, evolvesTo: [] }],
+  }],
+}
+
+test('rollStageForLevelSync with no level argument starts from the requested id, not the chain root', () => {
+  _seedChainCacheForTest(9001, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9002, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9003, THREE_STAGE_LINE)
+  // Calling with id 9002 and omitting `level` (not just passing a low one)
+  // exercises the same undefaulted `level` parameter as resolveEvolutionLine's
+  // level-less callers.
+  const seen = new Set()
+  for (let i = 0; i < 50; i++) seen.add(rollStageForLevelSync(9002, undefined))
+  // A buggy `if (root)` guard runs downgradeTarget with level=undefined, which
+  // is never <= any minLevel, collapsing effectiveId to the chain root (9001).
+  // The fixed guard (`level != null`) skips the downgrade entirely, so the
+  // walk starts at 9002 and 9001 must never appear.
+  expect(seen.has(9001)).toBe(false)
+})
+
+// ── Characterization test: pins rollStageForLevel's (async) CURRENT behavior
+// so the Step 6 stagesFromRoot extraction can be proven not to change it ──
+
+test('rollStageForLevel (async) is unchanged by the stagesFromRoot extraction', async () => {
+  const LINE = {
+    id: 10,
+    minLevel: 1,
+    levelUp: true,
+    evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+  }
+  _seedChainCacheForTest(10, LINE)
+
+  // Below the evolution level, only the base form is reachable.
+  await expect(rollStageForLevel(10, 5)).resolves.toBe(10)
+
+  // Above it, both stages are reachable — sample until both appear.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(await rollStageForLevel(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+
+  // The generation ceiling drops the evolved branch entirely.
+  const capped = new Set()
+  for (let i = 0; i < 50; i++) capped.add(await rollStageForLevel(10, 50, 10))
+  expect(capped).toEqual(new Set([10]))
+})
+
+// Regression coverage for the stagesFromRoot guard bug: the extraction's
+// first draft guarded the downgrade on `if (root)` instead of `if (level !=
+// null)`. Both callers already know root is truthy, so that guard was
+// vacuously true and ran the downgrade even with level omitted entirely —
+// downgradeTarget's `minLevel <= level` is false for every stage when level
+// is undefined, which collapses the result to the chain root. This test
+// calls resolveEvolutionLine WITHOUT a level argument (not just a low one) so
+// a regression of that guard shows up as stages starting at 9001 instead of
+// 9002. Ids are outside the real Pokédex range and seeded under every member
+// of the line (see THREE_STAGE_LINE above) so a cache-key mismatch can't
+// silently fall through to real bundled/network data and mask the assertion.
+test('resolveEvolutionLine with no level argument resolves from the requested id, not the chain root', async () => {
+  _seedChainCacheForTest(9001, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9002, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9003, THREE_STAGE_LINE)
+
+  const stages = await resolveEvolutionLine(9002, Infinity)
+  expect(stages[0].id).toBe(9002)
+  expect(stages.some(s => s.id === 9001)).toBe(false)
+})
+
+test('cachedSprite returns null for a species that was never warmed', () => {
+  expect(cachedSprite(9999)).toBe(null)
 })

@@ -156,9 +156,49 @@ export function _seedChainCacheForTest(id, root) {
 }
 ```
 
-- [ ] **Step 5: Extract the shared stage walk**
+- [ ] **Step 5: Pin the existing behavior before refactoring**
 
-`resolveEvolutionLine` currently contains the walk inline. Pull the pure part into a helper both callers use, so the sync and async paths can never diverge.
+Step 6 edits `resolveEvolutionLine`, which already works. Add a characterization test first so the extraction is provably behavior-preserving — without it, a silent change here would make the previewed sprite disagree with the species fought, the one failure the mode cannot have.
+
+Add to `src/game/pokemon.test.js`:
+
+```js
+import { rollStageForLevel, _seedChainCacheForTest as seedChain } from './pokemon.js'
+
+// Characterization test: pins rollStageForLevel's CURRENT behavior so the
+// stagesFromRoot extraction in the next step can be proven not to change it.
+// Uses the same warm-cache seam as the sync tests, so no network is involved.
+test('rollStageForLevel (async) is unchanged by the stagesFromRoot extraction', async () => {
+  const LINE = {
+    id: 10,
+    minLevel: 1,
+    levelUp: true,
+    evolvesTo: [{ id: 11, minLevel: 7, levelUp: true, evolvesTo: [] }],
+  }
+  seedChain(10, LINE)
+
+  // Below the evolution level, only the base form is reachable.
+  await expect(rollStageForLevel(10, 5)).resolves.toBe(10)
+
+  // Above it, both stages are reachable — sample until both appear.
+  const seen = new Set()
+  for (let i = 0; i < 200; i++) seen.add(await rollStageForLevel(10, 50))
+  expect(seen.has(10)).toBe(true)
+  expect(seen.has(11)).toBe(true)
+
+  // The generation ceiling drops the evolved branch entirely.
+  const capped = new Set()
+  for (let i = 0; i < 50; i++) capped.add(await rollStageForLevel(10, 50, 10))
+  expect(capped).toEqual(new Set([10]))
+})
+```
+
+Run: `npm test -- src/game/pokemon.test.js`
+Expected: PASS **before** any refactor. If it fails now, the test is wrong — fix it before touching `resolveEvolutionLine`, because a red characterization test cannot prove anything about the change.
+
+- [ ] **Step 6: Extract the shared stage walk**
+
+`resolveEvolutionLine` currently contains the walk inline. Pull the pure part into a helper both callers use, so the sync and async paths can never diverge. The Step 5 test must still pass afterward, unchanged.
 
 In `src/game/pokemon.js`, add above `resolveEvolutionLine`:
 
@@ -170,7 +210,13 @@ In `src/game/pokemon.js`, add above `resolveEvolutionLine`:
 // `root` (await a fetch vs. read the warm cache).
 function stagesFromRoot(root, id, level, maxSpeciesId) {
   let effectiveId = id
-  if (root) {
+  // Guard on `level`, NOT on `root` — both callers have already checked root,
+  // so `if (root)` would be vacuously true and would run the downgrade even
+  // when no level was supplied. downgradeTarget compares `minLevel <= level`,
+  // which is false for every stage when level is undefined, collapsing the
+  // result to the chain root and silently changing what resolveEvolutionLine
+  // returns for its level-less callers.
+  if (level != null) {
     const path = levelUpPathTo(root, id)
     if (path) effectiveId = downgradeTarget(path, level)
   }
@@ -203,12 +249,12 @@ function stagesFromRoot(root, id, level, maxSpeciesId) {
 
 Then replace that same walk inside `resolveEvolutionLine` with a call to `stagesFromRoot(root, pokeId, level, maxSpeciesId)`, keeping its existing `await`-and-error handling around it. Do not change what `resolveEvolutionLine` returns.
 
-- [ ] **Step 6: Run the full test suite**
+- [ ] **Step 7: Run the full test suite**
 
 Run: `npm test`
-Expected: PASS, including every pre-existing `pokemon.test.js` test. The extraction in Step 5 is a refactor — if an existing test now fails, `stagesFromRoot` does not match the original walk. Fix it rather than editing the test.
+Expected: PASS, including the Step 5 characterization test and every pre-existing `pokemon.test.js` test. The extraction in Step 6 is a refactor — if any of them now fail, `stagesFromRoot` does not match the original walk. Fix the code rather than editing the test.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/game/pokemon.js src/game/pokemon.test.js
@@ -355,11 +401,26 @@ test('leaves every other node type untouched', () => {
 })
 
 test('de-duplicates species within a row when the pool allows it', () => {
-  // Three bakeable nodes against a three-species pool — all distinct.
+  // Three bakeable nodes against a three-species pool — all distinct. This is
+  // deterministic, not probabilistic: availableIn removes used species from
+  // the pool before each draw, so the third node can only draw the one that
+  // is left. A retry-based de-dup would make this test flaky.
   const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
   bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
   const ids = rows[0].map(n => n.species.id)
   expect(new Set(ids).size).toBe(3)
+})
+
+test('grass de-dup holds across many generations, not just on a lucky seed', () => {
+  // Guards the property the previous test asserts once. A draw-and-retry
+  // de-dup passes that test most runs and fails a few percent of the time;
+  // this loop makes such an implementation fail reliably.
+  for (let i = 0; i < 200; i++) {
+    const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.GRASS, NODE_TYPES.GRASS)
+    bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+    const ids = rows[0].map(n => n.species.id)
+    expect(new Set(ids).size).toBe(3)
+  }
 })
 
 test('allows duplicates when a row has more nodes than the pool has species', () => {
@@ -437,21 +498,31 @@ import { mapLevelRange, pickLevel } from './battleTeams.js'
 import { rollStageForLevelSync } from './pokemon.js'
 import { rng } from './rng.js'
 
-// How many times to redraw when a row already used a species. Best-effort: a
-// row with more bakeable nodes than the pool has species MUST still generate,
-// so after this many attempts the duplicate is accepted.
-const DEDUP_ATTEMPTS = 8
-
 // Grass levels sit this far below the map's trainer band — mirrors the Classic
 // grass draw in NodeMap.fetchEnemyTeam.
 const GRASS_LEVEL_OFFSET = 3
 
+// Exclude species a row has already used, so de-dup is a filtered draw rather
+// than draw-and-retry. Retrying would be probabilistic: three nodes against a
+// three-species pool leaves the last node a (2/3)^N chance of never finding
+// the free species, which makes map generation — and any test of it — flaky.
+// Filtering is deterministic and costs exactly one draw per node, so it also
+// keeps the rng() stream stable.
+//
+// Returns the full pool when filtering would empty it: a row with more nodes
+// than the pool has species MUST still generate, duplicates and all.
+function availableIn(pool, usedInRow) {
+  const free = pool.filter(entry => !usedInRow.has(entry.id))
+  return free.length > 0 ? free : pool
+}
+
 // Draw one grass species. Mirrors the Classic grass path exactly: uniform pick
 // over the catch pool (grass ignores rarity — it is a forced fight, not a
 // reward) at the trainer band minus GRASS_LEVEL_OFFSET.
-function bakeGrass(config, mapIndex, positionWeight) {
+function bakeGrass(config, mapIndex, positionWeight, usedInRow) {
   const pool = config.catchPools?.[mapIndex] ?? []
-  const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+  const drawable = availableIn(pool, usedInRow)
+  const id = drawable.length > 0 ? pick(drawable).id : (config.fallbackSpeciesId ?? 504)
   const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
   const band = [
     Math.max(1, min - GRASS_LEVEL_OFFSET),
@@ -465,13 +536,15 @@ function bakeGrass(config, mapIndex, positionWeight) {
 // multi-Pokémon offer on any path, which is why Collector's Eye is inert here.
 // Levels come from the region's own catch bands so difficulty tuning cannot
 // move what the player catches.
-function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId) {
+function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow) {
   const pool = config.catchPools?.[mapIndex] ?? []
   if (pool.length === 0) return null
 
   const bands = config.catchLevelRanges ?? config.mapLevelRanges
   const level = pickLevel(mapLevelRange(bands, mapIndex), positionWeight)
-  const [chosen] = config.pickCatchOffer(pool, 1, config.catchTierBudget)
+  // Draw from the row's unused species so rarity weighting still applies,
+  // just over a smaller pool — see availableIn.
+  const [chosen] = config.pickCatchOffer(availableIn(pool, usedInRow), 1, config.catchTierBudget)
   if (!chosen) return null
 
   // Same stage roll Classic applies to catch offers, in its sync form.
@@ -503,22 +576,21 @@ export function bakeSafariSpecies(rows, { config, mapIndex, maxSpeciesId = Infin
     row.forEach(node => {
       const positionWeight = totalNodes > 0 ? node.id / totalNodes : 0.5
 
+      // One draw per node — availableIn has already removed this row's used
+      // species from the pool, so there is nothing to retry.
       let species = null
-      for (let attempt = 0; attempt < DEDUP_ATTEMPTS; attempt++) {
-        if (node.type === NODE_TYPES.GRASS) {
-          species = bakeGrass(config, mapIndex, positionWeight)
-        } else if (node.type === NODE_TYPES.POKEBALL) {
-          species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId)
-        } else if (node.type === NODE_TYPES.MASTER_BALL) {
-          species = bakeMasterBall(config, mapIndex)
-        } else {
-          return // not a bakeable node type
-        }
-
-        // An empty pool yields null — nothing to bake, nothing to retry.
-        if (!species) return
-        if (!usedInRow.has(species.id)) break
+      if (node.type === NODE_TYPES.GRASS) {
+        species = bakeGrass(config, mapIndex, positionWeight, usedInRow)
+      } else if (node.type === NODE_TYPES.POKEBALL) {
+        species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow)
+      } else if (node.type === NODE_TYPES.MASTER_BALL) {
+        species = bakeMasterBall(config, mapIndex)
+      } else {
+        return // not a bakeable node type
       }
+
+      // An empty pool yields null — nothing to bake.
+      if (!species) return
 
       usedInRow.add(species.id)
       node.species = species
@@ -1064,44 +1136,97 @@ In `getIcon`, insert a branch **before** the existing type checks, so a baked no
   }
 ```
 
-- [ ] **Step 4: Add the visual treatments**
+- [ ] **Step 4: Add the visual treatments as SVG filters**
 
-Add near `ICON_SCALE` (~line 301):
+**Read this before writing any code — the obvious approach does not work here.**
 
-```js
-  // Safari node treatments. Grass is a WILD Pokémon — you fight it and do not
-  // keep it — so it gets a red outline; a Pokéball's Pokémon joins your team
-  // and renders plain. Four stacked drop-shadows trace the sprite's actual
-  // silhouette, which survives small sizes and busy map backgrounds far better
-  // than a blur would.
-  const SAFARI_WILD_OUTLINE = [
-    'drop-shadow(1.5px 0 0 #e23b3b)',
-    'drop-shadow(-1.5px 0 0 #e23b3b)',
-    'drop-shadow(0 1.5px 0 #e23b3b)',
-    'drop-shadow(0 -1.5px 0 #e23b3b)',
-  ].join(' ')
+Map nodes are SVG `<image>` elements, not HTML `<img>`. Their `filter` **attribute** is already in use and is mutually exclusive:
 
-  // Master Ball keeps its legendary hidden until clicked: brightness(0)
-  // collapses the sprite to solid black while preserving shape and alpha.
-  const SAFARI_SILHOUETTE = 'brightness(0)'
-
-  function safariFilter(node) {
-    if (!node.species?.id) return undefined
-    if (node.type === NODE_TYPES.GRASS) return SAFARI_WILD_OUTLINE
-    if (node.type === NODE_TYPES.MASTER_BALL) return SAFARI_SILHOUETTE
-    return undefined
-  }
+```jsx
+filter={isHovered ? 'url(#hover-outline-sm)' : reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)'}
 ```
 
-Find where the node icon `<img>` is rendered (search for `ICON_SCALE` usage) and add `filter: safariFilter(node)` to its inline `style` object. Also give baked nodes their own scale entry, since Pokémon sprites carry different padding than the grass icon:
+So a CSS `filter` in the `style` prop will not compose with it, and replacing the attribute would destroy hover and reachability feedback. Instead, define Safari's treatments as **new SVG filters that layer on top of the existing effects**, and pick among them in the same ternary.
 
-```js
-  const SAFARI_ICON_SCALE = 0.85
+Add these two filters inside the existing `<defs>`, immediately after `#white-outline-sm` (~line 244). They follow that filter's structure exactly — shadow, dilate, flood, composite, merge — with the flood colour changed to red:
+
+```jsx
+          {/* Safari: a WILD Pokémon (grass node) — you fight it and do not keep
+              it. Red replaces the white dilation ring so the outline reads as
+              danger at node size, and the gold reachability glow is kept so
+              Safari nodes still show whether the player can walk there. Same
+              structure as #white-outline-sm; only the flood colour differs. */}
+          <filter id="safari-wild-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#e23b3b" result="red" />
+            <feComposite in="red" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Safari: a Master Ball's legendary stays hidden until clicked.
+              feColorMatrix with all-zero RGB rows collapses the sprite to solid
+              black while preserving its alpha, so the silhouette keeps the
+              species' exact shape. The white ring and glow are kept so the node
+              still reads as reachable. */}
+          <filter id="safari-silhouette-sm" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+            <feDropShadow in="SourceGraphic" dx="2" dy="5" stdDeviation="5" floodColor="rgba(0,0,0,0.4)" result="shadowed" />
+            <feColorMatrix in="SourceGraphic" type="matrix" result="black"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" result="expanded" />
+            <feFlood floodColor="#ffffff" result="white" />
+            <feComposite in="white" in2="expanded" operator="in" result="outline" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#facc15" floodOpacity="0.85" result="glow" />
+            <feMerge>
+              <feMergeNode in="shadowed" />
+              <feMergeNode in="glow" />
+              <feMergeNode in="outline" />
+              <feMergeNode in="black" />
+            </feMerge>
+          </filter>
 ```
 
-Use it in place of the `ICON_SCALE` lookup when `node.species?.id` is set.
+Then select them at the render site (~line 308). Hover must still win, so it stays first in the chain — a Safari node the player is pointing at should light up like any other:
 
-- [ ] **Step 5: Name the species in tooltips**
+```jsx
+                // Safari nodes carry their own filter: a red ring for wild
+                // (grass) Pokémon, a black silhouette for an unrevealed
+                // legendary. Hover still takes precedence so pointing at a
+                // Safari node gives the same feedback as any other node.
+                const safariFilter =
+                  node.species?.id && node.type === NODE_TYPES.GRASS ? 'url(#safari-wild-sm)'
+                  : node.species?.id && node.type === NODE_TYPES.MASTER_BALL ? 'url(#safari-silhouette-sm)'
+                  : null
+                const nodeFilter = isHovered
+                  ? 'url(#hover-outline-sm)'
+                  : safariFilter ?? (reachable ? 'url(#white-outline-sm)' : 'url(#node-shadow)')
+```
+
+and change the element's attribute to `filter={nodeFilter}`.
+
+Note a Pokéball node gets no Safari filter at all — plain rendering is the signal that this one joins your team.
+
+- [ ] **Step 5: Scale baked sprites to match the other icons**
+
+Pokémon sprites carry different internal padding than the grass icon, so a baked node needs its own scale. At the `ICON_SCALE` lookup (~line 301):
+
+```js
+                // Pokémon sprites have more transparent padding than the node
+                // icons, so a baked Safari sprite is scaled up slightly to sit
+                // at the same visual weight as its Classic neighbours.
+                const SAFARI_ICON_SCALE = 0.85
+                const scale = node.species?.id ? SAFARI_ICON_SCALE : (ICON_SCALE[node.type] ?? 1)
+```
+
+- [ ] **Step 6: Name the species in tooltips**
 
 In `getNodeLabel`, add before the existing `switch`:
 
@@ -1123,20 +1248,27 @@ In `getNodeLabel`, add before the existing `switch`:
 
 The `{ type, name, level }` row shape matches the boss and rival tooltips, so it renders a colored type chip with no new tooltip code.
 
-- [ ] **Step 6: Verify in the browser**
+- [ ] **Step 7: Verify in the browser**
 
 Run: `npm run dev`
 
-There is no Safari entry point yet (Task 8), so force one temporarily: in `NodeMap.jsx`'s `useMemo` that calls `mapConfig.generate(starter)`, pass `{ mode: 'safari' }`. Start a Kanto run and confirm: grass nodes show Pokémon with a red outline, Pokéball nodes show Pokémon with no outline, any Master Ball shows a black silhouette, tooltips name the species with a type chip, and the Master Ball tooltip still reads `???`.
+There is no Safari entry point yet (Task 9), so force one temporarily: in `NodeMap.jsx`'s `useMemo` that calls `mapConfig.generate(starter)`, pass `{ mode: 'safari' }`. Start a Kanto run and confirm:
+
+- grass nodes show a Pokémon with a **red** ring
+- Pokéball nodes show a Pokémon with the normal white ring (no red)
+- a Master Ball, if one spawns, shows a solid black silhouette
+- **hovering a Safari node still shows the gold hover treatment** — this is the regression the SVG-filter approach exists to prevent
+- unreachable Safari nodes still look unreachable
+- tooltips name the species with a type chip; the Master Ball tooltip still reads `???`
 
 **Revert the temporary change before committing.**
 
-- [ ] **Step 7: Run tests and lint**
+- [ ] **Step 8: Run tests and lint**
 
 Run: `npm test && npm run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add src/components/NodeMap.jsx
@@ -1145,13 +1277,19 @@ git commit -m "feat(safari): render baked species with wild outline and legendar
 
 ---
 
-### Task 8: Single-Pokémon Pokéball flow
+### Task 8: Baked-species battles and the single-Pokémon Pokéball flow
 
-In Safari a Pokéball holds one Pokémon, taken on click. The modal only appears when the roster is full and a swap decision is needed.
+Two halves of the same idea — the click path must consume what generation baked, never re-draw.
+
+1. **Battles fight the baked species.** Grass and Master Ball nodes build their enemy team from `node.species` instead of drawing fresh. Without this the map lies.
+2. **A Pokéball holds one Pokémon**, taken on click. The modal appears only when the roster is full and a swap decision is needed.
 
 **Files:**
-- Modify: `src/components/NodeMap.jsx` — `fetchOfferedPokemon` (~line 676), the click dispatch (~line 777), `resolveMysteryNode` (~line 719)
+- Modify: `src/components/NodeMap.jsx` — `fetchEnemyTeam` (~line 663, both the grass and legendary branches), `fetchOfferedPokemon` (~line 734), the Pokéball click dispatch (~line 835), `handlePokeballPick` (~line 969), the `PokeballNode` call site (~line 1078)
 - Modify: `src/components/PokeballNode.jsx` — single-Pokémon variant
+- Test: `src/game/safariBake.test.js`
+
+Line numbers are approximate — Task 7 shifted this file. Locate by function name.
 
 **Interfaces:**
 - Consumes: `node.species` from Task 3, `getActiveExtras().partySize` (existing).
@@ -1161,7 +1299,51 @@ In Safari a Pokéball holds one Pokémon, taken on click. The modal only appears
 
 Read `src/components/NodeMap.jsx` lines 676–740 (`fetchOfferedPokemon`, `resolveMysteryNode`) and 777–800 (the Pokéball dispatch). Read `src/components/PokeballNode.jsx` in full — it is 207 lines and handles the offer grid, the roster-full swap panel, and the Mystery reroll.
 
-- [ ] **Step 2: Build the offer from the baked species**
+- [ ] **Step 2: Make the grass battle fight the baked species**
+
+**This is the most important step in the task.** Without it a grass node shows one Pokémon and the player fights a different one — the single failure the whole mode exists to prevent. The bake and the render are already done; this is the third leg.
+
+In `fetchEnemyTeam`, the grass branch (~line 706) currently draws fresh at click time:
+
+```js
+    } else {
+      // Grass: one wild Pokémon from this map's catch pool, a few levels below
+      // the map's trainers, scaled by node position. Grass ignores rarity —
+      // it's a forced fight, not a reward — so pick a species uniformly.
+      const pool = config.catchPools?.[mapIndex] ?? []
+      const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
+    }
+```
+
+Replace that block with:
+
+```js
+    } else if (node.species?.id) {
+      // Safari: the species was drawn at map generation and is already on
+      // screen. Fight exactly that — drawing again here would make the sprite
+      // the player walked toward a lie, which is the one thing this mode
+      // cannot do.
+      specs = [{ id: node.species.id, level: node.species.level }]
+    } else {
+      // Grass: one wild Pokémon from this map's catch pool, a few levels below
+      // the map's trainers, scaled by node position. Grass ignores rarity —
+      // it's a forced fight, not a reward — so pick a species uniformly.
+      const pool = config.catchPools?.[mapIndex] ?? []
+      const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
+      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
+    }
+```
+
+Note the new branch goes BEFORE the existing `else`, and is reached only when a species was baked — Classic nodes have no `species`, so they take the original path unchanged.
+
+A Master Ball node also carries `node.species`, and it flows through a different branch of `fetchEnemyTeam`. Read how the legendary branch picks its species and give it the same treatment: when `node.species?.id` is present, fight that exact legendary at that exact level rather than re-drawing from `config.legendaryPools`. Otherwise the silhouette on the map can reveal a different legendary than the one baked.
+
+- [ ] **Step 3: Build the offer from the baked species**
 
 In `fetchOfferedPokemon`, add at the top:
 
@@ -1180,7 +1362,7 @@ In `fetchOfferedPokemon`, add at the top:
     // ...existing body unchanged...
 ```
 
-- [ ] **Step 3: Take the Pokémon directly when the roster has room**
+- [ ] **Step 4: Take the Pokémon directly when the roster has room**
 
 In the click dispatch, replace the `else if (node.type === NODE_TYPES.POKEBALL)` branch:
 
@@ -1239,7 +1421,7 @@ Then update the modal's call site at line 1561 to pass the node:
           onPick={pick => handlePokeballPick(pick, pendingPokeball.node)}
 ```
 
-- [ ] **Step 4: Keep the reroll on Mystery-resolved Pokéballs**
+- [ ] **Step 5: Keep the reroll on Mystery-resolved Pokéballs**
 
 A Mystery node bakes nothing, so a Mystery that resolves into a Pokéball has no `node.species`. In Safari it must still draw **one** species, not three, and must keep its reroll — the reroll is the Mystery node's entire bonus.
 
@@ -1257,7 +1439,7 @@ In `resolveMysteryNode`, thread the mode through so the resolved node knows to d
 
 `mode` reaches `NodeMap` as a prop in Task 9. Until then, add the prop with a `'classic'` default so this task is testable on its own.
 
-- [ ] **Step 5: Add the single-Pokémon variant to `PokeballNode`**
+- [ ] **Step 6: Add the single-Pokémon variant to `PokeballNode`**
 
 In `src/components/PokeballNode.jsx`, add `single = false` to the props, and use it for the header and the grid:
 
@@ -1280,7 +1462,7 @@ Change the header copy so the single case does not tell the player to choose:
 
 The existing offer grid already renders whatever `offered` contains, so a one-element array renders one card with no further change. Leave `handleSelectPokemon` alone: with a full roster it opens the swap panel, which is exactly what the single case needs.
 
-- [ ] **Step 6: Pass `single` at the call site**
+- [ ] **Step 7: Pass `single` at the call site**
 
 In `NodeMap.jsx`, where `PokeballNode` is rendered (~line 1559), add:
 
@@ -1290,24 +1472,52 @@ In `NodeMap.jsx`, where `PokeballNode` is rendered (~line 1559), add:
 
 Leave the existing `onReroll={pendingPokeball.node.fromMystery ? rerollPokeballOffer : null}` untouched — that is what keeps the Mystery bonus alive.
 
-- [ ] **Step 7: Verify in the browser**
+- [ ] **Step 8: Add a test proving the battle fights the baked species**
+
+The truth property deserves a test, not just a browser glance. `fetchEnemyTeam` lives inside the React component and is hard to call directly, so assert the property at the seam that matters: a baked grass node's `species` is what the battle spec is built from.
+
+Add to `src/game/safariBake.test.js`:
+
+```js
+test('a baked grass node carries the exact id and level the battle will use', () => {
+  // NodeMap.fetchEnemyTeam builds its grass spec as
+  //   [{ id: node.species.id, level: node.species.level }]
+  // when a species is baked, so these two fields ARE the battle. If this
+  // shape changes, the sprite on the map stops matching the fight.
+  const rows = rowsWith(NODE_TYPES.GRASS)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  const { species } = rows[0][0]
+  expect(typeof species.id).toBe('number')
+  expect(typeof species.level).toBe('number')
+  expect(species.level).toBeGreaterThan(0)
+  expect([1, 4, 7]).toContain(species.id)
+})
+```
+
+- [ ] **Step 9: Verify in the browser**
 
 Run: `npm run dev`
 
-Temporarily force Safari again as in Task 7. Confirm: clicking a Pokéball node with roster space adds that exact Pokémon with no modal and pays the node cash; clicking one with a full roster opens the swap panel showing a single Pokémon; a Mystery node that resolves into a Pokéball shows one Pokémon with a working reroll button.
+Temporarily force Safari again as in Task 7. Confirm:
+
+- **A grass node's battle is against the species shown on the node.** Note the Pokémon on a grass node, click it, and check the battle opponent matches. This is the mode's core promise — check it before anything else.
+- A Master Ball's revealed legendary matches the silhouette that was there.
+- Clicking a Pokéball node with roster space adds that exact Pokémon with no modal, and pays the node cash.
+- Clicking one with a full roster opens the swap panel showing a single Pokémon.
+- A Mystery node resolving into a Pokéball shows one Pokémon with a working reroll.
 
 **Revert the temporary change before committing.**
 
-- [ ] **Step 8: Run tests and lint**
+- [ ] **Step 10: Run tests and lint**
 
 Run: `npm test && npm run lint`
 Expected: PASS and clean.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add src/components/NodeMap.jsx src/components/PokeballNode.jsx
-git commit -m "feat(safari): single-Pokemon pokeball flow"
+git add src/components/NodeMap.jsx src/components/PokeballNode.jsx src/game/safariBake.test.js
+git commit -m "feat(safari): single-Pokemon pokeball flow and baked-species battles"
 ```
 
 ---

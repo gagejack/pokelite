@@ -76,6 +76,8 @@ import Sabrina3 from '../../assets/regions/Kanto/Kanto Character Sprites/Sabrina
 import { buildRows, NODE_TYPES } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
 import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, RIVAL_STARTER_COUNTERS, MAP_LEVEL_RANGES, CATCH_LEVEL_RANGES, BLUE_STARTER_COUNTER } from './kanto.teams.js'
+import { bakeSafariSpecies } from '../safariBake.js'
+import { GEN_MAX_ID } from '../pokemon.js'
 
 // --- Map + misc assets ---
 import bgRock from '../../assets/regions/Kanto/Maps/Rock.png'
@@ -553,11 +555,21 @@ export const kantoConfig = {
   ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     name: MAP_NAMES[i],
-    generate: (starter) => {
+    generate: (starter, { mode = 'classic' } = {}) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Brock') : MAP_BOSSES[i]
+      // NOTE: buildRows is deliberately NOT given the safari options here.
+      // Kanto overwrites a node below, and baking before that fixup would
+      // waste rng() draws on a node that is discarded. The bake runs after.
       const rows = buildRows(TRAINER_POOLS[i], boss, i)
       if (i === 2) {
         rows[4][1] = { id: rows[4][1].id, type: NODE_TYPES.RIVAL, trainer: 'Blue', rivalTeam: 'blueEarlyGame' }
+      }
+      if (mode === 'safari') {
+        bakeSafariSpecies(rows, {
+          config: kantoConfig,
+          mapIndex: i,
+          maxSpeciesId: GEN_MAX_ID[1],
+        })
       }
       return { region: 'Kanto', mapIndex: i, rows }
     },

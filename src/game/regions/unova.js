@@ -1,6 +1,7 @@
 import { buildRows } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
 import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, MAP_LEVEL_RANGES, CATCH_LEVEL_RANGES } from './unova.teams.js'
+import { GEN_MAX_ID } from '../pokemon.js'
 
 // --- Assets ---
 import bgStriaton from '../../assets/regions/Unova/MapAssets/Striaton.png'
@@ -706,9 +707,19 @@ export const unovaConfig = {
   ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     name: MAP_NAMES[i],
-    generate: (starter) => {
+    generate: (starter, { mode = 'classic' } = {}) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Chili') : MAP_BOSSES[i]
-      return { region: 'Unova', mapIndex: i, rows: buildRows(TRAINER_POOLS[i], boss, i) }
+      // Unova applies no post-buildRows fixups, so the bake can run inside
+      // buildRows via its options bag.
+      return {
+        region: 'Unova',
+        mapIndex: i,
+        rows: buildRows(TRAINER_POOLS[i], boss, i, {
+          mode,
+          config: unovaConfig,
+          maxSpeciesId: GEN_MAX_ID[5],
+        }),
+      }
     },
     edges: MAP_EDGES,
     background,
