@@ -375,10 +375,14 @@ function MapSvg({
                 // a fork between those two, and one looking bigger reads as
                 // one being more important.
                 const ICON_SCALE = { [NODE_TYPES.GRASS]: 0.7, [NODE_TYPES.POKEMART]: 0.9 }
-                // Pokémon sprites have more transparent padding than the node
-                // icons, so a baked Safari sprite is scaled up slightly to sit
-                // at the same visual weight as its Classic neighbours.
-                const SAFARI_ICON_SCALE = 0.85
+                // Pokémon sprites carry far more transparent padding than the
+                // node icons, and the species IS the information a Safari node
+                // exists to convey — it has to be readable at a glance, not
+                // merely present. Scaled past 1 so the sprite overflows the
+                // node box; `offset` below goes negative to keep it centered on
+                // the node point. Note this stacks with NODE_SCALE on the
+                // parent <g>, so the on-screen size is NODE_SIZE * this * 1.3.
+                const SAFARI_ICON_SCALE = 1.7
                 const scale = node.species?.id ? SAFARI_ICON_SCALE : (ICON_SCALE[node.type] ?? 1)
                 const size = NODE_SIZE * scale
                 // Shrunk icons stay centered on the node point rather than
