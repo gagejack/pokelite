@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { createProfile, runEndPayout, canAfford, applyPurchase, effectivePrice, totalVitamins, unlockRegion } from './metaProfile.js'
+import { createProfile, runEndPayout, canAfford, applyPurchase, effectivePrice, totalVitamins, unlockRegion, claimFirstSafariRegion, unlockSafariRegion } from './metaProfile.js'
 import { META_CATALOG_BY_ID } from './metaCatalog.js'
 
 // ── createProfile ────────────────────────────────────────────────────────
@@ -391,4 +391,63 @@ test('unlockRegion returns a NEW profile object on success, never mutating the i
   // original untouched
   expect(profile.keys).toBe(1)
   expect(profile.unlockedRegions).toEqual(['Unova'])
+})
+
+// ── Safari Mode: separate unlock list on the shared key wallet ──────────
+
+test('a fresh profile has no safari regions and has not claimed its free one', () => {
+  const p = createProfile()
+  expect(p.safariUnlockedRegions).toEqual([])
+  expect(p.safariFirstRegionClaimed).toBe(false)
+})
+
+test('claiming the first safari region is free and costs no keys', () => {
+  const p = { ...createProfile(), keys: 3 }
+  const { ok, profile } = claimFirstSafariRegion(p, 'Unova')
+  expect(ok).toBe(true)
+  expect(profile.safariUnlockedRegions).toEqual(['Unova'])
+  expect(profile.safariFirstRegionClaimed).toBe(true)
+  expect(profile.keys).toBe(3)
+})
+
+test('the free claim can only be used once', () => {
+  const p = claimFirstSafariRegion(createProfile(), 'Kanto').profile
+  const { ok, reason } = claimFirstSafariRegion(p, 'Unova')
+  expect(ok).toBe(false)
+  expect(reason).toBe('Free region already claimed')
+})
+
+test('a second safari region costs one key from the shared wallet', () => {
+  const first = claimFirstSafariRegion({ ...createProfile(), keys: 2 }, 'Kanto').profile
+  const { ok, profile } = unlockSafariRegion(first, 'Unova')
+  expect(ok).toBe(true)
+  expect(profile.keys).toBe(1)
+  expect(profile.safariUnlockedRegions).toEqual(['Kanto', 'Unova'])
+})
+
+test('unlocking a safari region with no keys is rejected', () => {
+  const p = { ...createProfile(), keys: 0, safariUnlockedRegions: ['Kanto'], safariFirstRegionClaimed: true }
+  const { ok, reason } = unlockSafariRegion(p, 'Unova')
+  expect(ok).toBe(false)
+  expect(reason).toBe('Not enough keys')
+})
+
+test('unlocking an already-unlocked safari region is rejected, never double-charged', () => {
+  const p = { ...createProfile(), keys: 5, safariUnlockedRegions: ['Kanto'], safariFirstRegionClaimed: true }
+  const { ok, profile, reason } = unlockSafariRegion(p, 'Kanto')
+  expect(ok).toBe(false)
+  expect(reason).toBe('Region already unlocked')
+  expect(profile.keys).toBe(5)
+})
+
+test('safari unlocks do not leak into classic', () => {
+  const p = claimFirstSafariRegion(createProfile(), 'Unova').profile
+  // Classic still only has its starting region.
+  expect(p.unlockedRegions).toEqual(['Kanto'])
+  expect(p.unlockedRegions).not.toContain('Unova')
+})
+
+test('classic unlocks do not leak into safari', () => {
+  const p = unlockRegion({ ...createProfile(), keys: 1 }, 'Unova').profile
+  expect(p.safariUnlockedRegions).toEqual([])
 })

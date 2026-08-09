@@ -199,6 +199,34 @@ test('migrateGuestProfile returns a new object, not a mutated input, for a real 
   expect(account.metacash).toBe(2000)
 })
 
+// ── safariUnlockedRegions / safariFirstRegionClaimed ─────────────────────
+//
+// migrateGuestProfile builds its result from an explicit field list, so a
+// field it doesn't name is silently dropped on merge. These guard that
+// Safari's two profile fields are actually wired in, with their own rules:
+// the unlock list unions like unlockedRegions, but the free-claim flag is an
+// OR (not "prefer account") — see the note on that field below.
+
+test('merging profiles unions safari unlocks from both sides', () => {
+  const account = { ...createProfile(), safariUnlockedRegions: ['Kanto'], safariFirstRegionClaimed: true }
+  const local = { ...createProfile(), safariUnlockedRegions: ['Unova'], safariFirstRegionClaimed: true }
+  const merged = migrateGuestProfile(local, account)
+  expect(new Set(merged.safariUnlockedRegions)).toEqual(new Set(['Kanto', 'Unova']))
+})
+
+test('merging keeps the free region claimed if EITHER side claimed it', () => {
+  const account = { ...createProfile(), safariFirstRegionClaimed: false }
+  const local = { ...createProfile(), safariUnlockedRegions: ['Unova'], safariFirstRegionClaimed: true }
+  // Without the OR, the merged profile would be handed a second free region.
+  expect(migrateGuestProfile(local, account).safariFirstRegionClaimed).toBe(true)
+})
+
+test('merging leaves safari fields intact when neither side has any', () => {
+  const merged = migrateGuestProfile(createProfile(), createProfile())
+  expect(merged.safariUnlockedRegions).toEqual([])
+  expect(merged.safariFirstRegionClaimed).toBe(false)
+})
+
 // ── saveProfile / migrateMetaProfile: Supabase failure posture ───────────
 //
 // These need a mocked Supabase client and a fake localStorage, so they're
