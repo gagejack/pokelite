@@ -485,7 +485,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic' }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -509,13 +509,29 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // reproducible regardless of how many shared-stream rng() calls happened
   // before (the starter's async shiny roll, prior battles, etc.). Unseeded runs
   // generate straight off the shared Math.random stream as before.
+  //
+  // SAFARI ORDERING GATE — do not simplify `prewarmReady` out of this.
+  // Safari's generate() bakes a species onto every grass node, and that bake
+  // rolls each species' evolution stage with rollStageForLevelSync, which
+  // reads pokemon.js's chainCache SYNCHRONOUSLY. prewarmCache fills that cache
+  // asynchronously (App.jsx's beginPrewarm). If generation wins the race,
+  // every stage roll misses the cache and silently falls back to the base
+  // form: no crash, no warning, just a map quietly full of the wrong Pokémon.
+  // That is why this returns null and waits, and why `prewarmReady` is in the
+  // dependency array — it is what rebuilds the map the instant the cache is
+  // warm. It looks like a redundant dependency. It is the whole gate.
+  //
+  // Classic never touches that cache at generation time, so it never waits:
+  // the guard is scoped to `mode === 'safari'` and Classic's timing, rng
+  // ordering and output are byte-for-byte unchanged.
   const mapData = useMemo(
     () => {
       if (initialMapData && initialMapData.mapIndex === mapIndex) return initialMapData
-      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter))
-      return mapConfig.generate(starter)
+      if (mode === 'safari' && !prewarmReady) return null
+      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter, { mode }))
+      return mapConfig.generate(starter, { mode })
     },
-    [mapConfig] // eslint-disable-line react-hooks/exhaustive-deps
+    [mapConfig, prewarmReady] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const edges = mapConfig.edges
 
@@ -542,7 +558,15 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
   // Keep the parent's snapshot of this map's progress current, so hitting Home
   // can save exactly where the player is (layout + cleared nodes + position).
+  //
+  // Skipped while mapData is null — the Safari prewarm gate above holds it
+  // there for the frames before the evolution cache is warm. Publishing a
+  // null-layout snapshot would overwrite App's mapProgress with a run whose
+  // map cannot be rebuilt, and persistProgress would then WRITE that to the
+  // save. The very next commit (gate opens, mapData populates) re-fires this
+  // effect with the real layout, so nothing is lost by waiting.
   useEffect(() => {
+    if (!mapData) return
     onProgressChange?.({
       mapData,
       clearedNodes: [...clearedNodes],
@@ -616,8 +640,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
 
+  // `mapData?.rows ?? []` rather than `mapData.rows`: the Safari prewarm gate
+  // above holds mapData at null for the frames before the evolution cache is
+  // warm, and the loading early-return that handles that cannot sit here —
+  // there are still hooks below (the notice timer, useBagTouchDrag), and
+  // returning before them would change the hook order between the waiting and
+  // ready renders. So the layout math degrades to an empty map for those
+  // frames and the early return happens just above the JSX instead.
+  const rows = mapData?.rows ?? []
   const nodePositions = {}
-  mapData.rows.forEach((row, rowIndex) => {
+  rows.forEach((row, rowIndex) => {
     const totalCols = row.length
     const spread = ROW_SPREAD[rowIndex] ?? 1
     row.forEach((node, colIndex) => {
@@ -627,7 +659,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     })
   })
 
-  const totalRows = mapData.rows.length
+  const totalRows = rows.length
   const svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 60
   const svgWidth = 4 * COL_WIDTH + NODE_SIZE * 2
 
@@ -1282,6 +1314,36 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     : config.eliteFour
       ? () => { onMapCleared?.(); onEnterEliteFour?.() }
       : null
+
+  // Safari's prewarm gate (see the mapData useMemo) holds the layout at null
+  // until the evolution cache is warm. Placed AFTER every hook above so the
+  // hook order is identical on the waiting and ready renders — React would
+  // throw on the transition otherwise. Reuses the node spinner's `nodeSpin`
+  // keyframes so this reads as the same app, not a bare fallback — but those
+  // keyframes are declared inside MapSvg, which is NOT rendered on this
+  // branch, so the rule has to be re-emitted here or the spinner sits frozen.
+  if (!mapData) {
+    return (
+      <Layout onHome={onBack} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
+        <style>{`@keyframes nodeSpin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '14px',
+        }}>
+          <div style={{
+            width: '38px', height: '38px',
+            border: '4px solid rgba(0,0,0,0.25)',
+            borderTopColor: '#facc15',
+            borderRadius: '50%',
+            animation: 'nodeSpin 0.7s linear infinite',
+          }} />
+          <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: dark ? '#DBDBDB' : '#333333' }}>
+            Loading map…
+          </span>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} onSkipMap={handleSkipMap} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} showTutorial>

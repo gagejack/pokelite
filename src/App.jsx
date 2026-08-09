@@ -3,6 +3,7 @@ import { ThemeProvider } from './lib/theme'
 import { SettingsProvider } from './lib/settings'
 import MainMenu from './components/MainMenu'
 import RegionSelect from './components/RegionSelect'
+import SafariRegionSelect from './components/SafariRegionSelect'
 import StarterSelect from './components/StarterSelect'
 import DailyChallenge from './components/DailyChallenge'
 // NodeMap (pulls in the whole battle stack: BattleCard, MoveAnimation + its 78
@@ -18,7 +19,7 @@ import { supabase } from './lib/supabase.js'
 import { dailyFor, submitAttempt, todayUtc } from './lib/daily.js'
 import { saveRun, loadRun, clearRun } from './lib/runSave.js'
 import { migrateMetaProfile, loadProfile, saveProfile } from './lib/metaSave.js'
-import { createProfile, runEndPayout, unlockRegion } from './game/metaProfile.js'
+import { createProfile, runEndPayout, unlockRegion, claimFirstSafariRegion, unlockSafariRegion } from './game/metaProfile.js'
 import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
 import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
@@ -42,6 +43,26 @@ export default function App() {
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [runSeed, setRunSeed] = useState(null)   // { region, seed, code } or null
   const [runMode, setRunMode] = useState('normal')
+  // Which GAME MODE the active run is in: 'classic' | 'safari'. Persisted on
+  // the snapshot so a resumed Safari run rebuilds as Safari — a run that came
+  // back as Classic would regenerate its maps without baked species.
+  //
+  // A DIFFERENT axis from `runMode` above ('normal' | 'daily' | 'custom'),
+  // which is about how the run was seeded. The two are orthogonal and must not
+  // be merged: a Safari run is still 'normal'-seeded.
+  const [gameMode, setGameMode] = useState('classic')
+  // Whether prewarmCache has finished for the region the player is entering.
+  //
+  // Safari's map generation reads the prewarmed evolution cache SYNCHRONOUSLY
+  // (bakeSafariSpecies → rollStageForLevelSync → chainCache), so it must not
+  // run until prewarmCache resolves — otherwise every stage roll misses and
+  // the map bakes base forms with no crash and no error, which is the one bug
+  // in this feature that looks like it works. Classic never reads that cache
+  // at generation time and does not wait on this flag at all.
+  //
+  // Set false at every prewarm start and true on its resolution, so it always
+  // describes the CURRENT region rather than a previously warmed one.
+  const [prewarmReady, setPrewarmReady] = useState(false)
   const [dailyOpen, setDailyOpen] = useState(false)
   const runStartedAt = useRef(0)
   const dailyDate = useRef(null)                  // Phase 2 (daily) sets this
@@ -256,6 +277,38 @@ export default function App() {
     return () => { cancelled = true }
   }, [user])
 
+  // The ONE place prewarmCache is started. Every path into a run (daily,
+  // custom seed, region select, resume) funnels through here so `prewarmReady`
+  // can never be left describing a different region than the one being
+  // entered.
+  //
+  // Still fire-and-forget for the CALLER — nothing awaits this, and Classic's
+  // behaviour is byte-for-byte what it was: prewarming was already a
+  // background sprite/base warm that the map never waited on. What is new is
+  // the completion SIGNAL. Safari's generation reads the evolution cache
+  // synchronously (see prewarmReady's declaration), so NodeMap holds its
+  // useMemo until this resolves. Without the flag there is nothing to hold on:
+  // the four call sites this replaces had no completion signal at all.
+  //
+  // Sets false FIRST, unconditionally: a stale `true` left over from the
+  // previous region would let Safari generate against a cache warmed for a
+  // different species set — the exact silent-wrong-map failure the flag
+  // exists to prevent. A missing config resolves immediately (nothing to
+  // warm), so a mapless/unknown region can never deadlock the gate.
+  function beginPrewarm(config) {
+    setPrewarmReady(false)
+    if (!config) { setPrewarmReady(true); return }
+    // .catch releases the gate on failure too. prewarmCache today try/catches
+    // every individual fetch and cannot reject — but a rejection would leave
+    // the flag false forever, which is a Safari run stuck on "Loading map…"
+    // with nothing on screen to explain it. Opening the gate degrades to
+    // Classic-quality stage rolls instead of a hang; the warn is what makes
+    // that visible rather than mysterious.
+    prewarmCache(config)
+      .catch(err => console.warn('prewarmCache failed:', err))
+      .finally(() => setPrewarmReady(true))
+  }
+
   // Launch today's daily seed: derive region+seed from the UTC date,
   // seed the run, and record the start-date so the attempt submits under the
   // day it began (even across a midnight rollover). Called from DailyChallenge.
@@ -264,9 +317,12 @@ export default function App() {
     const daily = dailyFor(date)                 // { date, region, seed, code }
     setRunSeed({ region: daily.region, seed: daily.seed, code: daily.code })
     setRunMode('daily')
+    // Daily is a Classic-mode run: its seed→region→map derivation and its
+    // leaderboard comparability both assume Classic generation.
+    setGameMode('classic')
     dailyDate.current = date
     setSelectedRegion({ name: daily.region })
-    prewarmCache(getRegionConfig(daily.region))
+    beginPrewarm(getRegionConfig(daily.region))
     setDailyOpen(false)
     setScreen('starter')
   }
@@ -379,6 +435,10 @@ export default function App() {
       savedAt: Date.now(),
       runSeed,
       runMode,
+      // Which game mode this run is in. Without it a resumed Safari run would
+      // rebuild as Classic and regenerate every later map with no baked
+      // species, silently turning a Safari run into a Classic one mid-run.
+      gameMode,
       runStartedAt: runStartedAt.current,
       dailyDate: dailyDate.current,
       rngState: getRngState(),   // null for normal runs
@@ -470,6 +530,10 @@ export default function App() {
     setMapIndex(run.mapIndex ?? 0)
     setRunSeed(run.runSeed ?? null)
     setRunMode(run.runMode ?? 'normal')
+    // `?? 'classic'` is what makes a LEGACY save — written before gameMode
+    // existed, so the field is simply absent — resume as Classic, which is
+    // what it actually was.
+    setGameMode(run.gameMode ?? 'classic')
     runStartedAt.current = run.runStartedAt ?? Date.now()
     dailyDate.current = run.dailyDate ?? null
     // Restore the exact RNG position so resumed rolls match an uninterrupted run.
@@ -501,9 +565,11 @@ export default function App() {
     savedRunData.current = null
     setHasSavedRun(false)
     clearRun(user)
-    // Prewarm sprites for the region, then show the map.
-    const config = getRegionConfig(run.region.name)
-    if (config) prewarmCache(config)
+    // Prewarm sprites for the region, then show the map. A resumed Safari run
+    // usually replays its SAVED mapData (initialMapData), so it does not
+    // re-bake — but advancing to the next map inside the resumed run does, and
+    // that generation is gated on this same flag.
+    beginPrewarm(getRegionConfig(run.region.name))
     setScreen('nodemap')
   }
 
@@ -545,6 +611,10 @@ export default function App() {
     setMapIndex(snapshot.mapIndex ?? 0)
     setRunSeed(snapshot.runSeed ?? null)
     setRunMode(snapshot.runMode ?? 'normal')
+    // Same `?? 'classic'` fallback as resumeRun: a Run It Back snapshot is the
+    // same shape buildRunSnapshot produces, so it always carries gameMode now,
+    // but the default keeps the two restore paths identical.
+    setGameMode(snapshot.gameMode ?? 'classic')
     runStartedAt.current = snapshot.runStartedAt ?? Date.now()
     dailyDate.current = snapshot.dailyDate ?? null
     if (snapshot.rngState != null) setRngState(snapshot.rngState)
@@ -595,6 +665,11 @@ export default function App() {
     clearRng()
     setRunSeed(null)
     setRunMode('normal')
+    // Back to the default mode with the rest of the run's state, so a Safari
+    // run left mid-way can't leak 'safari' onto the next Classic run started
+    // from the menu (every entry point sets it explicitly, but a stale value
+    // here would be a live bug the moment one stops doing so).
+    setGameMode('classic')
     runStartedAt.current = 0
     dailyDate.current = null
     setSelectedCharacter(DEFAULT_CHARACTER)
@@ -1074,6 +1149,67 @@ export default function App() {
     return { ok: true, notice: (saved || !user) ? undefined : 'Saved on this device — sign in again to bank it' }
   }
 
+  // Safari's counterpart to unlockAndEnterRegion above, and for the same
+  // reason: the gate lives here, not in the picker, so every Safari entry
+  // point is enforced in one place. Two differences from Classic —
+  //
+  //  1. It reads/writes `safariUnlockedRegions`, a list separate from
+  //     Classic's. Owning Kanto in Classic grants nothing here.
+  //  2. The FIRST region is free and player-chosen (claimFirstSafariRegion),
+  //     where Classic forces a fresh profile into Kanto. Afterwards it costs a
+  //     key from the SHARED wallet, same price as Classic.
+  //
+  // Returns the same { ok, notice? } / { ok:false, reason } contract, so the
+  // pickers do not have to learn a second failure convention.
+  async function unlockAndEnterSafariRegion(regionName) {
+    const config = getRegionConfig(regionName)
+    if (!config || (config.maps?.length ?? 0) === 0) {
+      return { ok: false, reason: 'Region not available yet' }
+    }
+    const current = profile ?? createProfile()
+    const safariUnlocked = current.safariUnlockedRegions ?? []
+    if (safariUnlocked.includes(regionName)) {
+      return { ok: true }
+    }
+    // Free pick or paid unlock — both return { ok, profile, reason? } and
+    // neither mutates, so this branch only chooses which one to call.
+    const result = current.safariFirstRegionClaimed
+      ? unlockSafariRegion(current, regionName)
+      : claimFirstSafariRegion(current, regionName)
+    if (!result.ok) return result
+    // Same optimistic posture as Classic's unlock: a storage hiccup must not
+    // block a player out of a region they just claimed or paid for. See
+    // unlockAndEnterRegion's saveProfile comment for why the return value is
+    // load-bearing and `saved || !user` is the guest-safe check.
+    setProfile(result.profile)
+    const saved = await saveProfile(result.profile, user)
+    const notice = (saved || !user)
+      ? undefined
+      : 'Saved on this device — sign in again to bank it'
+    return { ok: true, notice }
+  }
+
+  // Safari's region click. Mirrors handleSelectRegion below step for step —
+  // the only differences are the gate it calls and the gameMode it installs.
+  // Kept separate rather than parameterised so Classic's path is untouched.
+  async function handleSelectSafariRegion(region) {
+    setUnlockNotice(null)
+    const gate = await unlockAndEnterSafariRegion(region.name)
+    if (!gate.ok) return gate
+    setRunSeed(null)        // Safari has no seeded variant
+    setRunMode('normal')
+    // Set BEFORE the screen change so NodeMap's first render already knows it
+    // is a Safari run. The starter screen sits in between, so there is no
+    // ordering hazard here, but the invariant is worth holding: gameMode must
+    // never be read as 'classic' by a map that is about to bake.
+    setGameMode('safari')
+    setSelectedRegion(region)
+    beginPrewarm(getRegionConfig(region.name))
+    setScreen('starter')
+    if (gate.notice) setUnlockNotice(gate.notice)
+    return { ok: true, notice: gate.notice }
+  }
+
   // Shared by RegionSelect (mobile) and MainMenu's desktop region mode.
   async function handleSelectRegion(region) {
     // Clear any notice from a PREVIOUS unlock before this one resolves — a
@@ -1084,9 +1220,9 @@ export default function App() {
     if (!gate.ok) return gate
     setRunSeed(null)        // normal run
     setRunMode('normal')
+    setGameMode('classic')
     setSelectedRegion(region)
-    const config = getRegionConfig(region.name)
-    if (config) prewarmCache(config)
+    beginPrewarm(getRegionConfig(region.name))
     setScreen('starter')
     // Set AFTER setScreen so it's applied to the screen the player is about
     // to see, not the one they're leaving — RegionSelect/MainMenu's region
@@ -1116,8 +1252,11 @@ export default function App() {
     // decoded.code is already the normalized canonical string.
     setRunSeed({ region, seed: decoded.seed, code: decoded.code })
     setRunMode('custom')
+    // A seed code addresses a Classic run: the codes encode region+seed only,
+    // with no mode field, and Safari has no seeded variant to decode into.
+    setGameMode('classic')
     setSelectedRegion({ name: region })
-    prewarmCache(getRegionConfig(region))
+    beginPrewarm(getRegionConfig(region))
     setScreen('starter')
     return { ok: true }
   }
@@ -1135,11 +1274,15 @@ export default function App() {
         // stock BALANCE, so a fast click would drop every paid upgrade for
         // the rest of the run.
         <MainMenu
-          onPlay={() => setScreen('region')}
+          // Mobile's two mode buttons both land here; the mode picks which
+          // standalone region screen opens. Defaulting to Classic keeps every
+          // existing caller (LoginForm's onAuthSuccess) behaving as before.
+          onPlay={chosenMode => setScreen(chosenMode === 'safari' ? 'safariRegion' : 'region')}
           hasSavedRun={hasSavedRun && profile != null}
           onResume={resumeRun}
           onOpenDaily={() => setDailyOpen(true)}
           onSelectRegion={handleSelectRegion}
+          onSelectSafariRegion={handleSelectSafariRegion}
           onCustomSeed={handleCustomSeed}
           initialMode={menuMode}
           onModeChange={setMenuMode}
@@ -1160,15 +1303,30 @@ export default function App() {
           profile={profile}
         />
       )}
+      {screen === 'safariRegion' && (
+        // Mobile's Safari picker — the desktop equivalent is MainMenu's
+        // safariRegion column, swapped in place. No onCustomSeed/onOpenDaily:
+        // Safari has no seeded variant, so those would be dead controls.
+        <SafariRegionSelect
+          onBack={() => setScreen('menu')}
+          onSelectRegion={handleSelectSafariRegion}
+          pokedexOpen={pokedexOpen}
+          setPokedexOpen={setPokedexOpen}
+          profile={profile}
+        />
+      )}
       {screen === 'starter' && (
         <StarterSelect
           region={selectedRegion}
           onBack={() => {
             // Desktop's region picker lives inside the menu; mobile's is the
-            // standalone screen. Send Back to whichever one the player used.
+            // standalone screen. Send Back to whichever one the player used —
+            // and to the picker for the MODE they came in on, so a Safari
+            // player who backs out doesn't land in Classic's region list.
             setUnlockNotice(null)
-            if (isDesktop) { setMenuMode('region'); setScreen('menu') }
-            else setScreen('region')
+            const picker = gameMode === 'safari' ? 'safariRegion' : 'region'
+            if (isDesktop) { setMenuMode(picker); setScreen('menu') }
+            else setScreen(picker)
           }}
           onSelectStarter={starter => { setUnlockNotice(null); startRun(starter) }}
           caughtSet={caughtSet}
@@ -1222,6 +1380,11 @@ export default function App() {
           setPokedexOpen={setPokedexOpen}
           seedCode={runSeed?.code}
           seed={runSeed?.seed}
+          mode={gameMode}
+          // Safari's generation must not run before the evolution cache is
+          // warm (see prewarmReady's declaration). NodeMap holds its map
+          // useMemo on this; Classic ignores it entirely.
+          prewarmReady={prewarmReady}
         />
       )}
       {screen === 'nodemap' && runSeed && (

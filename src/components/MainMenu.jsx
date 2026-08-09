@@ -7,10 +7,12 @@ import MenuButton from './menu/MenuButton'
 import WeeklyStat from './menu/WeeklyStat'
 import CallingCard from './menu/CallingCard'
 import RegionBar from './menu/RegionBar'
+import SafariRegionBar from './menu/SafariRegionBar'
 import UpdateNotice from './UpdateNotice'
 import { hasSeenUpdate, markUpdateSeen } from '../lib/updateSeen'
 import { VERSION } from '../game/version'
 import { REGIONS } from '../game/regions/regionList'
+import { regionNames } from '../game/regionRegistry'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 import { getShopOverrides } from '../lib/metaShopBalance.js'
@@ -20,7 +22,17 @@ import { getShopOverrides } from '../lib/metaShopBalance.js'
 // sees until SHOP is clicked.
 const MetaShop = lazy(() => import('./MetaShop'))
 
-export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile, onProfileChange }) {
+// Safari only offers regions that actually have authored maps. Hoenn and
+// Sinnoh have `maps: []` and would crash at config.maps[0]; Classic's column
+// still lists them (RegionBar renders COMING SOON), but Safari's does not,
+// because an inert card sitting next to "first region free" reads as a bug.
+// Module scope: REGION_CONFIGS is static, so this never needs recomputing.
+const SAFARI_MENU_REGIONS = (() => {
+  const playable = new Set(regionNames({ playableOnly: true }))
+  return REGIONS.filter(r => playable.has(r.name))
+})()
+
+export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, pokedexOpen, setPokedexOpen, onSelectRegion, onSelectSafariRegion, onCustomSeed, initialMode = 'menu', onModeChange, profile, onProfileChange }) {
   const { dark } = useTheme()
   // profile is null for one frame while App.jsx's initial load is in flight —
   // fall back to "nothing unlocked yet", same fallback RegionSelect uses.
@@ -29,6 +41,10 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   // as unlocked before we know would let a click through on a region the
   // player may not own.
   const unlockedRegions = profile?.unlockedRegions ?? []
+  // Safari keeps its own unlock list and its own "the free pick is spent" flag
+  // — a region owned in Classic is still locked in Safari, and vice versa.
+  const safariUnlockedRegions = profile?.safariUnlockedRegions ?? []
+  const safariFirstRegionClaimed = profile?.safariFirstRegionClaimed ?? false
   const keys = profile?.keys ?? 0
   const metacash = profile?.metacash ?? 0
   const isDesktop = useIsDesktop()
@@ -49,6 +65,20 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   }
   const [seedInput, setSeedInput] = useState('')
   const [seedError, setSeedError] = useState(null)
+  // Rejection reason from the Safari unlock path ({ ok:false, reason } out of
+  // claimFirstSafariRegion / unlockSafariRegion). Its own state rather than
+  // reusing seedError: the Safari column has no seed input, and sharing one
+  // slot would let a stale seed error surface under the region bars.
+  const [safariError, setSafariError] = useState(null)
+
+  // Safari's region click. App's handler returns the same { ok, reason } shape
+  // the Classic path uses, so a refusal (free pick already spent and no key)
+  // shows here instead of silently doing nothing.
+  async function handleSafariSelect(region) {
+    setSafariError(null)
+    const res = await onSelectSafariRegion?.(region)
+    if (res && res.ok === false) setSafariError(res.reason ?? 'Could not enter that region')
+  }
 
   // Patch notes. `unread` is read once on mount so dismissing the popup can dim
   // the badge in the same tick it writes the flag. The popup auto-opens only
@@ -93,18 +123,32 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     return () => subscription.unsubscribe()
   }, [])
 
-  // Start a run. Desktop's region picker is a column swapped in place inside
-  // this menu; mobile's is the standalone RegionSelect screen that `onPlay`
-  // routes to. EVERY path into region selection must go through here — PLAY and
-  // the login card both do. Calling `onPlay` directly used to be how signing in
-  // on desktop dumped the player onto mobile's screen.
-  const startRun = () => (isDesktop ? changeMode('region') : onPlay())
+  // Start a run in `gameMode` ('classic' | 'safari'). Desktop's region picker
+  // is a column swapped in place inside this menu; mobile's is a standalone
+  // screen that `onPlay` routes to. EVERY path into region selection must go
+  // through here — CLASSIC, SAFARI and the login card all do. Calling `onPlay`
+  // directly used to be how signing in on desktop dumped the player onto
+  // mobile's screen.
+  //
+  // The mode is carried on BOTH paths: desktop encodes it in the column name
+  // ('region' vs 'safariRegion'), mobile passes it to onPlay, which App turns
+  // into the matching screen. Neither path may lose it — a Safari pick that
+  // arrives at App as Classic starts a run whose maps have no baked species.
+  const startRun = (gameMode = 'classic') =>
+    (isDesktop ? changeMode(gameMode === 'safari' ? 'safariRegion' : 'region') : onPlay(gameMode))
 
   // Single source of truth for the menu bars. Both layouts map over this, so
   // adding a mode or changing a size happens in exactly one place.
   const buttonDefs = [
-    { id: 'play',  label: 'PLAY',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
-      color: '#fff', fontSize: '26px', onClick: startRun, visible: true },
+    // PLAY split into the two game modes (Safari Mode, spec §Entry). Classic
+    // keeps PLAY's green and its top slot so the default path is unchanged;
+    // Safari takes a distinct amber so the two never read as one button with a
+    // toggle. Both funnel through startRun, which is the only place either
+    // mode's routing is decided.
+    { id: 'play',  label: 'CLASSIC',  background: 'linear-gradient(to top, #16a34a, #4ade80)',
+      color: '#fff', fontSize: '26px', onClick: () => startRun('classic'), visible: true },
+    { id: 'safari', label: 'SAFARI', background: 'linear-gradient(to top, #b45309, #f59e0b)',
+      color: '#fff', fontSize: '26px', onClick: () => startRun('safari'), visible: true },
     { id: 'daily', label: 'DAILY SEED', background: 'linear-gradient(to top, #dc2626, #f97316)',
       color: '#fff', fontSize: '22px', onClick: onOpenDaily, visible: true, className: 'daily-glow' },
     { id: 'resume', label: 'RESUME RUN', background: '#3b82f6',
@@ -170,7 +214,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       {/* Auth card — hidden once logged in. Above the version tag: it is a
           control, and the version is a footnote, so burying the only way to
           sign in under the footnote read as an afterthought. */}
-      {!loggedIn && <LoginForm onAuthSuccess={startRun} />}
+      {!loggedIn && <LoginForm onAuthSuccess={() => startRun('classic')} />}
 
       {/* Version tag — closes the column, with the patch-notes badge beside it. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -233,6 +277,39 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
     </div>
   )
 
+  // Safari's region column — the desktop counterpart to regionColumn above.
+  // Deliberately NOT the same column with a flag: it reads Safari's own unlock
+  // list, prices the first pick as free, and drops the Daily bar and the seed
+  // input, neither of which Safari has. Only playable regions appear; a
+  // mapless one would crash at config.maps[0] and its inert card would read as
+  // a bug next to the free-pick messaging.
+  const safariRegionColumn = (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
+      <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
+      <span style={{ fontFamily: 'Upheaval', fontSize: '18px', color: '#f59e0b', letterSpacing: '1px', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
+        {safariFirstRegionClaimed ? 'SAFARI — PICK A REGION' : 'SAFARI — FIRST REGION FREE'}
+      </span>
+      {SAFARI_MENU_REGIONS.map(region => (
+        <SafariRegionBar key={region.name} region={region} dark={dark} onSelect={handleSafariSelect}
+          unlockedRegions={safariUnlockedRegions} firstRegionClaimed={safariFirstRegionClaimed} keys={keys} />
+      ))}
+      {/* Rejection from claimFirstSafariRegion/unlockSafariRegion, shown in
+          place rather than swallowed. Below the bars so it never resizes them. */}
+      {safariError && (
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#ef4444', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
+          {safariError}
+        </span>
+      )}
+      <div style={{ width: '320px', display: 'flex', gap: '8px' }}>
+        <MenuButton
+          def={{ id: 'back', label: 'BACK', background: '#6b7280', color: '#fff', fontSize: '16px', onClick: () => { setSafariError(null); changeMode('menu') } }}
+          dark={dark}
+          style={{ flex: 1, width: 'auto' }}
+        />
+      </div>
+    </div>
+  )
+
   // Desktop: the artwork is the hero. fullArtwork.webp is MIRRORED
   // (scaleX(-1)) because every subject in the original sits on the left —
   // unmirrored, the logo and buttons would cover Pikachu and the whole group.
@@ -269,7 +346,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
         padding: '32px 40px', overflowY: 'auto',
       }}>
         {/* Upper-left: logo + button stack over the night sky */}
-        {mode === 'region' ? regionColumn : (
+        {mode === 'region' ? regionColumn : mode === 'safariRegion' ? safariRegionColumn : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
             <img src={speedmonLogo} alt="Speedmon" style={{ width: '320px', height: 'auto', display: 'block' }} />
             {buttonDefs.map(def => (
@@ -296,7 +373,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
             <CallingCard dark={dark} profile={profile} />
-            {!loggedIn && <LoginForm onAuthSuccess={startRun} />}
+            {!loggedIn && <LoginForm onAuthSuccess={() => startRun('classic')} />}
           </div>
         </div>
       </div>
@@ -304,7 +381,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   )
 
   return (
-    <Layout onHome={() => { setPokedexOpen(false); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
+    <Layout onHome={() => { setPokedexOpen(false); setSafariError(null); changeMode('menu') }} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen} mobileFooter statsOpen={statsOpen} setStatsOpen={setStatsOpen}>
       {isDesktop ? desktopLayout : mobileLayout}
       {/* Rendered last so it overlays whichever layout is active. Suppressed
           while the Dex or Stats sheet is open — those are full-screen, and a
