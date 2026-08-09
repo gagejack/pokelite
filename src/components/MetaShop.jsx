@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
-import { METACASH_ITEMS, KEY_ITEMS } from '../game/metaCatalog.js'
+import { METACASH_ITEMS, KEY_ITEMS, metaIconUrl } from '../game/metaCatalog.js'
 import { applyPurchase, effectivePrice } from '../game/metaProfile.js'
 import { rowState, rowPrice, starterPickerRows } from '../game/metaShopUi.js'
 import { spritesForRegion, SPRITE_REGIONS } from '../game/spriteIndex.js'
@@ -42,6 +42,7 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+  const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
 
   return (
     <div style={{
@@ -49,7 +50,28 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
       gap: '12px', padding: '10px 12px', borderBottom: borderStyle,
       opacity: dimmed ? 0.6 : 1,
     }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+      {/* Icon leads the row. The name/description block is what gets scanned,
+          so a fixed-width cell on the left gives the eye a straight rail to run
+          down 23 rows; trailing it would put the sprite in competition with the
+          price and Buy button, which are the action zone.
+
+          The recessed cell is doing real work, not decoration: PokeAPI item
+          sprites vary in silhouette and transparent padding, so bare <img>s
+          would make the rail visibly jitter. A fixed box with the panel's own
+          border keeps it optically straight and reads as a shelf compartment,
+          which is what a shop shelf actually looks like. */}
+      <div style={{
+        width: '34px', height: '34px', flexShrink: 0,
+        border: borderStyle, backgroundColor: cellBg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <img
+          src={metaIconUrl(item)}
+          alt=""
+          style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }}
+        />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
         <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>{item.name}</span>
         <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>{item.description}</span>
       </div>

@@ -50,6 +50,7 @@ export const VITAMIN_CAP_PER_STARTER = 3
 export const METACASH_ITEMS = [
   {
     id: 'side_hustle',
+    icon: 'amulet-coin',
     name: 'Side Hustle',
     cost: 300,
     currency: 'metacash',
@@ -58,6 +59,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'starting_funds_1',
+    icon: 'nugget',
     name: 'Starting Funds I',
     cost: 400,
     currency: 'metacash',
@@ -66,6 +68,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'hp_up',
+    icon: 'hp-up',
     name: 'HP Up',
     cost: 500,
     currency: 'metacash',
@@ -74,6 +77,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'protein',
+    icon: 'protein',
     name: 'Protein',
     cost: 500,
     currency: 'metacash',
@@ -82,6 +86,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'iron',
+    icon: 'iron',
     name: 'Iron',
     cost: 500,
     currency: 'metacash',
@@ -90,6 +95,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'calcium',
+    icon: 'calcium',
     name: 'Calcium',
     cost: 500,
     currency: 'metacash',
@@ -98,6 +104,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'zinc',
+    icon: 'zinc',
     name: 'Zinc',
     cost: 500,
     currency: 'metacash',
@@ -106,6 +113,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'carbos',
+    icon: 'carbos',
     name: 'Carbos',
     cost: 500,
     currency: 'metacash',
@@ -114,6 +122,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'bargain_hunter',
+    icon: 'coin-case',
     name: 'Bargain Hunter',
     cost: 500,
     currency: 'metacash',
@@ -122,6 +131,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'bonded',
+    icon: 'soothe-bell',
     name: 'Bonded',
     cost: 700,
     currency: 'metacash',
@@ -133,6 +143,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'type_synergy',
+    icon: 'silk-scarf',
     name: 'Type Synergy',
     cost: 800,
     currency: 'metacash',
@@ -141,6 +152,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'treasure_map',
+    icon: 'town-map',
     name: 'Treasure Map',
     cost: 800,
     currency: 'metacash',
@@ -149,6 +161,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'quick_heal',
+    icon: 'max-revive',
     name: 'Quick Heal',
     cost: 800,
     currency: 'metacash',
@@ -157,6 +170,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'collectors_eye',
+    icon: 'wide-lens',
     name: "Collector's Eye",
     cost: 900,
     currency: 'metacash',
@@ -165,6 +179,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'interest',
+    icon: 'big-nugget',
     name: 'Interest',
     cost: 1000,
     currency: 'metacash',
@@ -173,6 +188,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'starting_funds_2',
+    icon: 'pearl-string',
     name: 'Starting Funds II',
     cost: 1200,
     currency: 'metacash',
@@ -184,6 +200,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'item_expert',
+    icon: 'macho-brace',
     name: 'Item Expert',
     cost: 1200,
     currency: 'metacash',
@@ -192,6 +209,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'win_streak',
+    icon: 'lucky-punch',
     name: 'Win Streak',
     cost: 1200,
     currency: 'metacash',
@@ -200,6 +218,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'shiny_charm',
+    icon: 'shiny-charm',
     name: 'Shiny Charm',
     cost: 1500,
     currency: 'metacash',
@@ -208,6 +227,7 @@ export const METACASH_ITEMS = [
   },
   {
     id: 'dex_dividends',
+    icon: 'oval-charm',
     name: 'Dex Dividends',
     cost: 1500,
     currency: 'metacash',
@@ -225,6 +245,7 @@ export const METACASH_ITEMS = [
 export const KEY_ITEMS = [
   {
     id: 'run_it_back',
+    icon: 'escape-rope',
     name: 'Run It Back',
     cost: 4,
     currency: 'keys',
@@ -233,6 +254,7 @@ export const KEY_ITEMS = [
   },
   {
     id: 'extra_slot',
+    icon: 'luxury-ball',
     name: 'Extra Slot',
     cost: 5,
     currency: 'keys',
@@ -241,6 +263,7 @@ export const KEY_ITEMS = [
   },
   {
     id: 'deja_vu',
+    icon: 'everstone',
     name: 'Déjà Vu',
     cost: 6,
     currency: 'keys',
@@ -260,3 +283,21 @@ export const META_CATALOG = [...METACASH_ITEMS, ...KEY_ITEMS]
 export const META_CATALOG_BY_ID = Object.freeze(
   Object.fromEntries(META_CATALOG.map(item => [item.id, item]))
 )
+
+// Sprite URL for a shop item's icon, from the same PokeAPI sprite repo
+// `items.js`'s itemIconUrl already pulls from — one source for every item
+// image in the game rather than a second convention for the shop.
+//
+// The six vitamins map to their real counterparts exactly (Protein is
+// Protein). The rest are chosen by MECHANIC, not loose theme: Amulet Coin for
+// the item that generates cash, Wide Lens for the one that shows more catch
+// choices, Macho Brace for the one that strengthens held items. An icon that
+// lies about what an item does is worse than no icon at all.
+//
+// Returns null for an item with no icon, so a caller can skip the <img>
+// rather than request a 404 — every catalog item has one today, but a new
+// item added without one shouldn't ship a broken image.
+export function metaIconUrl(item) {
+  if (!item?.icon) return null
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${item.icon}.png`
+}
