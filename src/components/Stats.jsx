@@ -7,7 +7,9 @@ import { allLegendaryIds } from '../game/regionRegistry'
 import LoginModal from './LoginModal'
 import BalanceDashboard from './BalanceDashboard'
 import Leaderboard from './Leaderboard'
-import LevelBar from './LevelBar'
+import ProfilePanel from './ProfilePanel'
+import GuestProfile from './GuestProfile'
+import CollectionDetail from './CollectionDetail'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { itemByName, itemIconUrl } from '../game/items.js'
@@ -18,29 +20,9 @@ import { REGION_STARTERS } from '../game/starters.js'
 // question than the one that list asks.
 const STARTER_IDS = new Set(Object.values(REGION_STARTERS).flat())
 
-// The fifteen starters by name. A literal table rather than pokemon.js's
-// cachedName(), which only answers once the species cache is warm — Stats can
-// open before any run has populated it, and a starter with no name is worse
-// than no starter panel.
-const STARTER_NAMES = {
-  1: 'Bulbasaur',  4: 'Charmander', 7: 'Squirtle',
-  152: 'Chikorita', 155: 'Cyndaquil', 158: 'Totodile',
-  252: 'Treecko',  255: 'Torchic',  258: 'Mudkip',
-  387: 'Turtwig',  390: 'Chimchar', 393: 'Piplup',
-  495: 'Snivy',    498: 'Tepig',    501: 'Oshawott',
-}
-
-// Run length as "12m 04s", or "1h 05m" once it passes the hour. Minutes are the
-// unit a run is actually felt in, so seconds drop off rather than crowd the
-// hour. Returns null for runs recorded before elapsed_ms existed.
-function fmtRunTime(ms) {
-  if (ms == null || !Number.isFinite(ms) || ms < 0) return null
-  const total = Math.round(ms / 1000)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(s).padStart(2, '0')}s`
-}
+// STARTER_NAMES and fmtRunTime moved to ProfilePanel.jsx along with the markup
+// that reads them — the profile layout owns its own formatting now, so a guest
+// profile and your own can't format a run time two different ways.
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
@@ -64,6 +46,15 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
   // as STATS with a different landing tab, so it passes 'leaderboards' rather
   // than being a second screen that duplicates the board.
   const [statsTab, setStatsTab] = useState(initialStatsTab)
+  // The player whose profile the third sub-tab shows, or null when there is no
+  // third tab. ONE guest slot, not a growing set: the sub-tab row is a plain
+  // flex row with no horizontal scroll, so accumulating tabs would overflow on
+  // a phone after two names. Clicking another name replaces this one.
+  const [guest, setGuest] = useState(null)
+  const openProfile = name => { setGuest(name); setStatsTab('guest') }
+  // Closing returns to the board, which is where the tab was opened from —
+  // landing on My Profile instead would lose your place in the ladder.
+  const closeGuest = () => { setGuest(null); setStatsTab(t => (t === 'guest' ? 'leaderboards' : t)) }
   const isAdmin = role === 'admin'
   // If the role resolves late (or the user logs out), never leave the admin
   // tab selected.
@@ -176,16 +167,11 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
     return () => { cancelled = true }
   }, [reloadKey])
 
-  const Stat = ({ label, value }) => (
-    <div style={{
-      backgroundColor: innerBg, border: panelBorder,
-      boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-      padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-    }}>
-      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: accent(dark) }}>{value}</span>
-      <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>{label}</span>
-    </div>
-  )
+  // The <Stat> tile used to be defined here, which is why this file's stat
+  // tiles were inlined three times over: a component declared inside the render
+  // gets a new identity every pass (react-hooks/static-components), so every
+  // extra call site was another lint error. It now lives at module scope in
+  // ProfilePanel.jsx, where it is reused instead of copied.
 
   return (
     <div
@@ -269,7 +255,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
             has scrolled to the bottom of a long profile still needs one tap to
             reach the board. */}
         {tab === 'stats' && (
-          <div className="flex px-5" style={{ gap: '18px', borderBottom: panelBorder }}>
+          <div className="flex px-5 items-center" style={{ gap: '18px', borderBottom: panelBorder }}>
             {[
               { key: 'profile', label: 'My Profile' },
               { key: 'leaderboards', label: 'Leaderboards' },
@@ -292,11 +278,70 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                   // reads as the tab claiming that edge rather than a second
                   // line beneath it.
                   marginBottom: '-2px',
+                  flexShrink: 0,
                 }}
               >
                 {t.label}
               </button>
             ))}
+
+            {/* The guest tab. Present only while a player is open, and it
+                carries the username itself rather than a generic "Profile" —
+                the name IS the label, so the strip says whose profile you are
+                one tap away from.
+
+                The × is a sibling button, not nested inside the tab button
+                (a button inside a button is invalid HTML and the click targets
+                fight). Both sit in one bordered group so they read as a single
+                tab with a dismiss, not two controls. */}
+            {guest && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                minWidth: 0,
+              }}>
+                <button
+                  onClick={() => setStatsTab('guest')}
+                  title={guest}
+                  style={{
+                    fontFamily: 'Upheaval',
+                    fontSize: isDesktop ? '15px' : '14px',
+                    color: statsTab === 'guest' ? textColor : mutedColor,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '9px 0',
+                    // The underline belongs to the NAME, not to the group: when
+                    // it spanned the × as well, the dismiss control read as the
+                    // last letter of the username.
+                    borderBottom: statsTab === 'guest' ? `2px solid ${accent(dark)}` : '2px solid transparent',
+                    marginBottom: '-2px',
+                    // A long username can't be allowed to push the two fixed
+                    // tabs off a narrow screen, so this is the column that
+                    // truncates.
+                    maxWidth: isDesktop ? '220px' : '110px',
+                    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                    minWidth: 0,
+                  }}
+                >
+                  {guest}
+                </button>
+                <button
+                  onClick={closeGuest}
+                  aria-label={`Close ${guest}'s profile`}
+                  className="hover:opacity-70 transition-opacity"
+                  style={{
+                    fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    // 44px touch target with the glyph still visually 11px,
+                    // absorbed by negative margin so the row keeps its height.
+                    minWidth: '44px', minHeight: '44px',
+                    margin: '0 -16px 0 -16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  X
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -309,7 +354,14 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               that isn't theirs. It also owns its own loading state, so it
               doesn't wait on the profile query above. */}
           {tab === 'stats' && statsTab === 'leaderboards' ? (
-            <Leaderboard />
+            <Leaderboard onOpenProfile={openProfile} />
+          ) : tab === 'stats' && statsTab === 'guest' && guest ? (
+            // Another player's profile. Renders the SAME ProfilePanel as the
+            // My Profile tab below, so the two stay parallel by construction.
+            // It sits above the login gate for the same reason the board does:
+            // it reads a public SECURITY DEFINER RPC, so a logged-out visitor
+            // browsing the ladder can open a profile without being stopped.
+            <GuestProfile username={guest} />
           ) : loading ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>Loading...</span>
@@ -525,275 +577,25 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
-              {/* Account level — a full-width panel above the tiles, not a
-                  ninth tile in them. The level is what the tallies below add
-                  up to, so it reads as a summary rather than a peer; and the
-                  progress bar needs width a ~square grid cell can't give it.
-                  Inlined markup (not the <Stat> helper) because
-                  react-hooks/static-components fires once per <Stat> call
-                  site, and another call would grow this file's 9-error
-                  baseline — the same reason the Speed Cash tile below is
-                  inlined. */}
-              <div style={{
-                backgroundColor: innerBg, border: panelBorder,
-                boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '28px' : '22px', color: accent(dark) }}>
-                    LV {stats.levelInfo.level}
-                  </span>
-                  {/* The REMAINING XP (xpForNext - xpIntoLevel), not the XP
-                      earned into the level. Both are on hand and mixing them
-                      up is the easy mistake here — at 12,740 this reads 860,
-                      not 740. */}
-                  <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
-                    {stats.levelInfo.xpForNext === 0
-                      ? 'Max level'
-                      : `${(stats.levelInfo.xpForNext - stats.levelInfo.xpIntoLevel).toLocaleString()} XP to level ${stats.levelInfo.level + 1}`}
-                  </span>
-                </div>
-                <LevelBar progress={stats.levelInfo.progress} dark={dark} height="10px" />
-              </div>
-
-              {/* Run stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)', gap: '8px' }}>
-                <Stat label="Total Runs" value={stats.totalRuns} />
-                <Stat label="Wins" value={stats.wins} />
-                <Stat label="Losses" value={stats.losses} />
-                <Stat label="Win Rate" value={`${stats.winRate}%`} />
-                <Stat label="Badges Earned" value={stats.totalBadges} />
-                {/* Best run replaced "Avg Badges / Run", which for a player
-                    whose runs mostly end early is always ≈1 and says nothing.
-                    A deepest run is a thing you remember. Inlined rather than a
-                    <Stat> because it carries a second line — and because
-                    react-hooks/static-components fires per <Stat> call site. */}
-                <div style={{
-                  backgroundColor: innerBg, border: panelBorder,
-                  boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                  padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: accent(dark) }}>
-                    {stats.bestRun ? stats.bestRun.maps : '—'}
-                  </span>
-                  {/* The time only appears once there is one. Runs recorded
-                      before elapsed_ms existed simply show the depth. */}
-                  {stats.bestRun && fmtRunTime(stats.bestRun.elapsedMs) && (
-                    <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor }}>
-                      {fmtRunTime(stats.bestRun.elapsedMs)}
-                    </span>
-                  )}
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
-                    Best Run
-                  </span>
-                </div>
-                <Stat label="Wild Catches" value={stats.totalCatches} />
-                {/* Same tile markup as <Stat> above, inlined rather than a
-                    ninth <Stat> call site: react-hooks/static-components fires
-                    once per call site (Stat is defined inside this component),
-                    so another one would grow this file's lint baseline.
-                    The amount uses cash(dark), not the tiles' default #facc15 —
-                    that yellow is only 1.11:1 on the light tile. */}
-                <div style={{
-                  backgroundColor: innerBg, border: panelBorder,
-                  boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                  padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '24px' : '20px', color: cash(dark) }}>
-                    ${stats.totalCashEarned.toLocaleString()}
-                  </span>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
-                    Speed Cash earned
-                  </span>
-                </div>
-              </div>
-
-              {/* Most-caught species. Replaced the per-region completion bars,
-                  which said the same thing the Pokédex says better and said it
-                  in five rows of identical weight. This answers a question the
-                  Dex can't: not what you've filled in, but who you keep
-                  reaching for. */}
-              <div className="flex flex-col gap-2">
-                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '14px', color: textColor }}>
-                  Most Caught
-                </span>
-                {stats.topCaught.length === 0 ? (
-                  <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
-                    Catch a Pokémon and it starts counting here.
-                  </span>
-                ) : (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: isDesktop ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)',
-                    gap: '6px',
-                  }}>
-                    {stats.topCaught.map((m, i) => (
-                      <div key={m.id} style={{
-                        backgroundColor: innerBg, border: panelBorder,
-                        boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                        padding: '6px 4px', display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', gap: '1px', position: 'relative',
-                      }}>
-                        {/* Rank in the corner rather than a column of its own:
-                            the list is already in order, so the number is a
-                            reference point, not the thing you read. */}
-                        <span style={{
-                          position: 'absolute', top: '3px', left: '5px',
-                          fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor,
-                        }}>
-                          {i + 1}
-                        </span>
-                        <img src={SPRITE(m.id)} alt={m.name} style={{
-                          width: isDesktop ? '56px' : '48px', height: isDesktop ? '56px' : '48px',
-                          imageRendering: 'pixelated',
-                        }} />
-                        <span style={{
-                          fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
-                          textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.1,
-                          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
-                        }}>
-                          {m.name.replace(/-/g, ' ')}
-                        </span>
-                        <span style={{
-                          fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark),
-                          textShadow: '0 0 6px rgba(0,0,0,0.45), 0 0 3px rgba(0,0,0,0.35)',
-                        }}>
-                          ×{m.count}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Favourite starter — counted over runs STARTED, not runs won,
-                  because "favourite" is about what you reach for rather than
-                  what worked. One entry: a podium of three would imply a
-                  ranking nobody is competing in. */}
-              <div className="flex flex-col gap-2">
-                <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '16px' : '14px', color: textColor }}>
-                  Favourite Starter
-                </span>
-                {!stats.favouriteStarter ? (
-                  // Runs recorded before starter_id existed carry no starter, so
-                  // this stays empty until the next run rather than guessing.
-                  <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
-                    Your next run picks one.
-                  </span>
-                ) : (
-                  <div style={{
-                    backgroundColor: innerBg, border: panelBorder,
-                    boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                    padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '14px',
-                  }}>
-                    <img
-                      src={SPRITE(stats.favouriteStarter.id)}
-                      alt=""
-                      style={{ width: '72px', height: '72px', imageRendering: 'pixelated', flexShrink: 0 }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                      <span style={{
-                        fontFamily: 'Upheaval', fontSize: isDesktop ? '22px' : '18px', color: textColor,
-                        textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                      }}>
-                        {STARTER_NAMES[stats.favouriteStarter.id] ?? `#${stats.favouriteStarter.id}`}
-                      </span>
-                      <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor }}>
-                        {stats.favouriteStarter.count === 1
-                          ? 'Chosen once'
-                          : `Chosen ${stats.favouriteStarter.count} times`}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Collection boxes — open detail popups. Each has a gradient
-                  stroke: RGB rainbow for legendaries, green→yellow for shinies.
-                  The gradient is a padded wrapper (CSS borders can't be gradients). */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {[
-                  { key: 'legendary', label: 'Legendaries', gradient: 'linear-gradient(120deg, #ff0000, #ff8800, #ffee00, #00cc44, #0088ff, #6600ff, #ff0088)' },
-                  { key: 'shiny', label: 'Shinies', gradient: 'linear-gradient(120deg, #22c55e, #facc15)' },
-                ].map(box => (
-                  <div
-                    key={box.key}
-                    style={{
-                      background: box.gradient,
-                      padding: '3px',
-                      boxShadow: dark ? '-3px 4px 0 0 #121212' : '-3px 4px 0 0 #2e2e2e',
-                    }}
-                  >
-                    <button
-                      onClick={() => setDetail(box.key)}
-                      className="hover:opacity-80 transition-opacity"
-                      style={{
-                        width: '100%', backgroundColor: innerBg,
-                        padding: '18px 12px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: textColor }}>{box.label}</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            /* Your own profile. The layout lives in ProfilePanel so the guest
+               tab above renders the identical component — change a tile there
+               and both profiles move together. This file keeps only the
+               QUERY that builds `stats`, plus the collection popups below,
+               which are private and have no guest counterpart. */
+            <ProfilePanel stats={stats} scope="self" onOpenDetail={setDetail} />
           )}
         </div>
 
-        {/* Detail popup — dex-style cards of each legendary / shiny caught, with
-            an ×count under each sprite. */}
-        {detail && (() => {
-          const isShiny = detail === 'shiny'
-          const list = (isShiny ? stats?.shinies : stats?.legendaries) ?? []
-          const spriteFor = id => (isShiny ? SHINY_SPRITE(id) : SPRITE(id))
-          return (
-            <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 70 }} onClick={() => setDetail(null)}>
-              <div onClick={e => e.stopPropagation()} style={{
-                width: '86%', maxWidth: '640px', maxHeight: '82%', display: 'flex', flexDirection: 'column',
-                backgroundColor: cardBg, border: panelBorder,
-                boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e',
-              }}>
-                <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: panelBorder }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor }}>
-                    {isShiny ? 'Shinies Caught' : 'Legendaries Caught'}
-                  </span>
-                  <button onClick={() => setDetail(null)} className="hover:opacity-70 transition-opacity"
-                    style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor }}>X</button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  {list.length === 0 ? (
-                    <div className="flex items-center justify-center py-8">
-                      <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
-                        {isShiny ? 'No shinies caught yet' : 'No legendaries caught yet'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: '8px' }}>
-                      {list.map(m => (
-                        <div key={m.id} style={{
-                          backgroundColor: innerBg, border: panelBorder,
-                          boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 4px', gap: '2px',
-                        }}>
-                          <img src={spriteFor(m.id)} alt={m.name}
-                            style={{ width: isDesktop ? '64px' : '52px', height: isDesktop ? '64px' : '52px', imageRendering: 'pixelated' }} />
-                          {/* Species names arrive kebab-cased from the catches
-                              table (nidoran-f, mr-mime), so the hyphen has to
-                              go before capitalize does its work. */}
-                          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textTransform: 'capitalize', textAlign: 'center' }}>{m.name.replace(/-/g, ' ')}</span>
-                          <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: accent(dark) }}>×{m.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+        {/* Detail popup — the same component the guest tab opens, so the two
+            can't drift. Rendered here rather than inside ProfilePanel because
+            it covers the whole sheet, including the tab strip. */}
+        {detail && (
+          <CollectionDetail
+            kind={detail}
+            list={detail === 'shiny' ? stats?.shinies : stats?.legendaries}
+            onClose={() => setDetail(null)}
+          />
+        )}
       </div>
 
       {/* Login popup — sits above the stats overlay. On success, re-load stats. */}

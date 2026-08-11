@@ -17,7 +17,7 @@ import SeedCodeChip from './SeedCodeChip.jsx'
 import RunEndScreen from './RunEndScreen.jsx'
 import { defeatVerdict } from '../game/runVerdict.js'
 import { getBattleSkin } from './battleSkins/index.js'
-import { playSound, playSoundUrl } from '../lib/sound.js'
+import { playSound, playSoundUrl, stopMoveSfx } from '../lib/sound.js'
 import { getMoveSound } from '../game/moveSounds.js'
 import battleGrass from '../assets/battleGrass.png'
 import DayBattleBackground from '../assets/DayBattleBackground.png'
@@ -414,6 +414,11 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
       return () => clearTimeout(t)
     }
   }, [battleResult])
+
+  // Cut any still-ringing move SFX when the battle UI drops (Continue,
+  // auto-close, Play Again, Run It Back — all unmount this card) so a long
+  // clip doesn't trail into whatever screen comes next.
+  useEffect(() => () => stopMoveSfx(), [])
 
   const currentEntry = battleLogRef.current?.log[logIndex - 1] ?? null
 

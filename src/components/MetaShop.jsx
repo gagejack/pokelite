@@ -65,19 +65,19 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
           border keeps it optically straight and reads as a shelf compartment,
           which is what a shop shelf actually looks like. */}
       <div style={{
-        width: '34px', height: '34px', flexShrink: 0,
+        width: '64px', height: '64px', flexShrink: 0,
         border: borderStyle, backgroundColor: cellBg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <img
           src={metaIconUrl(item)}
           alt=""
-          style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }}
+          style={{ width: '52px', height: '52px', imageRendering: 'pixelated' }}
         />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
-        <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor }}>{item.name}</span>
-        <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>{item.description}</span>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '21px', color: textColor }}>{item.name}</span>
+        <span style={{ fontFamily: 'Orange Kid', fontSize: '18px', color: mutedColor }}>{item.description}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
         {state === 'locked' ? (

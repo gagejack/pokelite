@@ -23,7 +23,7 @@ const podium = dark => accent(dark)
 // thing without leaving the type system.
 const isPodium = rank => rank <= 3
 
-export default function Leaderboard() {
+export default function Leaderboard({ onOpenProfile }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -74,7 +74,7 @@ export default function Leaderboard() {
   const selfVisible = self != null && rows.some(r => r.is_self)
   const showPinned = self != null && !selfVisible
 
-  const theme = { dark, isDesktop, textColor, mutedColor, panelBorder, innerBg, rowShadow }
+  const theme = { dark, isDesktop, textColor, mutedColor, panelBorder, innerBg, rowShadow, onOpenProfile }
 
   return (
     <div className="flex flex-col gap-4">
@@ -125,9 +125,12 @@ export default function Leaderboard() {
 // around by inlining its tiles; a row this long is better hoisted than inlined
 // twice.
 function Row({ rank, row, pinned = false, theme }) {
-  const { dark, isDesktop, textColor, mutedColor, panelBorder, innerBg, rowShadow } = theme
+  const { dark, isDesktop, textColor, mutedColor, panelBorder, innerBg, rowShadow, onOpenProfile } = theme
   const { level } = levelForXp(row.xp)
   const gold = isPodium(rank) && !pinned
+  // Your own row is not a link: "My Profile" is already a tab, and opening a
+  // guest copy of yourself would put the same player on the strip twice.
+  const openable = onOpenProfile != null && !row.is_self
   return (
     <div
       style={{
@@ -162,16 +165,48 @@ function Row({ rank, row, pinned = false, theme }) {
       </span>
 
       {/* Username — the only flexible column, so long names truncate and the
-          figures stay locked to the right edge. */}
-      <span style={{
-        fontFamily: 'Orange Kid',
-        fontSize: isDesktop ? '19px' : '17px',
-        color: textColor,
-        flex: 1, minWidth: 0,
-        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-      }}>
-        {row.username}
-      </span>
+          figures stay locked to the right edge.
+
+          A real <button>, not a clickable div: it is keyboard-reachable and
+          announces itself as a control for free. The dotted underline is the
+          only affordance — a solid link underline would read as web chrome in a
+          column of pixel type, and coloring the name would collide with the
+          gold and green edges that already encode podium and self. */}
+      {openable ? (
+        <button
+          onClick={() => onOpenProfile(row.username)}
+          title={`View ${row.username}'s profile`}
+          className="hover:opacity-70 transition-opacity"
+          style={{
+            fontFamily: 'Orange Kid',
+            fontSize: isDesktop ? '19px' : '17px',
+            color: textColor,
+            flex: 1, minWidth: 0,
+            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+            background: 'none', border: 'none', cursor: 'pointer',
+            textAlign: 'left',
+            // Vertical padding gives the tap target height inside a row that is
+            // only ~38px tall, absorbed by the negative margin so no row grows.
+            padding: '8px 0', margin: '-8px 0',
+            textDecoration: 'underline',
+            textDecorationStyle: 'dotted',
+            textUnderlineOffset: '3px',
+            textDecorationColor: mutedColor,
+          }}
+        >
+          {row.username}
+        </button>
+      ) : (
+        <span style={{
+          fontFamily: 'Orange Kid',
+          fontSize: isDesktop ? '19px' : '17px',
+          color: textColor,
+          flex: 1, minWidth: 0,
+          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+        }}>
+          {row.username}
+        </span>
+      )}
 
       {/* The three figures. Each is a fixed-width cell with the number above a
           small label, so the columns line up down the whole board without a

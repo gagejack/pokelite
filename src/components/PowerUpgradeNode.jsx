@@ -1,5 +1,5 @@
 import { useTheme } from '../lib/theme'
-import { muted } from '../lib/colors'
+import { muted, cash } from '../lib/colors'
 import { TYPE_COLORS } from '../game/types.js'
 import { TIER_BASE_POWER } from '../game/typeMoves.js'
 
@@ -20,29 +20,38 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'rgba(0,0,0,0.7)',
     }}>
-      <div style={{
-        backgroundColor: bg,
-        border: borderStyle,
-        boxShadow: shadowStyle,
-        padding: '20px',
-        display: 'flex', flexDirection: 'column', gap: '16px',
-        maxWidth: '440px', width: '94vw',
-        maxHeight: '90vh', overflowY: 'auto',
-      }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tm-title"
+        style={{
+          backgroundColor: bg,
+          border: borderStyle,
+          boxShadow: shadowStyle,
+          padding: '20px',
+          display: 'flex', flexDirection: 'column', gap: '16px',
+          maxWidth: '440px', width: '94vw',
+          maxHeight: '90vh', overflowY: 'auto',
+        }}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor }}>TM — Upgrade a Move</span>
+            <h2 id="tm-title" style={{ fontFamily: 'Upheaval', fontSize: '22px', color: textColor, margin: 0 }}>TM — Upgrade a Move</h2>
             <button
               onClick={onClose}
-              className="hover:opacity-70 transition-opacity"
-              style={{ fontFamily: 'Upheaval', fontSize: '16px', color: mutedColor, background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
+              aria-label="Close"
+              className="hover:opacity-70 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]"
+              style={{ fontFamily: 'Upheaval', fontSize: '18px', color: textColor, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
             >
               X
             </button>
           </div>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '9px', color: mutedColor }}>
-            Pick one Pokémon to raise its move one tier
+          {/* Instruction line. Was 9px muted — the smallest, lowest-contrast text
+              on the screen was also the only text explaining what to do. Body
+              face at 15px, full-strength ink: it is a sentence, not a caption. */}
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '15px', color: textColor }}>
+            Pick one Pokémon to raise its move one tier.
           </span>
         </div>
 
@@ -60,43 +69,57 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                 style={{
                   backgroundColor: innerBg,
                   border: borderStyle,
-                  padding: '8px 10px',
+                  padding: '10px',
                   display: 'flex', alignItems: 'center', gap: '10px',
-                  opacity: pokemon.fainted ? 0.5 : 1,
                 }}
               >
-                {/* Sprite */}
+                {/* Sprite. Fainted dimming moved off the row and onto the sprite
+                    alone — a 0.5 opacity row took the text and the button down
+                    with it, and "fainted" is a fact about the Pokémon, not a
+                    reason to make its move unreadable. */}
                 <img
                   src={pokemon.sprite}
-                  alt={pokemon.name}
-                  style={{ width: '40px', height: '40px', imageRendering: 'pixelated', flexShrink: 0 }}
+                  alt=""
+                  style={{
+                    width: '44px', height: '44px', imageRendering: 'pixelated', flexShrink: 0,
+                    opacity: pokemon.fainted ? 0.55 : 1,
+                  }}
                 />
                 {/* Name + current move */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-                  <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#ffffff', textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+                  {/* Was hardcoded #ffffff, which measured ~1.6:1 on the light
+                      inner fill (#c8c8c8) — the name was effectively invisible
+                      in light mode. Uses the theme ink like every other name in
+                      the game. */}
+                  <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: textColor, textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                     {pokemon.name}
+                    {pokemon.fainted && (
+                      <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: mutedColor, textTransform: 'none' }}> · Fainted</span>
+                    )}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
-                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '8px', color: '#fff',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '11px', color: '#fff',
                       backgroundColor: TYPE_COLORS[move?.type] || '#888',
                       border: '1px solid #000', borderRadius: '5px',
                       boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
-                      padding: '1px 4px', textTransform: 'uppercase',
+                      padding: '2px 6px', textTransform: 'uppercase',
                       WebkitTextStroke: '1px #000', paintOrder: 'stroke fill', flexShrink: 0,
                     }}>
                       T{tier}
                     </span>
-                    <span style={{ fontFamily: 'Orange Kid', fontSize: '10px', color: textColor, textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: textColor, textTransform: 'capitalize', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                       {move ? move.name.replace(/-/g, ' ') : '—'}
                       {move ? <span style={{ color: mutedColor }}> · PWR {move.power}</span> : null}
                     </span>
                   </div>
                 </div>
-                {/* Power gain indicator */}
+                {/* Power gain. #22c55e measured 2.29:1 on the light inner fill —
+                    the one number the player is comparing across rows was the
+                    hardest thing to read. cash() is the audited green pair. */}
                 <span style={{
-                  fontFamily: 'Upheaval', fontSize: '11px', flexShrink: 0, textAlign: 'right', minWidth: '54px',
-                  color: maxed ? mutedColor : '#22c55e',
+                  fontFamily: 'Upheaval', fontSize: '14px', flexShrink: 0, textAlign: 'right', minWidth: '62px',
+                  color: maxed ? mutedColor : cash(dark),
                 }}>
                   {maxed ? 'Max' : `+${powerGain} PWR`}
                 </span>
@@ -104,15 +127,18 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                 <button
                   disabled={maxed}
                   onClick={() => onUpgrade(i)}
+                  aria-label={maxed
+                    ? `${pokemon.name}'s move is at the maximum tier`
+                    : `Upgrade ${pokemon.name}'s move to tier ${tier + 1}, plus ${powerGain} power`}
+                  className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]"
                   style={{
-                    fontFamily: 'Upheaval', fontSize: '10px',
+                    fontFamily: 'Upheaval', fontSize: '14px',
                     color: maxed ? mutedColor : '#1a1a1a',
                     border: borderStyle,
                     backgroundColor: maxed ? innerBg : '#facc15',
-                    padding: '4px 10px',
+                    padding: '8px 14px',
                     cursor: maxed ? 'not-allowed' : 'pointer',
                     flexShrink: 0,
-                    opacity: maxed ? 0.6 : 1,
                   }}
                 >
                   {maxed ? 'MAX' : 'Upgrade'}
@@ -125,11 +151,11 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
         {/* Skip */}
         <button
           onClick={onClose}
-          className="hover:opacity-70 transition-opacity"
+          className="hover:opacity-70 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]"
           style={{
-            fontFamily: 'Upheaval', fontSize: '13px',
-            color: mutedColor, border: borderStyle,
-            backgroundColor: innerBg, padding: '8px', cursor: 'pointer', width: '100%',
+            fontFamily: 'Upheaval', fontSize: '16px',
+            color: textColor, border: borderStyle,
+            backgroundColor: innerBg, padding: '12px', cursor: 'pointer', width: '100%',
           }}
         >
           Skip

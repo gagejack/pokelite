@@ -108,7 +108,7 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
                       padding: '6px 8px',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
                       cursor: 'pointer',
-                      width: '68px',
+                      width: '74px',
                       opacity: p.fainted ? 0.5 : 1,
                     }}
                   >
@@ -135,20 +135,20 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
                         />
                       )}
                     </div>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: textColor, textTransform: 'capitalize' }}>
+                    <span style={{ fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '8px', color: textColor, textTransform: 'capitalize' }}>
                       {p.name}
                     </span>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: '7px', color: mutedColor }}>
+                    <span style={{ fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: '#fbbf24' }}>
                       Lv.{p.level}
                     </span>
                     <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {p.types?.map(t => (
                         <span key={t} style={{
-                          fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '5px', color: '#fff',
+                          fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '7px', color: '#fff',
                           backgroundColor: TYPE_COLORS[t] || '#888',
                           border: '1px solid #000', borderRadius: '5px',
                           boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
-                          padding: '1px 3px', textTransform: 'uppercase',
+                          padding: '2px 5px', textTransform: 'uppercase',
                           WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                         }}>
                           {t}

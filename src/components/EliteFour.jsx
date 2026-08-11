@@ -282,29 +282,102 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   return (
     <Layout onHome={onBack} onRestart={onRestart} pokedexOpen={pokedexOpen} setPokedexOpen={setPokedexOpen}>
-      {/* Speed Cash — DESKTOP ONLY, as a floating readout. Mobile now carries
-          the balance at the right end of the bag bar, exactly as the maps do,
-          so the pill would state it twice. Sits opposite the mobile
-          FloatingNav (top-left, zIndex 150); zIndex 50 keeps it under the
-          battle overlay (100) so a fight covers it. */}
-      {isDesktop && (
-        <div style={{
-          position: 'fixed', top: '8px', right: '8px', zIndex: 50,
-          display: 'flex', alignItems: 'center', gap: '4px',
-          backgroundColor: 'rgba(0,0,0,0.55)', padding: '4px 8px',
-          pointerEvents: 'none',
-        }}>
-          {/* cash(true) unconditionally — this pill's backdrop is a fixed
-              rgba(0,0,0,0.55) in both themes. See NodeMap's matching HUD. */}
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: cash(true) }}>
-            ${speedCash}
-          </span>
-        </div>
-      )}
       {isDesktop ? (
+        /* Same three-column desktop frame as the maps: the team on the left
+           rail, the stage in the middle, and everything the run has EARNED —
+           badges, cash, bag — in the right rail. The gauntlet used to drop the
+           right rail entirely and float the cash balance in a corner pill,
+           which moved the bag and badges out from under the player's cursor at
+           the exact moment re-equipping matters most. */
         <div className="flex w-full py-4" style={{ alignItems: 'flex-start', justifyContent: 'center', gap: '16px', visibility: pendingBattle ? 'hidden' : 'visible', overflowY: 'auto', minHeight: 0 }}>
           <Roster roster={roster} onSwap={swapRoster} {...rosterItemProps} />
           {memberColumn}
+          {/* Right rail — mirrors NodeMap's desktop rail: same 132px width, the
+              same badges → cash → bag order, and the same panel chrome. */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flexShrink: 0, width: '132px', alignSelf: 'flex-start' }}>
+            {/* Reaching the gauntlet means every gym is cleared, so all badges
+                show earned — `config.badges.length`, where the maps pass the
+                running `mapIndex`. */}
+            <BadgeList badges={config?.badges ?? []} earned={(config?.badges ?? []).length} layout="vertical" />
+            <div style={{
+              width: '100%', boxSizing: 'border-box',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+              padding: '8px 10px',
+              backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+              border: borderStyle,
+              boxShadow: shadowStyle,
+            }}>
+              {/* 12px, not 9px: Upheaval stops resolving below ~12px
+                  (docs/UI_TOUCHUPS.md). */}
+              <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, letterSpacing: '0.5px' }}>
+                CASH
+              </span>
+              <span style={{ fontFamily: 'Upheaval', fontSize: '22px', color: cash(dark), lineHeight: 1 }}>
+                ${speedCash}
+              </span>
+            </div>
+            {/* Bag — drag an item onto a Pokémon to equip it. During an item
+                move, the whole panel is a drop target for stowing back to bag. */}
+            <div
+              onClick={() => { if (isMovingItem) resolveItemMove({ kind: 'bag' }) }}
+              onDragOver={e => { if (isMovingItem) e.preventDefault() }}
+              onDrop={e => { if (isMovingItem) { e.preventDefault(); resolveItemMove({ kind: 'bag' }) } }}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                border: isMovingItem ? '2px solid #facc15' : borderStyle,
+                boxShadow: isMovingItem ? '0 0 8px 2px rgba(250,204,21,0.5)' : shadowStyle,
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px', flexShrink: 0,
+                cursor: isMovingItem ? 'pointer' : 'default',
+              }}
+            >
+              <div style={{ backgroundColor: '#facc15', padding: '3px 10px', width: '100%', display: 'flex', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' }}>
+                <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#1a1a1a', letterSpacing: '0.5px' }}>BAG</span>
+              </div>
+              {bag && bag.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '5px 4px', gap: '2px', boxSizing: 'border-box' }}>
+                  {bag.map((item, i) => {
+                    const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+                    return (
+                      <div
+                        key={i}
+                        draggable
+                        onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
+                        onDragEnd={() => setMovingItem(null)}
+                        // Click opens the item's info popup (with an Equip action);
+                        // dragging (mouse OR touch) equips directly onto a Pokémon.
+                        onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
+                        {...bagTouchProps(item, { kind: 'bag', index: i })}
+                        title={`${item.name} — drag onto a Pokémon or click for info`}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                          padding: '4px 2px',
+                          cursor: 'grab', borderRadius: '2px',
+                          outline: picked ? '2px solid #facc15' : 'none',
+                          opacity: picked ? 0.6 : 1,
+                          touchAction: 'none',
+                        }}
+                      >
+                        <img src={itemIconUrl(item)} alt={item.name} style={{ width: '28px', height: '28px', imageRendering: 'pixelated', flexShrink: 0, pointerEvents: 'none' }} />
+                        {/* Item names are long and the rail is narrow, so the name
+                            sits UNDER its icon on two lines rather than being
+                            ellipsed beside it. */}
+                        <span style={{
+                          fontFamily: 'Pokemon Classic', fontSize: '8px', lineHeight: 1.35,
+                          color: dark ? '#DBDBDB' : '#333', textAlign: 'center',
+                          width: '100%', pointerEvents: 'none',
+                        }}>
+                          {item.name}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <span style={{ fontFamily: 'Pokemon Classic', fontSize: '9px', color: dark ? '#666' : '#999', padding: '10px 4px', textAlign: 'center' }}>empty</span>
+              )}
+            </div>
+          </div>
         </div>
       ) : (
         /* The member list scrolls in the flex space; the bars sit flush at the

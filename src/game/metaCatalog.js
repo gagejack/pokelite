@@ -72,7 +72,7 @@ export const METACASH_ITEMS = [
     name: 'HP Up',
     cost: 500,
     currency: 'metacash',
-    description: '+5% HP for one chosen starter (permanent)',
+    description: '+5% HP for one chosen starter',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.hp_up, amount: 0.05 },
   },
   {
