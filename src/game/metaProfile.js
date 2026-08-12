@@ -119,7 +119,7 @@ function roundMoney(amount) {
 export function runEndPayout(result, mapsCleared, profile, dexCount) {
   if (result === 'loss') {
     return {
-      metacash: roundMoney(5 * mapsCleared),
+      metacash: roundMoney(1 * mapsCleared),
       keys: 0,
       newWinStreak: 0, // a loss resets the streak regardless of prior length
     }
