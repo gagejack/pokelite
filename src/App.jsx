@@ -771,6 +771,12 @@ export default function App() {
       // anything but daily play. Runs recorded before this stay null.
       elapsed_ms: Math.max(0, Date.now() - (runStartedAt.current || Date.now())),
       starter_id: selectedStarter?.id ?? null,
+      // Which region this run was played in, for the admin Player Stats tab.
+      // Same value recordCatch already writes and the daily-attempt submission
+      // already sends. Null for a run with no selected region rather than a
+      // guessed default — the dashboard shows nulls as an honest Unknown
+      // bucket, and a wrong attribution is worse than a visible gap.
+      region: selectedRegion?.name ?? null,
     }
     if (result === 'win' && winRoster?.length) {
       payload.winning_roster = winRoster.map(p => ({
