@@ -15,6 +15,7 @@ import { getGameTuning, saveGameTuning, isCommittableTuning, STARTER_BOOST_MIN, 
 import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { SPRITE_TIERS } from '../game/spriteTiers.js'
 import { BALANCE } from '../game/balance.js'
+import PlayerStatsPanel from './admin/PlayerStatsPanel.jsx'
 
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 
@@ -441,6 +442,7 @@ export default function BalanceDashboard() {
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
         <button style={tabButtonStyle(dashTab === 'tuning')} onClick={() => setDashTab('tuning')}>Difficulty &amp; Odds</button>
         <button style={tabButtonStyle(dashTab === 'shop')} onClick={() => setDashTab('shop')}>Shop</button>
+        <button style={tabButtonStyle(dashTab === 'players')} onClick={() => setDashTab('players')}>Player Stats</button>
       </div>
     </>
   )
@@ -450,6 +452,15 @@ export default function BalanceDashboard() {
       <div className="flex flex-col gap-4">
         {header}
         <ShopPricesPanel theme={theme} />
+      </div>
+    )
+  }
+
+  if (dashTab === 'players') {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+        <PlayerStatsPanel theme={theme} />
       </div>
     )
   }
