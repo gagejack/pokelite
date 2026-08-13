@@ -186,6 +186,22 @@ export const ATTACK_TYPE = {
   902:   'water',      // basculegion-male — water/ghost
   979:   'fighting',   // annihilape — fighting/ghost
   983:   'dark',       // kingambit — dark/steel  // steel scores higher (3 vs 2)
+
+  // ── Mega Evolution forms ──────────────────────────────────────────────
+  // Keyed by the MEGA FORM's own PokéAPI id (10033+), not the base species
+  // id — a mega'd instance keeps its base pokeId for lookups (vitamins,
+  // Pokédex ownership) but its move-type pick must consult the form it's
+  // actually wearing right now, since 9 forms change typing on mega. See
+  // docs/superpowers/specs/2026-08-13-mega-evolution-design.md §2.
+  10034: 'fire',       // charizard-mega-x — fire/dragon (was fire/flying)
+  10041: 'water',      // gyarados-mega — water/dark (was water/flying)
+  10043: 'psychic',    // mewtwo-mega-x — psychic/fighting
+  10045: 'electric',   // ampharos-mega — electric/dragon
+  10065: 'grass',      // sceptile-mega — grass/dragon
+  10067: 'dragon',     // altaria-mega — dragon/fairy
+  10040: 'bug',        // pinsir-mega — bug/flying (newly dual-type)
+  10088: 'fighting',   // lopunny-mega — normal/fighting — fighting scores higher, normal is dead weight
+  10069: 'fairy',      // audino-mega — normal/fairy — fairy scores higher, normal is dead weight
 }
 
 // The type a Pokémon attacks with: its authored choice, else its first type.
