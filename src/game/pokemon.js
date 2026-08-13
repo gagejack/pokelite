@@ -836,17 +836,43 @@ export function retypeMove(pokemon, on) {
 // single place that folds heldItem into that answer (see its comment: every
 // rebuild must go through it), and the incoming Pokémon's own move tier is
 // preserved, since tier is a property of the Pokémon, not of the item.
+//
+// EXCEPTION: the Mega Stone. If the outgoing Pokémon is currently mega'd
+// (_megaBase set), its held item is the stone — but the newcomer gets none of
+// the actual transformation (no _megaBase/_megaFormId, no mega stats/types/
+// sprite). Handing it the stone anyway leaves it displaying "holding Mega
+// Stone" while untransformed, and MegaStoneNode's Equip/Unequip check
+// (`!!pokemon._megaBase`) would then show "Equip" for a Pokémon that already
+// holds the stone — equipping duplicates it, breaking the one-stone-per-run
+// invariant. So a mega'd outgoing Pokémon's item does NOT transfer; it comes
+// back via the `displaced` return value instead, the same "goes to bag" path
+// any other held item takes when its holder leaves the roster. The outgoing
+// instance itself is discarded (never returned), so there's no need to
+// revertMega it first.
+//
+// Returns { roster, displaced }: displaced is the item that must be handed
+// back to the caller's bag (null if there was nothing to displace, or if it
+// transferred normally to the newcomer).
 export function swapIntoRoster(roster, index, incoming) {
   const outgoing = roster[index]
-  if (!outgoing) return roster
+  if (!outgoing) return { roster, displaced: null }
   const item = outgoing.heldItem ?? null
-  return roster.map((p, i) => {
-    if (i !== index) return p
-    if (!item) return incoming
-    const withItem = { ...incoming, heldItem: item }
-    const tier = withItem.move?.tier ?? tierForLevel(withItem.level)
-    return { ...withItem, move: getTypeMove(currentMoveType(withItem), tier) }
-  })
+  if (outgoing._megaBase) {
+    return {
+      roster: roster.map((p, i) => (i === index ? incoming : p)),
+      displaced: item,
+    }
+  }
+  return {
+    roster: roster.map((p, i) => {
+      if (i !== index) return p
+      if (!item) return incoming
+      const withItem = { ...incoming, heldItem: item }
+      const tier = withItem.move?.tier ?? tierForLevel(withItem.level)
+      return { ...withItem, move: getTypeMove(currentMoveType(withItem), tier) }
+    }),
+    displaced: null,
+  }
 }
 
 // The type a Pokémon's move should have RIGHT NOW, held items included.

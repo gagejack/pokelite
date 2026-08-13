@@ -1124,8 +1124,16 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (swapIndex !== null) {
       // swapIntoRoster, not a bare replace: the outgoing Pokémon's held item
       // transfers to the newcomer (and its move is rebuilt if that item is a
-      // Polarity Band, whose retype depends on the holder's species).
-      setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
+      // Polarity Band, whose retype depends on the holder's species) — UNLESS
+      // the outgoing Pokémon is currently mega'd, in which case its item (the
+      // Mega Stone) does not transfer and comes back via `displaced` instead
+      // (see swapIntoRoster's comment). Computed from the current `roster`
+      // prop, not inside the setRoster updater, since React may invoke
+      // updaters more than once under StrictMode — same convention
+      // handleMegaEquip/moveItem use in App.jsx.
+      const { roster: nextRoster, displaced } = swapIntoRoster(roster, swapIndex, pokemon)
+      setRoster(nextRoster)
+      if (displaced) onItemKeepInBag?.(displaced)
     } else {
       setRoster(prev => prev.length < getActiveExtras().partySize ? [...prev, pokemon] : prev)
     }
@@ -1142,8 +1150,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (!pendingLegendary) return
     const node = pendingLegendary.node
     if (swapIndex !== null) {
-      // Same item transfer as handlePokeballPick — see the note there.
-      setRoster(prev => swapIntoRoster(prev, swapIndex, pokemon))
+      // Same item transfer (and mega-stone exception) as handlePokeballPick — see its comment.
+      const { roster: nextRoster, displaced } = swapIntoRoster(roster, swapIndex, pokemon)
+      setRoster(nextRoster)
+      if (displaced) onItemKeepInBag?.(displaced)
     } else {
       setRoster(prev => prev.length < getActiveExtras().partySize ? [...prev, pokemon] : prev)
     }

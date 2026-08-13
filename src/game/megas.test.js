@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { _seedChainCacheForTest, _clearChainCacheForTest, levelUp, calcHP, calcStat } from './pokemon.js'
+import { _seedChainCacheForTest, _clearChainCacheForTest, levelUp, calcHP, calcStat, swapIntoRoster } from './pokemon.js'
 import { applyMega, revertMega, shouldRevertMegaForItemChange } from './megas.js'
 import { MEGA_STONE_ITEM } from './items.js'
 
@@ -316,4 +316,44 @@ test('reverting AFTER a post-mega level-up restores correctly-leveled base stats
   expect(reverted.stats.attack).not.toBe(expectedAttackAt50)
   const expectedMaxHpAt52 = Math.floor(calcHP(CHARIZARD_BASE.baseStats.hp, 52))
   expect(reverted.stats.maxHp).toBe(expectedMaxHpAt52)
+})
+
+// ── swapIntoRoster + mega'd outgoing Pokémon (final review, Issue 2) ───────
+// Swapping a mega'd Pokémon out of a full roster used to hand its heldItem
+// (the Mega Stone) to the newcomer verbatim, leaving the newcomer "holding"
+// the stone with none of the actual transformation — MegaStoneNode's
+// Equip/Unequip check (`!!pokemon._megaBase`) would then show Equip for a
+// Pokémon that already holds the stone, and equipping duplicated it.
+
+const NEWCOMER = {
+  pokeId: 1, name: 'Bulbasaur', types: ['grass'], level: 10, shiny: false,
+  sprite: 'bulba-sprite', spriteBack: 'bulba-back',
+  stats: { maxHp: 30, hp: 30, attack: 10, defense: 10, spAtk: 10, spDef: 10, speed: 10 },
+  move: { type: 'grass', tier: 1, name: 'vine-whip', power: 40 },
+  fainted: false, heldItem: null,
+}
+
+test('swapping a mega\'d Pokémon out of the roster does not transfer the Mega Stone to the newcomer', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const roster = [mega]
+  const { roster: nextRoster, displaced } = swapIntoRoster(roster, 0, NEWCOMER)
+
+  // Newcomer inherits no mega state and no held item.
+  expect(nextRoster[0].heldItem).toBeNull()
+  expect(nextRoster[0]._megaBase).toBeUndefined()
+  expect(nextRoster[0]._megaFormId).toBeUndefined()
+  expect(nextRoster[0]._megaBaseStats).toBeUndefined()
+  expect(nextRoster[0].pokeId).toBe(NEWCOMER.pokeId)
+  // The stone comes back via `displaced`, the same "goes to bag" path any
+  // other held item takes when its holder leaves the roster.
+  expect(displaced).toBe(MEGA_STONE_ITEM)
+})
+
+test('swapping a NON-mega Pokémon out of the roster still transfers its held item normally (regression)', () => {
+  const holder = { ...CHARIZARD_INSTANCE, heldItem: { id: 'leftovers', name: 'Leftovers' } }
+  const roster = [holder]
+  const { roster: nextRoster, displaced } = swapIntoRoster(roster, 0, NEWCOMER)
+
+  expect(nextRoster[0].heldItem).toEqual({ id: 'leftovers', name: 'Leftovers' })
+  expect(displaced).toBeNull()
 })
