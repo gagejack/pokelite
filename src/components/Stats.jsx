@@ -13,7 +13,7 @@ import CollectionDetail from './CollectionDetail'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
 import { TOP_CAUGHT_LIMIT } from '../lib/playerProfile.js'
 import { fmtWinDate } from '../lib/formatRunTime.js'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { itemByName, itemIconUrl } from '../game/items.js'
 import { REGION_STARTERS } from '../game/starters.js'
 
@@ -224,7 +224,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               onClick={() => setTab('stats')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'stats' ? textColor : mutedColor,
-                background: 'none', cursor: 'pointer', padding: '8px 14px',
+                background: 'none', cursor: 'pointer', padding: isDesktop ? '8px 14px' : '4px 14px',
                 border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
                 backgroundColor: tab === 'stats' ? (dark ? '#00558e' : '#fce329') : 'transparent',
               }}
@@ -235,7 +235,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               onClick={() => setTab('halloffame')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'halloffame' ? textColor : mutedColor,
-                background: 'none', cursor: 'pointer', padding: '8px 14px',
+                background: 'none', cursor: 'pointer', padding: isDesktop ? '8px 14px' : '4px 14px',
                 border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
                 backgroundColor: tab === 'halloffame' ? (dark ? '#00558e' : '#fce329') : 'transparent',
               }}
@@ -250,7 +250,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                 onClick={() => setTab('balance')}
                 style={{
                   fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'balance' ? '#facc15' : mutedColor,
-                  background: 'none', cursor: 'pointer', padding: '8px 14px',
+                  background: 'none', cursor: 'pointer', padding: isDesktop ? '8px 14px' : '4px 14px',
                   border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
                   backgroundColor: tab === 'balance' ? '#3a3a3a' : 'transparent',
                 }}
@@ -530,12 +530,11 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {(p.types ?? []).map(t => (
                                 <span key={t} style={{
-                                  fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '12px', color: '#fff',
+                                  fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '12px', color: typeTextColor(TYPE_COLORS[t]),
                                   backgroundColor: TYPE_COLORS[t] ?? '#888',
-                                  border: '1px solid #000', borderRadius: '5px',
+                                  border: '1px solid #000', borderRadius: '0',
                                   boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                                   padding: '0 5px', textTransform: 'uppercase',
-                                  WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                                 }}>
                                   {t}
                                 </span>

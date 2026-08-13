@@ -1,7 +1,7 @@
 import { useTheme } from '../lib/theme'
 import { muted, cash, accent } from '../lib/colors'
 import SeedCodeChip from './SeedCodeChip.jsx'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 
 // The end-of-run screen, shared by both outcomes: the run ledger (badges +
 // money), the final team as a 2×3 card grid, and the exit buttons.
@@ -194,12 +194,11 @@ export default function RunEndScreen({
               <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {(p.types ?? []).map(t => (
                   <span key={t} style={{
-                    fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '6px', color: '#fff',
+                    fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '6px', color: typeTextColor(TYPE_COLORS[t]),
                     backgroundColor: TYPE_COLORS[t] ?? '#888',
-                    border: '1px solid #000', borderRadius: '5px',
+                    border: '1px solid #000', borderRadius: '0',
                     boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                     padding: '2px 5px', textTransform: 'uppercase',
-                    WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                   }}>
                     {t}
                   </span>

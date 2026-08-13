@@ -1,6 +1,6 @@
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { TIER_BASE_POWER } from '../game/typeMoves.js'
 
 // TM node: the player picks one Pokémon to raise its move by one tier (cap at Tier 4).
@@ -99,12 +99,12 @@ export default function PowerUpgradeNode({ roster, onUpgrade, onClose }) {
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
-                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '11px', color: '#fff',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '11px', color: typeTextColor(TYPE_COLORS[move?.type]),
                       backgroundColor: TYPE_COLORS[move?.type] || '#888',
-                      border: '1px solid #000', borderRadius: '5px',
+                      border: '1px solid #000', borderRadius: '0',
                       boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                       padding: '2px 6px', textTransform: 'uppercase',
-                      WebkitTextStroke: '1px #000', paintOrder: 'stroke fill', flexShrink: 0,
+                      flexShrink: 0,
                     }}>
                       T{tier}
                     </span>

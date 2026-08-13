@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { displayName } from '../game/pokemon.js'
 import { POKEMON_TYPES } from '../game/pokemonTypes.js'
 import { supabase } from '../lib/supabase'
@@ -273,12 +273,11 @@ export default function Pokedex({ onClose }) {
                       <div style={{ display: 'flex', gap: '2px', marginTop: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {p.types.map(type => (
                           <span key={type} style={{
-                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: isDesktop ? '11px' : '8px', color: '#fff',
+                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: isDesktop ? '11px' : '8px', color: typeTextColor(TYPE_COLORS[type]),
                             backgroundColor: TYPE_COLORS[type] || '#888',
-                            border: '1px solid #000', borderRadius: '5px',
+                            border: '1px solid #000', borderRadius: '0',
                             boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                             padding: isDesktop ? '1px 4px' : '1px 3px', textTransform: 'uppercase',
-                            WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                           }}>
                             {type}
                           </span>

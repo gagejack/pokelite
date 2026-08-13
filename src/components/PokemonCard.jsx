@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 
 const POKE_BALL_ICON = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png'
 
@@ -104,12 +104,11 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {pokemon.types.map(type => (
           <span key={type} style={{
-            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '11px', color: '#fff',
+            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '11px', color: typeTextColor(TYPE_COLORS[type]),
             backgroundColor: TYPE_COLORS[type] || '#888',
-            border: '1px solid #000', borderRadius: '5px',
+            border: '1px solid #000', borderRadius: '0',
             boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
             padding: '2px 8px', textTransform: 'uppercase',
-            WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
           }}>
             {type}
           </span>
@@ -192,12 +191,12 @@ export default function PokemonCard({ pokemon, onClick, selected = false, sprite
           </span>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <span style={{
-              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '10px', color: '#fff',
+              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '10px', color: typeTextColor(TYPE_COLORS[pokemon.move.type]),
               backgroundColor: TYPE_COLORS[pokemon.move.type] || '#888',
-              border: '1px solid #000', borderRadius: '5px',
+              border: '1px solid #000', borderRadius: '0',
               boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
               padding: '1px 5px', textTransform: 'uppercase',
-              WebkitTextStroke: '1px #000', paintOrder: 'stroke fill', flexShrink: 0,
+              flexShrink: 0,
             }}>
               {pokemon.move.type}
             </span>

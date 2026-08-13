@@ -3,7 +3,7 @@ import { useTheme } from '../lib/theme'
 import { muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 import { MAX_LEVEL } from '../game/pokemon.js'
 import { alternateTypeFor } from '../game/attackTypes.js'
@@ -188,12 +188,11 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                         <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                           {pokemon.types?.map(t => (
                             <span key={t} style={{
-                              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '6px', color: '#fff',
+                              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '6px', color: typeTextColor(TYPE_COLORS[t]),
                               backgroundColor: TYPE_COLORS[t] || '#888',
-                              border: '1px solid #000', borderRadius: '5px',
+                              border: '1px solid #000', borderRadius: '0',
                               boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                               padding: '2px 5px', textTransform: 'uppercase',
-                              WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                             }}>
                               {t}
                             </span>
@@ -500,12 +499,11 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {pokemon.types?.map(t => (
                     <span key={t} style={{
-                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: '#fff',
+                      fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: typeTextColor(TYPE_COLORS[t]),
                       backgroundColor: TYPE_COLORS[t] || '#888',
-                      border: '1px solid #000', borderRadius: '5px',
+                      border: '1px solid #000', borderRadius: '0',
                       boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                       padding: '1px 4px', textTransform: 'uppercase',
-                      WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                     }}>
                       {t}
                     </span>

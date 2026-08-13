@@ -4,7 +4,7 @@ import { muted, accent, twoTone, STAT_BAR_LIGHT, STAT_BAR_DARK } from '../lib/co
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { itemIconUrl } from '../game/items'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import { nearestRectAt } from '../game/dragHit.js'
 import { getActiveExtras } from '../game/metaModifiers.js'
@@ -64,12 +64,11 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
         <div style={{ display: 'flex', gap: s(4) }}>
           {pokemon.types.map(t => (
             <span key={t} style={{
-              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: '#fff',
+              fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: typeTextColor(TYPE_COLORS[t]),
               backgroundColor: TYPE_COLORS[t] || '#888',
-              border: '1px solid #000', borderRadius: '5px',
+              border: '1px solid #000', borderRadius: '0',
               boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
               padding: `${s(2)} ${s(5)}`, textTransform: 'uppercase',
-              WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
             }}>
               {t}
             </span>
@@ -169,12 +168,11 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
                 {move.name.replace(/-/g, ' ')}
               </span>
               <span style={{
-                fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: '#fff',
+                fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: sf(7), color: typeTextColor(TYPE_COLORS[move.type]),
                 backgroundColor: TYPE_COLORS[move.type] || '#888',
-                border: '1px solid #000', borderRadius: '5px',
+                border: '1px solid #000', borderRadius: '0',
                 boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                 padding: `${s(2)} ${s(5)}`, textTransform: 'uppercase',
-                WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
               }}>
                 {move.type}
               </span>

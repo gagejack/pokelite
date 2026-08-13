@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted } from '../lib/colors'
 import PokemonCard from './PokemonCard'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { itemIconUrl } from '../game/items.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 import { getActiveExtras } from '../game/metaModifiers.js'
@@ -144,12 +144,11 @@ export default function PokeballNode({ offered, roster, onPick, onClose, caughtS
                     <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {p.types?.map(t => (
                         <span key={t} style={{
-                          fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '7px', color: '#fff',
+                          fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '7px', color: typeTextColor(TYPE_COLORS[t]),
                           backgroundColor: TYPE_COLORS[t] || '#888',
-                          border: '1px solid #000', borderRadius: '5px',
+                          border: '1px solid #000', borderRadius: '0',
                           boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                           padding: '2px 5px', textTransform: 'uppercase',
-                          WebkitTextStroke: '1px #000', paintOrder: 'stroke fill',
                         }}>
                           {t}
                         </span>

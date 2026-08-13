@@ -23,7 +23,7 @@ import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedS
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { getTypeMove } from '../game/typeMoves.js'
-import { TYPE_COLORS } from '../game/types.js'
+import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { BALANCE } from '../game/balance.js'
 import { getEffectiveBalance, getActiveExtras } from '../game/metaModifiers.js'
@@ -505,12 +505,12 @@ function MapSvg({
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', lineHeight: '1.5' }}>
                         {line.type && (
                           <span style={{
-                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: '#fff',
+                            fontFamily: 'Mona Sans, sans-serif', fontWeight: 600, fontStretch: '112%', fontSize: '9px', color: typeTextColor(TYPE_COLORS[line.type]),
                             backgroundColor: TYPE_COLORS[line.type] ?? '#888',
-                            border: '1px solid #000', borderRadius: '5px',
+                            border: '1px solid #000', borderRadius: '0',
                             boxShadow: 'inset 0 0 4px rgba(255,255,255,0.65)',
                             padding: '2px 6px', textTransform: 'uppercase',
-                            WebkitTextStroke: '1px #000', paintOrder: 'stroke fill', flexShrink: 0,
+                            flexShrink: 0,
                           }}>
                             {line.type}
                           </span>
