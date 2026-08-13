@@ -20,7 +20,18 @@ alter table public.runs
   add column if not exists pokemon_seen_shiny_ids integer[] not null default '{}',
   add column if not exists speed_cash_earned   integer not null default 0,
   add column if not exists winning_roster      jsonb,
-  add column if not exists created_at          timestamptz not null default now();
+  add column if not exists created_at          timestamptz not null default now(),
+  -- Read by player_profile.sql and written by App.jsx recordRunEnd, but never
+  -- created by any file in this repo until now — they existed only in the live
+  -- database. An environment rebuilt from supabase/*.sql was missing them, which
+  -- silently broke the shipped profile RPCs.
+  add column if not exists elapsed_ms          bigint,
+  add column if not exists starter_id          integer,
+  -- Which region a run was played in. Nullable by design: null means "region
+  -- unknown", a real state for every run recorded before this column existed.
+  -- Never default this to a region name — a wrong attribution is worse than an
+  -- honest gap, and the dashboard shows the gap as an Unknown bucket.
+  add column if not exists region              text;
 
 -- 2. Row Level Security -------------------------------------------------------
 alter table public.runs enable row level security;  -- no-op if already enabled
@@ -37,3 +48,14 @@ drop policy if exists "runs_select_own" on public.runs;
 create policy "runs_select_own"
   on public.runs for select
   using (auth.uid() = user_id);
+
+-- 3. Indexes for admin dashboard filtering ------------------------------------
+-- The admin Player Stats panels filter by region and date on every control
+-- change. Two indexes, not one: the composite leads on `region`, so it cannot
+-- serve the default "All regions" view where only created_at is constrained —
+-- a composite index with an unconstrained leading column is not usable for
+-- that scan.
+create index if not exists runs_region_created_idx
+  on public.runs (region, created_at);
+create index if not exists runs_created_idx
+  on public.runs (created_at);
