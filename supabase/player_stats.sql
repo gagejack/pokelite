@@ -65,10 +65,23 @@ as $$
     from scoped
     group by user_id
   ),
-  -- First-ever run per player, deliberately NOT filtered by p_since.
+  -- First-ever run per player, deliberately NOT filtered by p_since or region:
+  -- "new" asks whether a player's debut falls in the window, so the min() must
+  -- see their whole history.
+  --
+  -- It DOES still carry the admin predicate. Without it this CTE was the one
+  -- unguarded read in the function: `scoped` correctly returned nothing for a
+  -- non-admin while `debut` counted every player, so the function reported
+  -- "13 new players, 0 active" to a caller entitled to see neither. Every CTE
+  -- that touches public.runs needs the gate, not just the one that feeds the
+  -- headline figure.
   debut as (
     select r.user_id, min(r.created_at) as first_run
     from public.runs r
+    where exists (
+            select 1 from public.profiles p
+            where p.id = auth.uid() and p.role = 'admin'
+          )
     group by r.user_id
   )
   select
