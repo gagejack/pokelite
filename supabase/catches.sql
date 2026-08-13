@@ -12,13 +12,18 @@
 --
 -- Run once in the Supabase SQL editor. Idempotent — safe to re-run.
 
+-- Verified against the live table on 2026-08-13. `user_id` and `species_id` are
+-- NOT NULL in production — stricter than this file first assumed, and correct:
+-- a catch with no owner belongs to nobody, and a catch with no species is not a
+-- record of anything. `region` and `name` are nullable, which matches rows
+-- written before `recordCatch` sent them.
 create table if not exists public.catches (
-  id         bigserial primary key,
-  user_id    uuid references auth.users (id) on delete cascade,
+  id         bigserial   primary key,
+  user_id    uuid        not null references auth.users (id) on delete cascade,
   region     text,
-  species_id integer,
+  species_id integer     not null,
   name       text,
-  shiny      boolean not null default false,
+  shiny      boolean     not null default false,
   caught_at  timestamptz not null default now()
 );
 
