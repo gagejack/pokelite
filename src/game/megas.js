@@ -5,7 +5,10 @@
 // region's catch pool — mega eligibility only depends on the player already
 // having the species in their roster. See
 // docs/superpowers/specs/2026-08-13-mega-evolution-design.md.
-import { checkEvolution } from './pokemon.js'
+import { checkEvolution, calcHP, calcStat } from './pokemon.js'
+import { attackTypeFor } from './attackTypes.js'
+import { getTypeMove, tierForLevel } from './typeMoves.js'
+import { MEGA_STONE_ITEM } from './items.js'
 
 let megaCache = null       // pokeId -> [{ formId, formName, label, types, baseStats, sprite, ... }]
 let loadPromise = null
@@ -55,4 +58,64 @@ export async function isMegaEligible(instance) {
   const forms = await megaFormsFor(instance.pokeId)
   if (forms.length === 0) return false
   return isFullyEvolved(instance)
+}
+
+// Equip a Mega Stone: rewrite types/stats/sprite/move onto the instance and
+// snapshot the pre-mega form into _megaBase so revertMega can restore it
+// exactly. Follows buildEvolvedInstance's pattern (pokemon.js) — the same
+// "bake it into the instance" convention every other stat/sprite/type
+// change in this game already uses, rather than deriving mega display live
+// from heldItem at render time.
+export function applyMega(instance, megaForm) {
+  const hpRatio = instance.stats.hp / instance.stats.maxHp
+  const level = instance.level
+  const stats = {
+    maxHp:   Math.floor(calcHP(megaForm.baseStats.hp, level)),
+    attack:  Math.floor(calcStat(megaForm.baseStats.attack,  level)),
+    defense: Math.floor(calcStat(megaForm.baseStats.defense, level)),
+    spAtk:   Math.floor(calcStat(megaForm.baseStats.spAtk,   level)),
+    spDef:   Math.floor(calcStat(megaForm.baseStats.spDef,   level)),
+    speed:   Math.floor(calcStat(megaForm.baseStats.speed,   level)),
+  }
+  const hp = Math.max(1, Math.floor(stats.maxHp * hpRatio))
+  const tier = instance.move?.tier ?? tierForLevel(level)
+  // Attack type is looked up under the MEGA FORM's own id (10033+), not the
+  // base species id — see attackTypes.js's "Mega Evolution forms" section
+  // (Task 2). A species with no dedicated row (typing unchanged, or the
+  // base row already applies) falls back to types[0] exactly as normal.
+  const moveType = attackTypeFor(megaForm.formId, megaForm.types)
+  return {
+    ...instance,
+    _megaBase: {
+      types: instance.types, stats: instance.stats,
+      sprite: instance.sprite, spriteBack: instance.spriteBack, move: instance.move,
+    },
+    _megaFormId: megaForm.formId,
+    types: megaForm.types,
+    sprite:     instance.shiny ? megaForm.shinySprite : megaForm.sprite,
+    spriteBack: instance.shiny ? megaForm.shinySpriteBack : megaForm.spriteBack,
+    stats: { ...stats, hp },
+    move: getTypeMove(moveType, tier),
+    heldItem: MEGA_STONE_ITEM,
+  }
+}
+
+// Unequip: restore the pre-mega snapshot, preserving current HP ratio
+// against the restored maxHp (matches applyMega's own HP-ratio rule, and
+// buildEvolvedInstance's). No-op if the instance was never mega'd.
+export function revertMega(instance) {
+  if (!instance._megaBase) return instance
+  const hpRatio = instance.stats.hp / instance.stats.maxHp
+  const restoredHp = Math.max(1, Math.floor(instance._megaBase.stats.maxHp * hpRatio))
+  const next = {
+    ...instance,
+    types: instance._megaBase.types,
+    sprite: instance._megaBase.sprite,
+    spriteBack: instance._megaBase.spriteBack,
+    stats: { ...instance._megaBase.stats, hp: restoredHp },
+    move: instance._megaBase.move,
+  }
+  delete next._megaBase
+  delete next._megaFormId
+  return next
 }

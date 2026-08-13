@@ -1,5 +1,6 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { _seedChainCacheForTest, _clearChainCacheForTest } from './pokemon.js'
+import { applyMega, revertMega } from './megas.js'
 
 // Fake megas.json fetch — same pattern pokemon.test.js uses for local data.
 const FAKE_MEGAS = {
@@ -143,4 +144,100 @@ test('isMegaEligible is false for a fully-evolved species with no mega forms at 
   const { isMegaEligible } = await import('./megas.js')
   const noMegaTerminal = makeInstance(999998, 100)
   await expect(isMegaEligible(noMegaTerminal)).resolves.toBe(false)
+})
+
+// ── applyMega / revertMega ─────────────────────────────────────────────────
+
+const CHARIZARD_INSTANCE = {
+  pokeId: 6, name: 'Charizard', types: ['fire', 'flying'], level: 50, shiny: false,
+  sprite: 'base-sprite', spriteBack: 'base-back',
+  stats: { maxHp: 160, hp: 100, attack: 120, defense: 100, spAtk: 130, spDef: 105, speed: 120 },
+  move: { type: 'fire', tier: 3, name: 'flamethrower', power: 90 },
+  fainted: false, heldItem: null,
+}
+
+const MEGA_X_FORM = {
+  formId: 10034, formName: 'charizard-mega-x', label: 'Mega Charizard X',
+  types: ['fire', 'dragon'],
+  baseStats: { hp: 78, attack: 130, defense: 111, spAtk: 130, spDef: 85, speed: 100 },
+  sprite: 'mega-x-sprite', spriteBack: 'mega-x-back',
+  shinySprite: 'mega-x-shiny', shinySpriteBack: 'mega-x-shiny-back',
+}
+
+test('applyMega swaps types, sprite, and recomputes stats from the mega base stats', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(mega.types).toEqual(['fire', 'dragon'])
+  expect(mega.sprite).toBe('mega-x-sprite')
+  expect(mega.spriteBack).toBe('mega-x-back')
+  expect(mega._megaFormId).toBe(10034)
+  // stats recomputed via calcStat/calcHP against MEGA_X_FORM.baseStats at level 50 — not copied from base
+  expect(mega.stats.attack).not.toBe(CHARIZARD_INSTANCE.stats.attack)
+  expect(mega.stats.attack).toBeGreaterThan(0)
+})
+
+test('applyMega preserves HP ratio, not raw HP', () => {
+  // CHARIZARD_INSTANCE is at 100/160 = 62.5% HP
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const ratio = mega.stats.hp / mega.stats.maxHp
+  expect(ratio).toBeCloseTo(100 / 160, 2)
+})
+
+test('applyMega sets heldItem to the Mega Stone', async () => {
+  const { MEGA_STONE_ITEM } = await import('./items.js')
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(mega.heldItem).toBe(MEGA_STONE_ITEM)
+})
+
+test('applyMega snapshots the pre-mega form into _megaBase', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(mega._megaBase.types).toEqual(['fire', 'flying'])
+  expect(mega._megaBase.sprite).toBe('base-sprite')
+  expect(mega._megaBase.stats).toEqual(CHARIZARD_INSTANCE.stats)
+})
+
+test('revertMega restores the exact pre-mega form, preserving HP ratio', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  // Simulate damage taken while mega'd.
+  const damaged = { ...mega, stats: { ...mega.stats, hp: Math.floor(mega.stats.maxHp * 0.4) } }
+  const reverted = revertMega(damaged)
+  expect(reverted.types).toEqual(['fire', 'flying'])
+  expect(reverted.sprite).toBe('base-sprite')
+  expect(reverted.stats.maxHp).toBe(CHARIZARD_INSTANCE.stats.maxHp)
+  // Two independent Math.floor HP-ratio conversions (base maxHp 160 -> mega
+  // maxHp 153 -> back to 160) compound rounding error beyond 2-decimal
+  // precision for this fixture's numbers (153 * 0.4 -> floor 61, then
+  // 160 * 61/153 -> floor 63 -> ratio 0.39375, off by 0.00625) — 1-decimal
+  // precision is what actually holds for integer HP tracked at these scales.
+  expect(reverted.stats.hp / reverted.stats.maxHp).toBeCloseTo(0.4, 1)
+  expect(reverted._megaBase).toBeUndefined()
+  expect(reverted._megaFormId).toBeUndefined()
+})
+
+test('revertMega on an instance that was never mega\'d is a no-op', () => {
+  const reverted = revertMega(CHARIZARD_INSTANCE)
+  expect(reverted).toBe(CHARIZARD_INSTANCE)
+})
+
+test('applyMega on a retyped form (e.g. mega Gyarados, water/dark) rebuilds the move on the mega-form-aware attack type', () => {
+  const gyaradosBase = {
+    pokeId: 130, name: 'Gyarados', types: ['water', 'flying'], level: 40, shiny: false,
+    sprite: 'g-sprite', spriteBack: 'g-back',
+    stats: { maxHp: 150, hp: 150, attack: 110, defense: 90, spAtk: 80, spDef: 90, speed: 95 },
+    move: { type: 'water', tier: 2, name: 'surf', power: 70 },
+    fainted: false, heldItem: null,
+  }
+  // formId 10041 is the real gyarados-mega id in the committed
+  // public/data/megas.json and src/game/attackTypes.js's mega-form table
+  // (Task 2) — NOT 10130. Task 2's table keys mega Gyarados's attack type
+  // as water despite its water/dark typing (its higher offensive stat is
+  // physical/water via Waterfall-style STAB, not Crunch), so this asserts
+  // the mega-form-aware lookup, not the placeholder from an earlier draft.
+  const gyaradosMega = {
+    formId: 10041, formName: 'gyarados-mega', label: 'Mega Gyarados',
+    types: ['water', 'dark'],
+    baseStats: { hp: 95, attack: 155, defense: 109, spAtk: 70, spDef: 130, speed: 81 },
+    sprite: 'gm-sprite', spriteBack: 'gm-back', shinySprite: 'gm-shiny', shinySpriteBack: 'gm-shiny-back',
+  }
+  const mega = applyMega(gyaradosBase, gyaradosMega)
+  expect(mega.move.type).toBe('water') // Task 2's table: mega Gyarados (10041) attacks as water
 })

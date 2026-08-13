@@ -837,7 +837,11 @@ export function currentMoveType(pokemon) {
     const alt = alternateTypeFor(pokemon.pokeId, pokemon.types)
     if (alt) return alt
   }
-  return attackTypeFor(pokemon.pokeId, pokemon.types)
+  // A mega'd Pokémon's attack-type row (if any) is keyed by the mega FORM's
+  // own id, not the base species id — see attackTypes.js's "Mega Evolution
+  // forms" section. Falls back to the base pokeId lookup once unequipped.
+  const lookupId = pokemon._megaFormId ?? pokemon.pokeId
+  return attackTypeFor(lookupId, pokemon.types)
 }
 
 // Type Prism — collapse a dual-type Pokémon onto its alternate type, for good.
