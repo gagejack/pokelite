@@ -219,6 +219,33 @@ test('revertMega on an instance that was never mega\'d is a no-op', () => {
   expect(reverted).toBe(CHARIZARD_INSTANCE)
 })
 
+// CHARIZARD_INSTANCE.move starts at tier 3 ({ type: 'fire', tier: 3, ... }),
+// which applyMega carries onto the mega form's move (tier preserved across
+// equip). This snapshots into _megaBase.move at tier 3.
+test('revertMega preserves a TM tier upgrade earned WHILE mega\'d (final review, Issue 4)', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(mega._megaBase.move.tier).toBe(3) // sanity: snapshot froze the pre-upgrade tier
+
+  // Simulate a PowerUpgradeNode purchase while mega'd: it rebuilds `move` via
+  // getTypeMove at the new tier, directly on the currently-active instance —
+  // the mega form's move, not the snapshot.
+  const upgraded = { ...mega, move: { ...mega.move, tier: 4 } }
+
+  const reverted = revertMega(upgraded)
+  // Must keep the higher post-equip tier (4), NOT revert to the stale
+  // pre-equip snapshot tier (3) — the paid upgrade must survive unequipping.
+  expect(reverted.move.tier).toBe(4)
+  expect(reverted.move.type).toBe('fire') // restored to the pre-mega attacking type
+})
+
+test('revertMega does not downgrade the tier if no upgrade happened while mega\'d', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const reverted = revertMega(mega)
+  // No upgrade occurred — both the live move and the snapshot are tier 3 — so
+  // the restored tier is unchanged at 3, matching pre-mega behavior exactly.
+  expect(reverted.move.tier).toBe(3)
+})
+
 // ── shouldRevertMegaForItemChange ──────────────────────────────────────────
 // Decision helper consumed by App.jsx's generic held-item paths (moveItem,
 // handleItemAssign) so a Pokémon dragged a non-stone item while mega'd

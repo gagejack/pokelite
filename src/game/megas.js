@@ -108,17 +108,28 @@ export function applyMega(instance, megaForm) {
 // Unequip: restore the pre-mega snapshot, preserving current HP ratio
 // against the restored maxHp (matches applyMega's own HP-ratio rule, and
 // buildEvolvedInstance's). No-op if the instance was never mega'd.
+//
+// The move's TIER is preserved across the round trip, not restored verbatim
+// from the snapshot — matching buildEvolvedInstance's preservedTier rule
+// (pokemon.js). _megaBase.move is the move as it was AT THE MOMENT OF
+// EQUIPPING; if the player bought a TM tier upgrade (PowerUpgradeNode) while
+// mega'd, that upgrade lives on instance.move.tier, not on the snapshot.
+// Restoring the snapshot's move verbatim would silently lose it on unequip.
+// Math.max keeps whichever tier is higher — the upgrade survives, and a
+// Pokémon that was never upgraded post-equip is unaffected (both tiers equal).
 export function revertMega(instance) {
   if (!instance._megaBase) return instance
   const hpRatio = instance.stats.hp / instance.stats.maxHp
   const restoredHp = Math.max(1, Math.floor(instance._megaBase.stats.maxHp * hpRatio))
+  const snapshotMove = instance._megaBase.move
+  const tier = Math.max(instance.move?.tier ?? 1, snapshotMove?.tier ?? 1)
   const next = {
     ...instance,
     types: instance._megaBase.types,
     sprite: instance._megaBase.sprite,
     spriteBack: instance._megaBase.spriteBack,
     stats: { ...instance._megaBase.stats, hp: restoredHp },
-    move: instance._megaBase.move,
+    move: snapshotMove ? getTypeMove(snapshotMove.type, tier) : snapshotMove,
   }
   delete next._megaBase
   delete next._megaFormId
