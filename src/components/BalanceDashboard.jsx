@@ -436,7 +436,7 @@ export default function BalanceDashboard() {
   const header = (
     <>
       <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '20px' : '17px', color: textColor, textAlign: 'center' }}>
-        Balance Dashboard
+        Admin Dashboard
       </span>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
         <button style={tabButtonStyle(dashTab === 'tuning')} onClick={() => setDashTab('tuning')}>Difficulty &amp; Odds</button>

@@ -255,7 +255,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                   backgroundColor: tab === 'balance' ? '#3a3a3a' : 'transparent',
                 }}
               >
-                Balance
+                Admin
               </button>
             )}
           </div>
@@ -279,7 +279,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
           </button>
         </div>
 
-        {/* Sub-tabs, shown only under Stats. Hall of Fame and Balance are their
+        {/* Sub-tabs, shown only under Stats. Hall of Fame and Admin are their
             own destinations, so a second tab row under them would suggest a
             division they don't have.
 
