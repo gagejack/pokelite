@@ -42,7 +42,7 @@ Three layers, mirroring the guest-profile work already in the tree.
 
 **Repairing existing drift first.** `runs.elapsed_ms` and `runs.starter_id` are
 read by `player_profile.sql` and written by `App.jsx`, but **no `alter table` in
-this repo ever adds them**. They exist only in the live database. A environment
+this repo ever adds them**. They exist only in the live database. An environment
 rebuilt from `supabase/*.sql` would break the shipped profile RPCs *and* this
 tab's backfill and Starters panel. `runs_tracking.sql` gains them:
 
@@ -85,9 +85,17 @@ change, and the backfill scans `catches` by user and time:
 ```sql
 create index if not exists runs_region_created_idx
   on public.runs (region, created_at);
+create index if not exists runs_created_idx
+  on public.runs (created_at);
 create index if not exists catches_user_caught_idx
   on public.catches (user_id, caught_at);
 ```
+
+The second index is not redundant with the first. `runs_region_created_idx`
+leads on `region`, so it cannot serve the **All regions** view — the most common
+one, and the default — where `region` is unconstrained and only `created_at` is
+filtered. A composite index with an unconstrained leading column is not usable
+for that scan.
 
 `region` is nullable by design. A null means "region unknown", a real state for
 historical rows that must stay distinguishable from any actual region name —
@@ -104,10 +112,13 @@ Four SECURITY DEFINER functions, one per panel:
 
 | Function | Feeds |
 |---|---|
-| `admin_player_engagement(region, since)` | Engagement panel |
-| `admin_player_difficulty(region, since)` | Difficulty panel |
-| `admin_player_starters(region, since, starter_ids)` | Starters panel |
-| `admin_player_economy(region, since)` | Economy panel |
+| `admin_player_engagement(p_region, p_since, p_unknown_only)` | Engagement panel |
+| `admin_player_difficulty(p_region, p_since, p_unknown_only)` | Difficulty panel |
+| `admin_player_starters(p_region, p_since, p_unknown_only, p_starter_ids)` | Starters panel |
+| `admin_player_economy(p_region, p_since, p_unknown_only)` | Economy panel |
+
+Every argument is `p_`-prefixed. See **Shared parameters** below — in
+`language sql` this is load-bearing, not cosmetic.
 
 Every one is admin-gated with the same role predicate the repo already uses in
 `game_tuning.sql`, `region_balance.sql` and `meta_shop_prices.sql`:
@@ -143,30 +154,55 @@ there is no case for a logged-out caller here.
 
 **Shared parameters.**
 
-- `region text default null` — null means "all regions"; a region name filters
-  to it.
-- `unknown_only boolean default false` — when true, selects rows where `region
-  is null`, so the Unknown bucket is inspectable rather than merely counted.
-  A separate boolean rather than a sentinel string like `'__unknown__'`: a
-  sentinel is a value that could one day collide with a real region name, and
-  "no region recorded" is a different kind of thing from "this region", not
-  another member of the same list.
-- `since timestamptz default null` — null means "all time".
+**Every argument carries a `p_` prefix. This is a correctness requirement, not
+a style preference.**
 
-**Precedence, stated so it cannot be guessed at.** `unknown_only = true`
-**overrides `region` entirely**; `region` is ignored when it is set. The
+In a `language sql` function, when an argument name matches a column name in
+the query, **the column wins** — silently, with no error. An argument named
+`region` would make `r.region = region` resolve to `r.region = r.region`, which
+is always true, and `region is null` resolve against the column rather than the
+argument. The region filter would quietly no-op and every region heading would
+show identical all-region numbers: a confident wrong answer, which is the worst
+possible failure for a tool whose entire purpose is informing tuning decisions.
+
+(Note this is the opposite of `plpgsql`, where the argument shadows the column.
+The existing `player_profile.sql` functions escape the trap only by accident —
+`uname` and `starter_ids` happen not to collide with any column name.)
+
+The repo already has this convention: `increment_badge(p_region text, …)`,
+called from `App.jsx:881`.
+
+- `p_region text default null` — null means "all regions"; a region name filters
+  to it.
+- `p_unknown_only boolean default false` — when true, selects rows where
+  `region is null`, so the Unknown bucket is inspectable rather than merely
+  counted. A separate boolean rather than a sentinel string like
+  `'__unknown__'`: a sentinel is a value that could one day collide with a real
+  region name, and "no region recorded" is a different kind of thing from "this
+  region", not another member of the same list.
+- `p_since timestamptz default null` — null means "all time".
+- `p_starter_ids integer[]` — the Starters panel only.
+
+**Precedence, stated so it cannot be guessed at.** `p_unknown_only = true`
+**overrides `p_region` entirely**; `p_region` is ignored when it is set. The
 alternative — ANDing them — produces `region = 'Kanto' and region is null`,
 which is unsatisfiable and would render as a convincing but false "no data"
 state. Written as a single branch in SQL:
 
 ```sql
-where (unknown_only and r.region is null)
-   or (not unknown_only and (region is null or r.region = region))
+where (p_unknown_only and r.region is null)
+   or (not p_unknown_only and (p_region is null or r.region = p_region))
 ```
 
 The UI cannot express the contradiction (the picker is one control whose
 Unknown entry sets the boolean and clears the name), but the SQL must not depend
 on the UI to stay correct.
+
+**`p_since` has no end bound** — the range is always `[p_since, now)`. That
+suits the preset ranges the UI offers (all time, last 7/30/90 days), all of
+which end at the present. A custom range with a past end date would need a
+second `p_until` argument; it is deliberately not in scope, and the single-bound
+shape should not be mistaken for one.
 
 **`set search_path = public, pg_temp` on every function**, and every table
 reference schema-qualified. The existing functions in this repo already set
@@ -191,11 +227,17 @@ a region is added. A copy in SQL would drift silently.
   both are already at module scope, so this is a move, not a rewrite.
   `BalanceDashboard.jsx` imports them from the new location.
 
-  **The theme bundle moves with them.** It is currently built by a `useMemo`
-  inside `BalanceDashboard` (`:327`). If `PlayerStats` built its own, the two
-  admin surfaces would drift into slightly different panel styling. So
-  `AdminPanels.jsx` exports a `useAdminTheme()` hook holding that one
-  definition, and both dashboards call it. One source, no drift.
+- `src/lib/useAdminTheme.js` — **the shared theme bundle**, currently built by a
+  `useMemo` inside `BalanceDashboard` (`:327`). If `PlayerStats` built its own,
+  the two admin surfaces would drift into slightly different panel styling, so
+  one definition is exported and both dashboards call it.
+
+  **It lives in `lib/`, not in `AdminPanels.jsx`**, for the same reason
+  `playerStats.js` is its own module: `eslint.config.js:14` enables
+  `reactRefresh.configs.vite`, and exporting a hook from a `.jsx` file that also
+  exports components trips `react-refresh/only-export-components`. Putting it in
+  `AdminPanels.jsx` would break the exact rule this spec invokes two paragraphs
+  earlier. `AdminPanels.jsx` exports `Panel` and `Bar` and nothing else.
 
 **Why a sibling file, not a section of BalanceDashboard.** `BalanceDashboard.jsx`
 is 660 lines and is a *tuning-knob editor* — every panel writes. This tab is
@@ -421,10 +463,20 @@ defect the `GuestProfile` switching test pins.
   rather than leaving a blank sheet. This is the reset-effect bug in touchpoint
   3 above, and it is invisible without a test.
 
-**Not tested:** the SQL itself and the backfill script, neither of which can run
-without a live database. The backfill's matching rule is the risky part; its
-dry-run `needs-review` count is the intended substitute for a test, and should
-be read before any write pass.
+**Manual verification, once against the live database.** The parameter-shadowing
+trap produces no error and no crash — only wrong numbers that look right — so it
+cannot be caught by the unit tests above and must be checked by hand before the
+tab is trusted:
+
+> Call one RPC with `p_region` set to a region that has runs, and again with
+> `p_region => null`. **The two results must differ.** If they match, the filter
+> has silently no-opped and every panel is reporting all-region figures under a
+> single region's heading.
+
+**Not otherwise tested:** the SQL bodies and the backfill script, neither of
+which can run without a live database. The backfill's matching rule is the risky
+part; its dry-run `needs-review` count is the intended substitute for a test,
+and should be read before any write pass.
 
 ## Deploy order
 
