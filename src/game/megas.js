@@ -119,3 +119,20 @@ export function revertMega(instance) {
   delete next._megaFormId
   return next
 }
+
+// Decision helper for the GENERIC held-item paths (moveItem,
+// handleItemAssign in App.jsx) — those call sites know nothing about mega
+// evolution and treat the Mega Stone as just another held item. When one of
+// them is about to change what a Pokémon holds, this says whether that
+// change would leave the Pokémon mega'd (_megaBase set) while displaying a
+// different item — a corrupted state (mega stats/types/sprite stuck on,
+// stone gone) — and therefore whether revertMega must run first.
+//
+// True only when the instance is CURRENTLY mega'd AND the incoming item is
+// not the Mega Stone itself (re-holding the same stone, or no change, isn't
+// a reason to revert). instance._megaBase is checked directly (not
+// heldItem.id) since it's the authoritative "is this Pokémon mega'd" signal
+// per the Task 8 report's own framing.
+export function shouldRevertMegaForItemChange(instance, incomingItem) {
+  return Boolean(instance?._megaBase) && incomingItem?.id !== MEGA_STONE_ITEM.id
+}

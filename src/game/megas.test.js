@@ -1,6 +1,7 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { _seedChainCacheForTest, _clearChainCacheForTest } from './pokemon.js'
-import { applyMega, revertMega } from './megas.js'
+import { applyMega, revertMega, shouldRevertMegaForItemChange } from './megas.js'
+import { MEGA_STONE_ITEM } from './items.js'
 
 // Fake megas.json fetch — same pattern pokemon.test.js uses for local data.
 const FAKE_MEGAS = {
@@ -216,6 +217,33 @@ test('revertMega restores the exact pre-mega form, preserving HP ratio', () => {
 test('revertMega on an instance that was never mega\'d is a no-op', () => {
   const reverted = revertMega(CHARIZARD_INSTANCE)
   expect(reverted).toBe(CHARIZARD_INSTANCE)
+})
+
+// ── shouldRevertMegaForItemChange ──────────────────────────────────────────
+// Decision helper consumed by App.jsx's generic held-item paths (moveItem,
+// handleItemAssign) so a Pokémon dragged a non-stone item while mega'd
+// doesn't get stuck with mega stats/types/sprite but a different held item.
+
+test('shouldRevertMegaForItemChange is true when a mega\'d Pokémon is about to receive a non-stone item', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const leftovers = { id: 'leftovers', name: 'Leftovers' }
+  expect(shouldRevertMegaForItemChange(mega, leftovers)).toBe(true)
+})
+
+test('shouldRevertMegaForItemChange is true when a mega\'d Pokémon is losing its item outright (incoming null)', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(shouldRevertMegaForItemChange(mega, null)).toBe(true)
+})
+
+test('shouldRevertMegaForItemChange is false when the incoming item is the Mega Stone itself (no real change)', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  expect(shouldRevertMegaForItemChange(mega, MEGA_STONE_ITEM)).toBe(false)
+})
+
+test('shouldRevertMegaForItemChange is false for a Pokémon that was never mega\'d, regardless of incoming item', () => {
+  const leftovers = { id: 'leftovers', name: 'Leftovers' }
+  expect(shouldRevertMegaForItemChange(CHARIZARD_INSTANCE, leftovers)).toBe(false)
+  expect(shouldRevertMegaForItemChange(CHARIZARD_INSTANCE, null)).toBe(false)
 })
 
 test('applyMega on a retyped form (e.g. mega Gyarados, water/dark) rebuilds the move on the mega-form-aware attack type', () => {

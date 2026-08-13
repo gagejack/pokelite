@@ -12,7 +12,7 @@ import DailyChallenge from './components/DailyChallenge'
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
-import { applyMega, revertMega } from './game/megas.js'
+import { applyMega, revertMega, shouldRevertMegaForItemChange } from './game/megas.js'
 import { MEGA_STONE_ITEM } from './game/items.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
@@ -922,12 +922,17 @@ export default function App() {
   // Equip straight from an item offer. This path bypasses moveItem, so it has
   // to apply the Polarity Band's move retype itself — including releasing the
   // one being swapped out, or a band displaced here would leave its retyped
-  // move behind on a Pokémon no longer holding it.
+  // move behind on a Pokémon no longer holding it. Same story for the Mega
+  // Stone: this generic path knows nothing about mega evolution, so a
+  // currently-mega'd Pokémon must be reverted before a non-stone item lands
+  // on it, or it's left with mega stats/types/sprite but a different held
+  // item (see shouldRevertMegaForItemChange in game/megas.js).
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
     setRoster(prev => prev.map((p, i) => {
       if (i !== pokemonIndex) return p
       let next = p
       if (swapBackItem?.retype === 'move') next = retypeMove(next, false)
+      if (shouldRevertMegaForItemChange(next, item)) next = { ...revertMega(next), heldItem: null }
       next = { ...next, heldItem: item }
       if (item?.retype === 'move') next = retypeMove(next, true)
       return next
@@ -990,9 +995,16 @@ export default function App() {
     // type, and the one gaining it switches to its alternate. Rebuilding here
     // rather than reading the item during battle keeps the displayed move name
     // honest — a move that says "Body Slam" always deals Normal damage.
+    // The Mega Stone gets the same treatment: this generic drag path has no
+    // idea what a Mega Stone does, so either end of the move can strand a
+    // Pokémon mega'd (types/stats/sprite still transformed) with a different
+    // item now in its held-item slot — the FROM side, dragging its stone
+    // elsewhere, or the TO side, having a different item dragged onto it and
+    // displacing the stone. Both must revertMega first.
     setRoster(prev => prev.map((p, i) => {
       let next = p
       if (from.kind === 'pokemon' && i === from.pokeIndex) {
+        if (shouldRevertMegaForItemChange(next, null)) next = revertMega(next)
         next = { ...next, heldItem: null }
         if (item.retype === 'move') next = retypeMove(next, false)
       }
@@ -1000,6 +1012,7 @@ export default function App() {
         // A displaced Polarity Band also has to release its hold on the move
         // before the incoming item is applied.
         if (displaced?.retype === 'move') next = retypeMove(next, false)
+        if (shouldRevertMegaForItemChange(next, item)) next = revertMega(next)
         next = { ...next, heldItem: item }
         if (item.retype === 'move') next = retypeMove(next, true)
       }
