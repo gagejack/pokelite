@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { _seedChainCacheForTest, _clearChainCacheForTest } from './pokemon.js'
+import { _seedChainCacheForTest, _clearChainCacheForTest, levelUp, calcHP, calcStat } from './pokemon.js'
 import { applyMega, revertMega, shouldRevertMegaForItemChange } from './megas.js'
 import { MEGA_STONE_ITEM } from './items.js'
 
@@ -268,4 +268,52 @@ test('applyMega on a retyped form (e.g. mega Gyarados, water/dark) rebuilds the 
   }
   const mega = applyMega(gyaradosBase, gyaradosMega)
   expect(mega.move.type).toBe('water') // Task 2's table: mega Gyarados (10041) attacks as water
+})
+
+// ── levelUp mega-awareness (final review, Issue 1) ─────────────────────────
+// levelUp reads `base.baseStats` (instance._base — always the PRE-mega
+// species, since applyMega never touches _base). Left unfixed, the very next
+// battle after equipping a Mega Stone silently overwrote mega stats back to
+// base-species numbers while types/sprite/_megaFormId still claimed the
+// Pokémon was mega'd.
+
+// Charizard's real base stats (pokeapi) — stands in for instance._base.baseStats,
+// which levelUp reads through the `base` parameter, distinct from
+// CHARIZARD_INSTANCE's already-computed level-50 stats above.
+const CHARIZARD_BASE = {
+  pokeId: 6, baseStats: { hp: 78, attack: 84, defense: 78, spAtk: 109, spDef: 85, speed: 100 },
+}
+
+test('levelUp on a mega\'d Pokémon recomputes stats from the MEGA form base stats, not the base species', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const leveled = levelUp(mega, CHARIZARD_BASE, 2)
+
+  expect(leveled.level).toBe(52)
+  // Compare against what the mega-form formula actually produces at level 52 —
+  // proves stats came from MEGA_X_FORM.baseStats, not CHARIZARD_BASE.baseStats.
+  const expectedMegaAttack = Math.floor(calcStat(MEGA_X_FORM.baseStats.attack, 52))
+  const expectedBaseAttack = Math.floor(calcStat(CHARIZARD_BASE.baseStats.attack, 52))
+  expect(leveled.stats.attack).toBe(expectedMegaAttack)
+  expect(leveled.stats.attack).not.toBe(expectedBaseAttack)
+  // Mega/_megaFormId state survives the level-up untouched.
+  expect(leveled._megaFormId).toBe(10034)
+  expect(leveled._megaBase).toBeDefined()
+})
+
+test('reverting AFTER a post-mega level-up restores correctly-leveled base stats, not the stale pre-level-up snapshot', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const leveled = levelUp(mega, CHARIZARD_BASE, 2) // level 50 -> 52
+  const reverted = revertMega(leveled)
+
+  expect(reverted.level).toBe(52)
+  expect(reverted._megaBase).toBeUndefined()
+  expect(reverted._megaBaseStats).toBeUndefined()
+  // Base-species stats at level 52 (the level AFTER the level-up), not level 50
+  // (CHARIZARD_INSTANCE's original level, which the stale-snapshot bug would produce).
+  const expectedAttackAt52 = Math.floor(calcStat(CHARIZARD_BASE.baseStats.attack, 52))
+  const expectedAttackAt50 = Math.floor(calcStat(CHARIZARD_BASE.baseStats.attack, 50))
+  expect(reverted.stats.attack).toBe(expectedAttackAt52)
+  expect(reverted.stats.attack).not.toBe(expectedAttackAt50)
+  const expectedMaxHpAt52 = Math.floor(calcHP(CHARIZARD_BASE.baseStats.hp, 52))
+  expect(reverted.stats.maxHp).toBe(expectedMaxHpAt52)
 })

@@ -739,15 +739,28 @@ export async function applyBattleVictory(finalPlayerTeam, { levelsGained = 2, fu
 // multiplier was already resolved correctly at creation/evolution time and
 // levels don't change which species (or vitamins) apply. Absent on every
 // non-starter, so this is a no-op there — byte-identical to the old behavior.
+//
+// MEGA-AWARE (Task: final review fix): `base` is instance._base, which
+// always points at the PRE-mega species — applyMega never touches it. If
+// this Pokémon is currently mega'd (instance._megaBaseStats set, stashed by
+// applyMega in megas.js), stats must be recomputed from the MEGA form's base
+// stats instead, or the very next battle after equipping a Mega Stone would
+// silently overwrite mega stats back to base-species numbers while
+// types/sprite/_megaFormId still claimed it was mega'd. The snapshot used to
+// revert (instance._megaBase.stats) is ALSO advanced to what the pre-mega
+// stats would be at the new level (via the normal base.baseStats formula),
+// so unequipping after a level-up lands on correctly-leveled base stats
+// rather than the stale pre-level-up snapshot.
 export function levelUp(instance, base, levels) {
   // Clamp at MAX_LEVEL — a full run's victories would otherwise push levels
   // past 100, where the stat formulas stop being meaningful. Already-capped
   // Pokémon keep their stats exactly (newLevel === level, so hpDiff is 0).
   const newLevel = Math.min(MAX_LEVEL, instance.level + levels)
   const m = instance._multipliers ?? { hp: 1, attack: 1, defense: 1, spAtk: 1, spDef: 1, speed: 1 }
-  const newHp = Math.floor(calcHP(base.baseStats.hp, newLevel) * m.hp)
+  const statBase = instance._megaBaseStats ?? base.baseStats
+  const newHp = Math.floor(calcHP(statBase.hp, newLevel) * m.hp)
   const hpDiff = newHp - instance.stats.maxHp
-  return {
+  const next = {
     ...instance,
     level: newLevel,
     stats: {
@@ -755,13 +768,29 @@ export function levelUp(instance, base, levels) {
       maxHp:   newHp,
       // Leveling raises max HP but must not revive a fainted Pokémon.
       hp:      instance.fainted ? 0 : Math.min(instance.stats.hp + hpDiff, newHp),
-      attack:  Math.floor(calcStat(base.baseStats.attack,  newLevel) * m.attack),
-      defense: Math.floor(calcStat(base.baseStats.defense, newLevel) * m.defense),
-      spAtk:   Math.floor(calcStat(base.baseStats.spAtk,   newLevel) * m.spAtk),
-      spDef:   Math.floor(calcStat(base.baseStats.spDef,   newLevel) * m.spDef),
-      speed:   Math.floor(calcStat(base.baseStats.speed,   newLevel) * m.speed),
+      attack:  Math.floor(calcStat(statBase.attack,  newLevel) * m.attack),
+      defense: Math.floor(calcStat(statBase.defense, newLevel) * m.defense),
+      spAtk:   Math.floor(calcStat(statBase.spAtk,   newLevel) * m.spAtk),
+      spDef:   Math.floor(calcStat(statBase.spDef,   newLevel) * m.spDef),
+      speed:   Math.floor(calcStat(statBase.speed,   newLevel) * m.speed),
     },
   }
+  if (instance._megaBase) {
+    const revertMaxHp = Math.floor(calcHP(base.baseStats.hp, newLevel) * m.hp)
+    next._megaBase = {
+      ...instance._megaBase,
+      stats: {
+        maxHp:   revertMaxHp,
+        hp:      Math.min(instance._megaBase.stats.hp, revertMaxHp),
+        attack:  Math.floor(calcStat(base.baseStats.attack,  newLevel) * m.attack),
+        defense: Math.floor(calcStat(base.baseStats.defense, newLevel) * m.defense),
+        spAtk:   Math.floor(calcStat(base.baseStats.spAtk,   newLevel) * m.spAtk),
+        spDef:   Math.floor(calcStat(base.baseStats.spDef,   newLevel) * m.spDef),
+        speed:   Math.floor(calcStat(base.baseStats.speed,   newLevel) * m.speed),
+      },
+    }
+  }
+  return next
 }
 
 // Rare Candy — level ONE roster member, then check it for an evolution.

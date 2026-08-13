@@ -91,6 +91,11 @@ export function applyMega(instance, megaForm) {
       sprite: instance.sprite, spriteBack: instance.spriteBack, move: instance.move,
     },
     _megaFormId: megaForm.formId,
+    // Stashed so levelUp (pokemon.js) can recompute stats from the MEGA
+    // form's base stats rather than instance._base.baseStats (the pre-mega
+    // species) — levelUp has no other way to know a mega form is active,
+    // since instance._base is never touched by applyMega/revertMega.
+    _megaBaseStats: megaForm.baseStats,
     types: megaForm.types,
     sprite:     instance.shiny ? megaForm.shinySprite : megaForm.sprite,
     spriteBack: instance.shiny ? megaForm.shinySpriteBack : megaForm.spriteBack,
@@ -117,6 +122,7 @@ export function revertMega(instance) {
   }
   delete next._megaBase
   delete next._megaFormId
+  delete next._megaBaseStats
   return next
 }
 
