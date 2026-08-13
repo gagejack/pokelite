@@ -10,13 +10,14 @@ import PokeballNode from './PokeballNode'
 import ItemNode from './ItemNode'
 import PokemartNode from './PokemartNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
+import MegaStoneNode from './MegaStoneNode'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
 import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
-import { pickThreeItems, itemIconUrl, isRosterConsumable } from '../game/items.js'
+import { pickThreeItems, itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
@@ -42,6 +43,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.MASTER_BALL]:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
+  [NODE_TYPES.MEGA_STONE]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mega-stone.png',
   [NODE_TYPES.POKECENTER]:    pokecenterIcon,
   [NODE_TYPES.POKEMART]:      pokemartIcon,
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
@@ -533,7 +535,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onMegaEquip, onMegaUnequip, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -596,6 +598,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingLegendary, setPendingLegendary] = useState(null)
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
+  const [pendingMega, setPendingMega] = useState(null)
   const [pendingMart, setPendingMart] = useState(null)
   // Remaining shop stock per mart node id, so a shelf survives Leave and
   // re-entry. Lives here rather than in PokemartNode because that component
@@ -1001,6 +1004,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
       onEarnCash?.(getEffectiveBalance().economy.payouts.node)
       setPendingPower({ node })
+    } else if (node.type === NODE_TYPES.MEGA_STONE) {
+      onEarnCash?.(getEffectiveBalance().economy.payouts.node)
+      setPendingMega({ node })
     } else {
       setClearedNodes(prev => new Set([...prev, node.id]))
       setCurrentNode(node.id)
@@ -1223,6 +1229,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       case NODE_TYPES.POKEBALL:      return { title: 'Poké Ball', sub: `Catch a Pokémon · $${nodePay}` }
       case NODE_TYPES.ITEM:          return { title: 'Item', sub: `Select an item · $${nodePay}` }
       case NODE_TYPES.POWER_UPGRADE: return { title: 'TM', sub: `Upgrade a move · $${nodePay}` }
+      case NODE_TYPES.MEGA_STONE:    return { title: 'Mega Stone', sub: `Mega Evolve a Pokémon · $${nodePay}` }
       case NODE_TYPES.POKECENTER:    return { title: 'Pokémon Center', sub: 'Full heal' }
       case NODE_TYPES.POKEMART:      return { title: 'Pokémart', sub: 'Spend Speed Cash' }
       case NODE_TYPES.MYSTERY:       return { title: 'Mystery', sub: '???' }
@@ -1886,6 +1893,34 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setClearedNodes(prev => new Set([...prev, pendingPower.node.id]))
             setCurrentNode(pendingPower.node.id)
             setPendingPower(null)
+          }}
+        />
+      )}
+
+      {pendingMega && (
+        <MegaStoneNode
+          roster={roster}
+          onEquip={(pokeIndex, megaForm) => {
+            onMegaEquip(pokeIndex, megaForm)
+            setClearedNodes(prev => new Set([...prev, pendingMega.node.id]))
+            setCurrentNode(pendingMega.node.id)
+            setPendingMega(null)
+          }}
+          onUnequip={(pokeIndex) => {
+            onMegaUnequip(pokeIndex)
+            // Unequip doesn't close the node — the player may still want to
+            // equip a different roster member before leaving.
+          }}
+          onKeepInBag={() => {
+            onItemKeepInBag(MEGA_STONE_ITEM)
+            setClearedNodes(prev => new Set([...prev, pendingMega.node.id]))
+            setCurrentNode(pendingMega.node.id)
+            setPendingMega(null)
+          }}
+          onClose={() => {
+            setClearedNodes(prev => new Set([...prev, pendingMega.node.id]))
+            setCurrentNode(pendingMega.node.id)
+            setPendingMega(null)
           }}
         />
       )}

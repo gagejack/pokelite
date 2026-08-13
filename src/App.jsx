@@ -12,6 +12,8 @@ import DailyChallenge from './components/DailyChallenge'
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
+import { applyMega, revertMega } from './game/megas.js'
+import { MEGA_STONE_ITEM } from './game/items.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
@@ -937,6 +939,32 @@ export default function App() {
     setBag(prev => [...prev, item])
   }
 
+  // Mega Evolve: rewrite the roster slot's types/stats/sprite/move via
+  // applyMega, same "bake it into the instance" convention evolution
+  // already uses. Unlike handleItemAssign, there's no swapBackItem to
+  // restore — a Mega Stone always displaces whatever was held before it
+  // (that item returns to the bag), since a mega'd Pokémon's held-item
+  // slot is now occupied by the stone itself.
+  //
+  // displaced/setBag are computed OUTSIDE the setRoster updater (mirrors
+  // moveItem's shape, see its comment above) — React may invoke updaters
+  // more than once under StrictMode, and nesting setBag inside setRoster
+  // caused a duplication bug there.
+  function handleMegaEquip(pokemonIndex, megaForm) {
+    const displaced = roster[pokemonIndex]?.heldItem ?? null
+    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? applyMega(p, megaForm) : p))
+    if (displaced) setBag(prev => [...prev, displaced])
+  }
+
+  // Unequip: revert to the pre-mega snapshot and return the Mega Stone
+  // itself to the bag (mirrors how moveItem returns a displaced held item).
+  function handleMegaUnequip(pokemonIndex) {
+    const target = roster[pokemonIndex]
+    if (!target?._megaBase) return
+    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? { ...revertMega(p), heldItem: null } : p))
+    setBag(prev => [...prev, MEGA_STONE_ITEM])
+  }
+
   // Move an already-owned item between the bag and roster Pokémon.
   //   from: { kind: 'bag', index } | { kind: 'pokemon', pokeIndex }
   //   to:   { kind: 'bag' }        | { kind: 'pokemon', pokeIndex }
@@ -1380,6 +1408,8 @@ export default function App() {
           onItemAssign={handleItemAssign}
           onItemKeepInBag={handleItemKeepInBag}
           onMoveItem={moveItem}
+          onMegaEquip={handleMegaEquip}
+          onMegaUnequip={handleMegaUnequip}
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
           cashEarned={cashEarned}
