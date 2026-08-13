@@ -137,8 +137,31 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) 
   const ROW_WIDTHS = BALANCE.map.rowWidths
   const { megaStoneAvailable = true } = options
   let id = 0
+
+  // Within-map dedup: megaStoneAvailable (above) only gates whether Mega
+  // Stone is offered to THIS buildRows call at all — it's a run-level flag
+  // (App.jsx/NodeMap.jsx) that caps spawns to one PER RUN by staying false
+  // on every later map once one has spawned. It says nothing about how many
+  // of the ~20+ node slots generated BELOW can independently win their own
+  // megaStoneChance(mapIndex) roll (each randomNode call rolls it fresh —
+  // see randomNode). Left unchecked, a single map can roll under that
+  // chance on two or more node positions and produce 2+ Mega Stone nodes on
+  // one map, which defeats the "at most one per run" intent before the
+  // run-level flag ever gets a say. `megaStoneUsedThisMap` tracks whether a
+  // MEGA_STONE node has already been generated anywhere in THIS call; it
+  // starts pre-used (true) when megaStoneAvailable is false, so the eligibility
+  // check passed into every randomNode call below stays a simple AND. The
+  // moment any generated node lands as MEGA_STONE, the flag flips and every
+  // subsequent randomNode call in this map is offered availability=false.
+  let megaStoneUsedThisMap = !megaStoneAvailable
+  const rollMegaStoneNode = (nodeId) => {
+    const node = randomNode(nodeId, trainerPool, mapIndex, megaStoneAvailable && !megaStoneUsedThisMap)
+    if (node.type === NODE_TYPES.MEGA_STONE) megaStoneUsedThisMap = true
+    return node
+  }
+
   const rows = ROW_WIDTHS.map(width =>
-    Array.from({ length: width }, () => randomNode(id++, trainerPool, mapIndex, megaStoneAvailable))
+    Array.from({ length: width }, () => rollMegaStoneNode(id++))
   )
 
   // Row 1's left node (the first fork off the start) is always a Pokéball.
@@ -149,7 +172,7 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) 
   const rightId = rows[1][1].id
   let right = rows[1][1]
   while (right.type === NODE_TYPES.POKEBALL || right.type === NODE_TYPES.MASTER_BALL) {
-    right = randomNode(rightId, trainerPool, mapIndex, megaStoneAvailable)
+    right = rollMegaStoneNode(rightId)
   }
   rows[1][1] = right
 

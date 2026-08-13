@@ -48,3 +48,41 @@ test('Master Ball override is not clobbered by a subsequent Mega Stone roll', ()
     clearRng()
   }
 })
+
+// Each node position independently rolls megaStoneChance(mapIndex) (flat 3%
+// from map index 2 on — see megaStoneChance above). A map has ~20+ node
+// slots across buildRows' rows, so across many maps some will roll UNDER 3%
+// on two or more positions in the SAME buildRows call. The run-level
+// megaStoneAvailable flag (threaded in from App.jsx/NodeMap.jsx) only caps
+// spawns to one PER RUN by gating whether map generation offers Mega Stone
+// at all going into this call — it says nothing about how many nodes within
+// a single call can independently win that roll. Without an additional
+// within-map dedup, a single map can legitimately produce 2+ MEGA_STONE
+// nodes, breaking the "at most one Mega Stone per run" design intent before
+// the run-level flag ever gets a chance to matter. Seed 6 at map index 7 is
+// a known repro (found by brute-force search over mulberry32): confirms the
+// bug is real, not just theoretical, then a broad seed sweep proves the fix
+// holds generally, not just for that one seed.
+test('buildRows never produces more than one MEGA_STONE node in a single call', () => {
+  seedRng(6)
+  try {
+    const rows = buildRows([1, 4, 7], 'Brock', 7, { megaStoneAvailable: true })
+    const count = rows.flat().filter(n => n.type === NODE_TYPES.MEGA_STONE).length
+    expect(count).toBeLessThanOrEqual(1)
+  } finally {
+    clearRng()
+  }
+})
+
+test('buildRows never produces more than one MEGA_STONE node across many seeds', () => {
+  try {
+    for (let seed = 1; seed <= 2000; seed++) {
+      seedRng(seed)
+      const rows = buildRows([1, 4, 7], 'Brock', 7, { megaStoneAvailable: true })
+      const count = rows.flat().filter(n => n.type === NODE_TYPES.MEGA_STONE).length
+      expect(count).toBeLessThanOrEqual(1)
+    }
+  } finally {
+    clearRng()
+  }
+})
