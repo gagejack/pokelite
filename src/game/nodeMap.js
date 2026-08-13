@@ -119,8 +119,11 @@ function randomNode(id, trainerPool, mapIndex = 0, megaStoneAvailable = true) {
   // Mega Stone: a separate, rarer override on top of whatever type was just
   // picked (any type, not just Pokéball) — capped to one spawn per run by
   // the caller via megaStoneAvailable (App.jsx tracks this at the run
-  // level, not per-map).
-  if (megaStoneAvailable && rng() < megaStoneChance(mapIndex)) {
+  // level, not per-map). Guarded against a node that was JUST promoted to
+  // Master Ball above: Master Ball is the legendary tier, so it must never
+  // be silently clobbered by a lower-tier Mega Stone roll landing right
+  // after it.
+  if (megaStoneAvailable && type !== NODE_TYPES.MASTER_BALL && rng() < megaStoneChance(mapIndex)) {
     type = NODE_TYPES.MEGA_STONE
   }
   return { id, type, ...(type === NODE_TYPES.TRAINER ? { trainer: pick(trainerPool) } : {}) }
