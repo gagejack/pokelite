@@ -30,6 +30,7 @@ import { loadShopPrices } from './lib/metaShopBalance.js'
 import { loadGameTuning, getGameTuning } from './lib/gameTuning.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
+import EvolutionAnimation from './components/EvolutionAnimation'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
 
 // Character select is skipped for now — every run uses this default protagonist.
@@ -74,6 +75,12 @@ export default function App() {
   const [selectedStarter, setSelectedStarter] = useState(null)
   const [roster, setRoster] = useState([])
   const [bag, setBag] = useState([])
+  // One-off flash animation for a successful Mega Stone equip — separate from
+  // any post-battle notice queue, since mega equip is a single immediate
+  // event, not something that can stack up between screens. Unequip
+  // (handleMegaUnequip) deliberately does NOT set this — a quiet, instant
+  // revert with no ceremony.
+  const [pendingMegaAnimation, setPendingMegaAnimation] = useState(null)
   const [mapIndex, setMapIndex] = useState(0)
   const [user, setUser] = useState(null)
   // Persistent set of species the player has EVER caught (across all saved runs).
@@ -965,9 +972,13 @@ export default function App() {
   // more than once under StrictMode, and nesting setBag inside setRoster
   // caused a duplication bug there.
   function handleMegaEquip(pokemonIndex, megaForm) {
-    const displaced = roster[pokemonIndex]?.heldItem ?? null
-    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? applyMega(p, megaForm) : p))
+    const before = roster[pokemonIndex]
+    if (!before) return
+    const displaced = before.heldItem ?? null
+    const mega = applyMega(before, megaForm)
+    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? mega : p))
     if (displaced) setBag(prev => [...prev, displaced])
+    setPendingMegaAnimation({ fromSprite: before.sprite, toSprite: mega.sprite, name: before.name })
   }
 
   // Unequip: revert to the pre-mega snapshot and return the Mega Stone
@@ -1537,6 +1548,16 @@ export default function App() {
           user={user}
           onPlay={startDailyRun}
           onClose={() => setDailyOpen(false)}
+        />
+      )}
+      {pendingMegaAnimation && (
+        <EvolutionAnimation
+          fromSprite={pendingMegaAnimation.fromSprite}
+          toSprite={pendingMegaAnimation.toSprite}
+          fromName={pendingMegaAnimation.name}
+          toName={pendingMegaAnimation.name}
+          mode="mega"
+          onDismiss={() => setPendingMegaAnimation(null)}
         />
       )}
     </Suspense>
