@@ -41,6 +41,12 @@ export const BALANCE = deepFreeze({
     // Master Ball (legendary) node chance ramps linearly from `start` at
     // `startIndex` to `end` at `endIndex` (map indices).
     masterBall: { startIndex: 3, endIndex: 7, start: 0.005, end: 0.10 },
+    // Mega Stone (rare) node chance: 0% before map index 2 (map 3), flat
+    // 3% on every map from there on. Independent of the weighted
+    // nodeTypeChances table (which sums to 100 and is always active) — this
+    // follows the SAME override pattern as masterBall above: randomNode
+    // rolls a normal type first, then may steal that slot for MEGA_STONE.
+    megaStone: { startIndex: 2, chance: 0.03 },
     // Weight of the MASTER_BALL outcome when a Mystery node resolves, relative
     // to the other outcomes (which are weight 1 each). 4 non-legendary outcomes
     // + w must put legendary at 2%: w / (4 + w) = 0.02 → w = 4/49.

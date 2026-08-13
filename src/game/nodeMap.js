@@ -7,6 +7,7 @@ export const NODE_TYPES = {
   TRAINER: 'trainer',
   POKEBALL: 'pokeball',
   MASTER_BALL: 'master_ball',
+  MEGA_STONE: 'mega_stone',
   ITEM: 'item',
   POWER_UPGRADE: 'power_upgrade',
   POKECENTER: 'pokecenter',
@@ -71,6 +72,15 @@ export function masterBallChance(mapIndex) {
   return start + t * (end - start)
 }
 
+// Chance (0..1) that a normal node roll is stolen for a Mega Stone node
+// instead — same override mechanic as masterBallChance above, not a slice
+// of NODE_TYPE_CHANCES (which sums to 100 and has no map-index gating). 0%
+// before map index 2 (map 3), flat BALANCE.map.megaStone.chance from there.
+export function megaStoneChance(mapIndex) {
+  const { startIndex, chance } = BALANCE.map.megaStone
+  return mapIndex >= startIndex ? chance : 0
+}
+
 // % chance for each node type (must sum to 100). Values come from BALANCE
 // (game/balance.js); balance.js uses string literals to stay import-free, so
 // we assert here that each maps to a real NODE_TYPES value — a typo there
@@ -98,13 +108,20 @@ export function pickType() {
   return NODE_TYPE_CHANCES[NODE_TYPE_CHANCES.length - 1].type
 }
 
-function randomNode(id, trainerPool, mapIndex = 0) {
+function randomNode(id, trainerPool, mapIndex = 0, megaStoneAvailable = true) {
   let type = pickType()
   // A Pokéball node has a rare, map-ramped chance to become a Master Ball
   // (legendary) node instead — a variant of the Pokéball, so the overall
   // node distribution is barely affected.
   if (type === NODE_TYPES.POKEBALL && rng() < masterBallChance(mapIndex)) {
     type = NODE_TYPES.MASTER_BALL
+  }
+  // Mega Stone: a separate, rarer override on top of whatever type was just
+  // picked (any type, not just Pokéball) — capped to one spawn per run by
+  // the caller via megaStoneAvailable (App.jsx tracks this at the run
+  // level, not per-map).
+  if (megaStoneAvailable && rng() < megaStoneChance(mapIndex)) {
+    type = NODE_TYPES.MEGA_STONE
   }
   return { id, type, ...(type === NODE_TYPES.TRAINER ? { trainer: pick(trainerPool) } : {}) }
 }
@@ -115,9 +132,10 @@ function randomNode(id, trainerPool, mapIndex = 0) {
 // generation ceiling. Classic callers omit it entirely and are unaffected.
 export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) {
   const ROW_WIDTHS = BALANCE.map.rowWidths
+  const { megaStoneAvailable = true } = options
   let id = 0
   const rows = ROW_WIDTHS.map(width =>
-    Array.from({ length: width }, () => randomNode(id++, trainerPool, mapIndex))
+    Array.from({ length: width }, () => randomNode(id++, trainerPool, mapIndex, megaStoneAvailable))
   )
 
   // Row 1's left node (the first fork off the start) is always a Pokéball.
@@ -128,7 +146,7 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) 
   const rightId = rows[1][1].id
   let right = rows[1][1]
   while (right.type === NODE_TYPES.POKEBALL || right.type === NODE_TYPES.MASTER_BALL) {
-    right = randomNode(rightId, trainerPool, mapIndex)
+    right = randomNode(rightId, trainerPool, mapIndex, megaStoneAvailable)
   }
   rows[1][1] = right
 
