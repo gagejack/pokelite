@@ -555,12 +555,12 @@ export const kantoConfig = {
   ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     name: MAP_NAMES[i],
-    generate: (starter, { mode = 'classic' } = {}) => {
+    generate: (starter, { mode = 'classic', megaStoneAvailable = true } = {}) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Brock') : MAP_BOSSES[i]
       // NOTE: buildRows is deliberately NOT given the safari options here.
       // Kanto overwrites a node below, and baking before that fixup would
       // waste rng() draws on a node that is discarded. The bake runs after.
-      const rows = buildRows(TRAINER_POOLS[i], boss, i)
+      const rows = buildRows(TRAINER_POOLS[i], boss, i, { megaStoneAvailable })
       if (i === 2) {
         rows[4][1] = { id: rows[4][1].id, type: NODE_TYPES.RIVAL, trainer: 'Blue', rivalTeam: 'blueEarlyGame' }
       }

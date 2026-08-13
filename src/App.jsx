@@ -14,6 +14,7 @@ const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
 import { applyMega, revertMega, shouldRevertMegaForItemChange } from './game/megas.js'
 import { MEGA_STONE_ITEM } from './game/items.js'
+import { NODE_TYPES } from './game/nodeMap.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
 import { decodeSeed } from './game/seed.js'
@@ -88,6 +89,13 @@ export default function App() {
   // "everything unlocked" before the load lands.
   const [profile, setProfile] = useState(null)
   const mapsCleared = useRef(0)
+  // True once a MEGA_STONE node has been generated anywhere in the current
+  // run — passed down to NodeMap so at most one spawns per run (see
+  // nodeMap.js's megaStoneChance / randomNode override). A ref, not state:
+  // it drives no render of its own, only gates a value read at map-
+  // generation time, same category as mapsCleared.current elsewhere in this
+  // file.
+  const megaStoneSpawnedThisRun = useRef(false)
   // Elite Four members beaten this run. Separate from mapsCleared because the
   // two pay different rates on a loss ($1/map vs $5/member) — counting E4
   // wins as maps is what made a champion death read as a dozen cleared maps.
@@ -912,6 +920,7 @@ export default function App() {
     pokemonCaughtIds.current = []
     pokemonSeenIds.current = []
     pokemonSeenShinyIds.current = []
+    megaStoneSpawnedThisRun.current = false
     setSpeedCash(0)
     setCashEarned(0)
     setMetacashEarned(0)
@@ -1423,6 +1432,12 @@ export default function App() {
           onMoveItem={moveItem}
           onMegaEquip={handleMegaEquip}
           onMegaUnequip={handleMegaUnequip}
+          megaStoneAvailable={!megaStoneSpawnedThisRun.current}
+          onMapGenerated={rows => {
+            if (rows.some(row => row.some(n => n.type === NODE_TYPES.MEGA_STONE))) {
+              megaStoneSpawnedThisRun.current = true
+            }
+          }}
           onApplyConsumable={applyConsumable}
           speedCash={speedCash}
           cashEarned={cashEarned}

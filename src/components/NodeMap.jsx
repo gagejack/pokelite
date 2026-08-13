@@ -535,7 +535,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onMegaEquip, onMegaUnequip, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onMegaEquip, onMegaUnequip, megaStoneAvailable = true, onMapGenerated, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -578,11 +578,24 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     () => {
       if (initialMapData && initialMapData.mapIndex === mapIndex) return initialMapData
       if (mode === 'safari' && !prewarmReady) return null
-      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter, { mode }))
-      return mapConfig.generate(starter, { mode })
+      if (seed != null) return withRng(deriveSeed(seed, mapIndex), () => mapConfig.generate(starter, { mode, megaStoneAvailable }))
+      return mapConfig.generate(starter, { mode, megaStoneAvailable })
     },
     [mapConfig, prewarmReady] // eslint-disable-line react-hooks/exhaustive-deps
   )
+
+  // Report the generated rows back up to App so it can flip
+  // megaStoneSpawnedThisRun if this map happened to roll one. Deliberately a
+  // separate effect from the useMemo above (which must stay a pure
+  // computation with no side effects) and deliberately excludes
+  // onMapGenerated from the dependency array — same justification as the
+  // mapConfig/prewarmReady-only deps on the useMemo: this must fire exactly
+  // once per NEW mapData, not whenever the caller passes a new function
+  // reference for the callback.
+  useEffect(() => {
+    if (mapData?.rows) onMapGenerated?.(mapData.rows)
+  }, [mapData]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const edges = mapConfig.edges
 
   // Seed node progress from a resumed run when it matches this map (else fresh).

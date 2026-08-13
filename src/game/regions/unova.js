@@ -707,7 +707,7 @@ export const unovaConfig = {
   ],
   maps: MAP_BACKGROUNDS.map((background, i) => ({
     name: MAP_NAMES[i],
-    generate: (starter, { mode = 'classic' } = {}) => {
+    generate: (starter, { mode = 'classic', megaStoneAvailable = true } = {}) => {
       const boss = i === 0 ? (STARTER_BOSS[starter?.id] ?? 'Chili') : MAP_BOSSES[i]
       // Unova applies no post-buildRows fixups, so the bake can run inside
       // buildRows via its options bag.
@@ -718,6 +718,7 @@ export const unovaConfig = {
           mode,
           config: unovaConfig,
           maxSpeciesId: GEN_MAX_ID[5],
+          megaStoneAvailable,
         }),
       }
     },
