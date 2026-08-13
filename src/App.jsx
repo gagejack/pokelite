@@ -464,6 +464,10 @@ export default function App() {
         pokemonSeenShinyIds: pokemonSeenShinyIds.current,
         speedCash,
         cashEarned,
+        // At-most-one-per-run guarantee for the Mega Stone node — without this
+        // a reload after (or even before) one spawned resets the ref and lets
+        // a second one spawn. Same per-run-ref category as mapsCleared above.
+        megaStoneSpawnedThisRun: megaStoneSpawnedThisRun.current,
       },
       map: mapProgress.current, // { mapData, clearedNodes, currentNode }
       savedAt: Date.now(),
@@ -579,6 +583,7 @@ export default function App() {
     pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = run.stats?.pokemonSeenIds ?? []
     pokemonSeenShinyIds.current = run.stats?.pokemonSeenShinyIds ?? []
+    megaStoneSpawnedThisRun.current = run.stats?.megaStoneSpawnedThisRun ?? false
     setSpeedCash(run.stats?.speedCash ?? 0)
     setCashEarned(run.stats?.cashEarned ?? 0)
     // Feed the current map's layout + node progress to NodeMap on mount.
@@ -660,6 +665,7 @@ export default function App() {
     pokemonCaughtIds.current = snapshot.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = snapshot.stats?.pokemonSeenIds ?? []
     pokemonSeenShinyIds.current = snapshot.stats?.pokemonSeenShinyIds ?? []
+    megaStoneSpawnedThisRun.current = snapshot.stats?.megaStoneSpawnedThisRun ?? false
     setSpeedCash(snapshot.stats?.speedCash ?? 0)
     setCashEarned(snapshot.stats?.cashEarned ?? 0)
     setMetacashEarned(0)
