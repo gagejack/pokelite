@@ -86,6 +86,10 @@ export default function App() {
   // "everything unlocked" before the load lands.
   const [profile, setProfile] = useState(null)
   const mapsCleared = useRef(0)
+  // Elite Four members beaten this run. Separate from mapsCleared because the
+  // two pay different rates on a loss ($1/map vs $5/member) — counting E4
+  // wins as maps is what made a champion death read as a dozen cleared maps.
+  const eliteFourDefeated = useRef(0)
   const pokemonCaught = useRef(0)
   const pokemonCaughtIds = useRef([])
   const pokemonSeenIds = useRef([])
@@ -436,6 +440,7 @@ export default function App() {
       mapIndex,
       stats: {
         mapsCleared: mapsCleared.current,
+        eliteFourDefeated: eliteFourDefeated.current,
         pokemonCaught: pokemonCaught.current,
         pokemonCaughtIds: pokemonCaughtIds.current,
         pokemonSeenIds: pokemonSeenIds.current,
@@ -552,6 +557,7 @@ export default function App() {
     if (run.rngState != null) setRngState(run.rngState)
     else clearRng()
     mapsCleared.current = run.stats?.mapsCleared ?? 0
+    eliteFourDefeated.current = run.stats?.eliteFourDefeated ?? 0
     pokemonCaught.current = run.stats?.pokemonCaught ?? 0
     pokemonCaughtIds.current = run.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = run.stats?.pokemonSeenIds ?? []
@@ -632,6 +638,7 @@ export default function App() {
     if (snapshot.rngState != null) setRngState(snapshot.rngState)
     else clearRng()
     mapsCleared.current = snapshot.stats?.mapsCleared ?? 0
+    eliteFourDefeated.current = snapshot.stats?.eliteFourDefeated ?? 0
     pokemonCaught.current = snapshot.stats?.pokemonCaught ?? 0
     pokemonCaughtIds.current = snapshot.stats?.pokemonCaughtIds ?? []
     pokemonSeenIds.current = snapshot.stats?.pokemonSeenIds ?? []
@@ -724,7 +731,7 @@ export default function App() {
     // pre-existing limitation of caughtSet, not something this task fixes.)
     const dexCount = new Set([...caughtSet, ...pokemonCaughtIds.current]).size
     const profile = (await loadProfile(user)) ?? createProfile()
-    const payout = runEndPayout(result, mapsCleared.current, profile, dexCount)
+    const payout = runEndPayout(result, mapsCleared.current, profile, dexCount, eliteFourDefeated.current)
     const nextProfile = {
       ...profile,
       metacash: profile.metacash + payout.metacash,
@@ -873,6 +880,12 @@ export default function App() {
     mapsCleared.current += 1
   }
 
+  // An Elite Four member went down. Counted separately from maps so the loss
+  // payout can price the two differently (see runEndPayout).
+  function handleEliteFourMemberDefeated() {
+    eliteFourDefeated.current += 1
+  }
+
   // A gym leader was beaten → the player earned badge `badgeIndex` (0–7) for the
   // current region. Increment the lifetime per-badge counter in the `badges`
   // table, live, the moment it's earned. Uses an atomic Postgres RPC so
@@ -892,6 +905,7 @@ export default function App() {
 
   function resetRunStats() {
     mapsCleared.current = 0
+    eliteFourDefeated.current = 0
     pokemonCaught.current = 0
     pokemonCaughtIds.current = []
     pokemonSeenIds.current = []
@@ -1372,7 +1386,6 @@ export default function App() {
           metacashEarned={metacashEarned}
           keysEarned={keysEarned}
           payoutSaved={payoutSaved}
-          mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onSpendCash={spendCash}
           mapIndex={mapIndex}
@@ -1430,13 +1443,12 @@ export default function App() {
           metacashEarned={metacashEarned}
           keysEarned={keysEarned}
           payoutSaved={payoutSaved}
-          mapsCleared={mapsCleared.current}
           onEarnCash={earnCash}
           onBack={saveAndExitToMenu}
           onRestart={restartRun}
           runItBackAvailable={runItBackReady}
           onRunItBack={runItBack}
-          onMapCleared={handleMapCleared}
+          onMemberDefeated={handleEliteFourMemberDefeated}
           onRunEnd={recordRunEnd}
           onSpeciesSeen={recordSpeciesSeen}
           onSpeciesOwned={recordSpeciesOwned}

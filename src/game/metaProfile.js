@@ -94,10 +94,14 @@ function roundMoney(amount) {
  * or return a new profile, only the payout).
  *
  * Win: $200 + 1 key, modified by Win Streak and Dex Dividends if owned.
- * Loss: $15 × mapsCleared, 0 keys. Win Streak and Dex Dividends are win-only
- * bonuses per spec (§Currencies: "winning pays much more"; Win Streak reads
- * "per extra win"; Dex Dividends reads "per win") — a loss's payout is pure
- * $15/map with no multiplier stacked on top.
+ * Loss: $1 × mapsCleared + $5 × eliteFourDefeated, 0 keys. Elite Four members
+ * pay more than a map because they are strictly harder and there are at most
+ * four of them — a player who dies to the champion should be paid for the
+ * three members they actually beat, which mapsCleared alone never counted.
+ * Win Streak and Dex Dividends are win-only bonuses per spec (§Currencies:
+ * "winning pays much more"; Win Streak reads "per extra win"; Dex Dividends
+ * reads "per win") — a loss's payout is pure map/member arithmetic with no
+ * multiplier stacked on top.
  *
  * ORDER: Dex Dividends multiplies the $200 base, THEN Win Streak's flat bonus
  * is added — they do not compound. With both owned, 2 prior wins and 50
@@ -114,12 +118,14 @@ function roundMoney(amount) {
  * @param {number} mapsCleared - maps cleared this run (used for loss payout)
  * @param {MetaProfile} profile
  * @param {number} dexCount - unique species caught, lifetime (for Dex Dividends)
+ * @param {number} [eliteFourDefeated] - Elite Four members beaten this run
+ *   (loss payout only; a win pays the flat base regardless)
  * @returns {{ metacash: number, keys: number, newWinStreak: number }}
  */
-export function runEndPayout(result, mapsCleared, profile, dexCount) {
+export function runEndPayout(result, mapsCleared, profile, dexCount, eliteFourDefeated = 0) {
   if (result === 'loss') {
     return {
-      metacash: roundMoney(1 * mapsCleared),
+      metacash: roundMoney(1 * mapsCleared + 5 * eliteFourDefeated),
       keys: 0,
       newWinStreak: 0, // a loss resets the streak regardless of prior length
     }

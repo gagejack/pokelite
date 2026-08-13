@@ -111,35 +111,33 @@ test('every badge shows earned on a region clear, unlike a mid-run defeat', () =
   expect(hive.style.filter).toBe('brightness(0) opacity(0.45)')
 })
 
-test('a win shows the metacash and key payout, with no maps arithmetic', () => {
-  const { container } = show({
+test('a win shows the metacash and key payout', () => {
+  show({
     title: 'Region Cleared', titleColor: '#3f9d4f',
-    metacashEarned: 200, keysEarned: 1, mapsCleared: 8,
+    metacashEarned: 200, keysEarned: 1,
   })
   expect(screen.getByText('+ $200 metacash')).toBeTruthy()
   expect(screen.getByText('+ 1 key')).toBeTruthy()
-  // A win's payout isn't a simple maps × $15 the player can reconstruct, so
-  // that line is loss-only.
-  expect(container.textContent).not.toContain('maps × $15')
 })
 
-test('a loss shows the metacash payout with the maps arithmetic beneath it, and no key figure', () => {
+test('a loss shows the metacash payout as a total, with no per-map breakdown and no key figure', () => {
   const { container } = show({
     title: 'Defeated...', titleColor: '#ef4444',
-    metacashEarned: 45, keysEarned: 0, mapsCleared: 3,
+    metacashEarned: 45, keysEarned: 0,
   })
   expect(screen.getByText('+ $45 metacash')).toBeTruthy()
-  expect(screen.getByText('3 maps × $15')).toBeTruthy()
+  // The arithmetic line was removed: maps and Elite Four members pay different
+  // rates, so no single "N maps × $X" line describes the total honestly.
+  expect(container.textContent).not.toMatch(/maps ×/)
   expect(container.textContent).not.toMatch(/\+ \d+ keys?/)
 })
 
-test('a map-0 loss still shows the reward band at $0, rather than hiding it', () => {
+test('a $0 loss still shows the reward band, rather than hiding it', () => {
   show({
     title: 'Defeated...', titleColor: '#ef4444',
-    metacashEarned: 0, keysEarned: 0, mapsCleared: 0,
+    metacashEarned: 0, keysEarned: 0,
   })
   expect(screen.getByText('+ $0 metacash')).toBeTruthy()
-  expect(screen.getByText('0 maps × $15')).toBeTruthy()
 })
 
 test('a payout that failed to reach the account tells the player, instead of just showing the number as if it banked', () => {

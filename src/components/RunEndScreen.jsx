@@ -36,7 +36,6 @@ export default function RunEndScreen({
   metacashEarned = 0,
   keysEarned = 0,
   payoutSaved = true,
-  mapsCleared = 0,
 }) {
   const { dark } = useTheme()
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
@@ -144,16 +143,6 @@ export default function RunEndScreen({
               <span style={{ fontFamily: 'Orange Kid', fontSize: '22px', color: cash(dark), lineHeight: 1 }}>
                 + ${metacashEarned.toLocaleString()} metacash
               </span>
-              {/* Loss only: show the arithmetic so a player who lost can see
-                  that going further pays more — the total alone doesn't
-                  teach that (spec §6b). Omitted on a win, where the payout is
-                  the flat $200 base (plus Win Streak/Dex Dividends, which
-                  aren't a simple multiply-out the player can reconstruct). */}
-              {keysEarned === 0 && (
-                <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
-                  {mapsCleared} maps × $15
-                </span>
-              )}
               {/* Only shown when a logged-in player's payout failed to reach
                   their account (saveProfile fell back to localStorage — see
                   App.jsx's recordRunEnd). The number above is still true on

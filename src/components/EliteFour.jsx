@@ -24,7 +24,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, mapsCleared = 0, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMapCleared, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMemberDefeated, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -89,7 +89,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: BALANCE.progression.levelsGained.eliteFour, fullHeal: false })
       onEarnCash?.(BALANCE.economy.payouts.eliteFour)
       setPendingBattle(null)
-        onMapCleared?.()
+        onMemberDefeated?.()
         setDefeated(index + 1)
         if (members[index].champion) {
           setWon(true)
@@ -488,7 +488,6 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             metacashEarned={metacashEarned}
             keysEarned={keysEarned}
             payoutSaved={payoutSaved}
-            mapsCleared={mapsCleared}
             // Reaching the gauntlet means every gym is cleared, so all badges
             // show earned — there is no mapIndex here to count from.
             badges={config?.badges ?? []}
@@ -522,7 +521,6 @@ export default function EliteFour({ region, character, starter, roster, setRoste
           metacashEarned={metacashEarned}
           keysEarned={keysEarned}
           payoutSaved={payoutSaved}
-          mapsCleared={mapsCleared}
           // Clearing the gauntlet means every gym fell, so all badges show earned.
           badges={config?.badges ?? []}
           badgesEarned={config?.badges?.length ?? 0}
