@@ -150,6 +150,18 @@ export const ITEMS = [
   ...TYPE_BOOST_ITEMS,
 ]
 
+// Mega Stone — NOT part of ITEMS/pickThreeItems/itemOdds. It never drops
+// from a general item node; it is granted exclusively by the MEGA_STONE map
+// node (see game/nodeMap.js). A normal held item otherwise — shares the
+// single held-item slot, moves through the same bag/moveItem paths as
+// Leftovers or Choice Band — but equipping/unequipping it also transforms
+// the holder's form (see game/megas.js applyMega/revertMega).
+export const MEGA_STONE_ITEM = {
+  id: 'mega_stone', name: 'Mega Stone',
+  description: "Mega Evolves the Pokémon it's given to, for as long as it's held",
+  tier: 'legendary', icon: 'mega-stone',
+}
+
 // Consumables that route through App.applyConsumable — they share one contract
 // (`{ roster, used }`, kept when `used` is false) and every drop path treats
 // them identically. Listed here rather than inline at each of the three call
