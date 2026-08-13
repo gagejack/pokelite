@@ -32,6 +32,20 @@ create table if not exists public.catches (
 -- which is why those functions need definer rights at all.
 alter table public.catches enable row level security;
 
+-- The live table already carries a policy named "own catches" (verified
+-- 2026-08-13): `for all` with `auth.uid() = user_id` on both USING and WITH
+-- CHECK. It predates this file and is the real enforcement in production.
+--
+-- It is named here rather than dropped. Permissive policies are ORed, so a
+-- second pair asserting the SAME predicate cannot widen access — and "own
+-- catches" is broader in the direction that matters: `for all` also covers
+-- UPDATE and DELETE, which the two policies below do not grant. Dropping it in
+-- favour of them would LOOSEN nothing but would leave update/delete
+-- unpoliced-by-name, and re-running this file on production would then be a
+-- change rather than a no-op.
+--
+-- The two below exist so an environment rebuilt from supabase/*.sql alone is
+-- still locked down. On production they are redundant, by design.
 drop policy if exists "catches_insert_own" on public.catches;
 create policy "catches_insert_own"
   on public.catches for insert
