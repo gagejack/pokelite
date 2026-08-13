@@ -227,7 +227,7 @@ export default function PlayerStatsPanel({ theme }) {
 
       <Section
         title="Engagement"
-        subtitle="Is anyone playing this region? Every figure covers the selected range."
+        subtitle="Is anyone playing this region? New players counts first-ever runs across every region; the rest are scoped to the selection."
         loading={loading} error={errors.engagement} empty={noRuns(engagement)} theme={theme}
       >
         {engagement && (
@@ -235,7 +235,7 @@ export default function PlayerStatsPanel({ theme }) {
             <Figure label="Total runs" value={engagement.totalRuns.toLocaleString()} theme={theme} />
             <Figure label="Active players" value={engagement.activePlayers.toLocaleString()} theme={theme} />
             <Figure label="Runs / player" value={engagement.runsPerPlayer} theme={theme} />
-            <Figure label="New players" value={engagement.newPlayers.toLocaleString()} theme={theme} />
+            <Figure label="New players (all regions)" value={engagement.newPlayers.toLocaleString()} theme={theme} />
           </div>
         )}
       </Section>

@@ -79,7 +79,13 @@ export function toDifficulty(row) {
     wins,
     winRate: pct(wins, totalRuns),
     avgMaps: num(row.avg_maps),
-    avgElapsedMs: num(row.avg_elapsed_ms),
+    // NOT `num()` — 0 is coerced everywhere else, but here it is a lie. Runs
+    // recorded before elapsed_ms existed leave it null, and SQL avg() skips
+    // nulls, so a window of legacy runs yields avg_elapsed_ms: null alongside
+    // a real total_runs. Coercing that to 0 renders "0m 00s", which an admin
+    // reads as "runs are ending instantly" rather than "data is missing".
+    // Preserving null lets the panel's `?? '—'` show the honest gap instead.
+    avgElapsedMs: row.avg_elapsed_ms == null ? null : num(row.avg_elapsed_ms),
   }
 }
 

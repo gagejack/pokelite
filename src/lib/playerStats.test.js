@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  pct, toEngagement, toDifficulty, toDepth, toStarters, toEconomy, RANGES,
+  pct, toEngagement, toDifficulty, toDepth, toStarters, toEconomy, RANGES, sinceFor,
 } from './playerStats.js'
 
 // Every fixture uses STRINGS for bigint columns, because that is what
@@ -80,7 +80,19 @@ describe('toDifficulty', () => {
     const d = toDifficulty({ total_runs: '0', wins: '0', avg_maps: null, avg_elapsed_ms: null })
     expect(d.winRate).toBe(0)
     expect(d.avgMaps).toBe(0)
-    expect(d.avgElapsedMs).toBe(0)
+    // NOT 0 — a null avg_elapsed_ms means no run in this window has elapsed_ms
+    // recorded (legacy data), which is a missing-data state, not a real
+    // "runs finish instantly" reading. See toDifficulty for why this is the
+    // one field that does not coerce null to 0.
+    expect(d.avgElapsedMs).toBeNull()
+  })
+
+  it('preserves a null avg_elapsed_ms rather than coercing it to 0', () => {
+    // Distinct from the zero-runs case above: total_runs is healthy here, so
+    // this pins the legacy-data scenario specifically — a window with real
+    // runs but no elapsed_ms recorded on any of them.
+    const d = toDifficulty({ total_runs: '50', wins: '5', avg_maps: '2', avg_elapsed_ms: null })
+    expect(d.avgElapsedMs).toBeNull()
   })
 
   it('returns null for a missing row', () => {
@@ -195,5 +207,23 @@ describe('RANGES', () => {
       expect(typeof r.key).toBe('string')
       expect(r.label.length).toBeGreaterThan(0)
     })
+  })
+})
+
+describe('sinceFor', () => {
+  it('returns null for all time', () => {
+    expect(sinceFor('all')).toBeNull()
+  })
+
+  it('returns null for an unrecognized range key', () => {
+    expect(sinceFor('nonsense')).toBeNull()
+  })
+
+  it('goes 30 days back, not 30 hours', () => {
+    // A generous few-second tolerance keeps this from flaking on slow CI,
+    // while still being tight enough to catch a days/hours unit mix-up.
+    const expected = Date.now() - 30 * 86400000
+    const actual = new Date(sinceFor('30d')).getTime()
+    expect(Math.abs(actual - expected)).toBeLessThan(5000)
   })
 })
