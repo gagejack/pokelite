@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { applyBattleVictory, evolveInto, checkEvolution, applyRareCandy, GEN_MAX_ID } from '../game/pokemon.js'
 import { BALANCE } from '../game/balance.js'
-import EvolutionNotice from '../components/EvolutionNotice'
+import EvolutionAnimation from '../components/EvolutionAnimation'
 import EvolutionChoice from '../components/EvolutionChoice'
 
 // Shared post-battle victory + evolution flow for the two screens that resolve
@@ -37,7 +37,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     // Each evolved form is a new owned species for the Pokédex.
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
     setRoster(updatedRoster)
-    if (notices.length > 0) setEvolutionNotices(notices)
+    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...notices])
     if (choices.length > 0) setEvolutionChoices(choices)
     return updatedRoster
   }
@@ -127,7 +127,19 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
         />
       )
     }
-    return <EvolutionNotice notices={evolutionNotices} onDismiss={() => setEvolutionNotices([])} />
+    if (evolutionNotices.length === 0) return null
+    const notice = evolutionNotices[0]
+    return (
+      <EvolutionAnimation
+        key={`${notice.pokeId}-${notice.from}-${notice.to}`}
+        fromSprite={notice.fromSprite}
+        toSprite={notice.toSprite}
+        fromName={notice.from}
+        toName={notice.to}
+        mode="evolve"
+        onDismiss={() => setEvolutionNotices(prev => prev.slice(1))}
+      />
+    )
   }
 
   return { applyVictory, evolveWithStone, useRareCandy, render, evolutionNotices, evolutionChoices }
