@@ -15,8 +15,22 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
 const SHINY_SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
 
-// `kind` is 'legendary' | 'shiny'. Everything else about the popup is identical
-// between the two, which is why it is one component with a flag rather than two.
+// `kind` is 'caught' | 'legendary' | 'shiny'. Everything else about the popup is
+// identical between them, which is why it is one component with a flag rather
+// than three. Only 'shiny' changes the sprite — the other two show a species in
+// its normal colours.
+const TITLES = {
+  caught: 'All Species Caught',
+  legendary: 'Legendaries Caught',
+  shiny: 'Shinies Caught',
+}
+
+const EMPTY = {
+  caught: 'No species caught yet',
+  legendary: 'No legendaries caught yet',
+  shiny: 'No shinies caught yet',
+}
+
 export default function CollectionDetail({ kind, list, onClose }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
@@ -44,7 +58,7 @@ export default function CollectionDetail({ kind, list, onClose }) {
       }}>
         <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: panelBorder }}>
           <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor }}>
-            {isShiny ? 'Shinies Caught' : 'Legendaries Caught'}
+            {TITLES[kind] ?? TITLES.caught}
           </span>
           <button
             onClick={onClose}
@@ -62,7 +76,7 @@ export default function CollectionDetail({ kind, list, onClose }) {
           {rows.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <span style={{ fontFamily: 'Upheaval', fontSize: '12px', color: mutedColor, textAlign: 'center' }}>
-                {isShiny ? 'No shinies caught yet' : 'No legendaries caught yet'}
+                {EMPTY[kind] ?? EMPTY.caught}
               </span>
             </div>
           ) : (

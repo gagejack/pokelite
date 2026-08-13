@@ -11,6 +11,8 @@ import ProfilePanel from './ProfilePanel'
 import GuestProfile from './GuestProfile'
 import CollectionDetail from './CollectionDetail'
 import { levelForXp, sumSpeedCashEarned } from '../game/level.js'
+import { TOP_CAUGHT_LIMIT } from '../lib/playerProfile.js'
+import { fmtWinDate } from '../lib/formatRunTime.js'
 import { TYPE_COLORS } from '../game/types.js'
 import { itemByName, itemIconUrl } from '../game/items.js'
 import { REGION_STARTERS } from '../game/starters.js'
@@ -76,10 +78,15 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
       if (cancelled) return
       if (!user) { setLoggedIn(false); setLoading(false); return }
       setLoggedIn(true)
+      // Ordered newest-first so the Hall of Fame shows the most recent win at
+      // the top. Without an explicit order the rows arrive in whatever order
+      // Postgres returns them, which is not a guarantee — the trophy case
+      // looked chronological only by accident of insertion.
       const { data, error } = await supabase
         .from('runs')
-        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster, elapsed_ms, starter_id')
+        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster, elapsed_ms, starter_id, created_at')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
       if (cancelled) return
       const rows = (!error && data) ? data : []
 
@@ -131,11 +138,16 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
         ? { maps: best.maps_cleared ?? 0, elapsedMs: best.elapsed_ms ?? null }
         : null
 
-      // Top 10 most-caught species, starters excluded. A starter is not caught,
-      // it is chosen — counting it here would put whatever you pick most at the
-      // top of a list about catching, which is a different question (answered
-      // by favouriteStarter below).
-      const topCaught = [...(() => {
+      // Most-caught species, starters excluded. A starter is not caught, it is
+      // chosen — counting it here would put whatever you pick most at the top
+      // of a list about catching, which is a different question (answered by
+      // favouriteStarter below).
+      //
+      // The full ordering is kept as well as the top 10: the grid shows ten to
+      // hold its shape on the page, and "View all" opens the rest. Both come
+      // from this one sort so the popup can never disagree with the grid about
+      // order or counts.
+      const allCaught = [...(() => {
         const m = new Map()
         ;(catchRows ?? []).forEach(row => {
           if (STARTER_IDS.has(row.species_id)) return
@@ -143,7 +155,8 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
           e.count += 1; m.set(row.species_id, e)
         })
         return m.values()
-      })()].sort(byCountThenId).slice(0, 10)
+      })()].sort(byCountThenId)
+      const topCaught = allCaught.slice(0, TOP_CAUGHT_LIMIT)
 
       // Most-chosen starter, counted over runs STARTED — the honest reading of
       // "favourite". Counting wins instead would answer "most successful",
@@ -157,11 +170,27 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
         .sort((a, b) => b[1] - a[1] || a[0] - b[0])
         .map(([id, count]) => ({ id, count }))[0] ?? null
 
+      // Winning teams, most recent first. The query already orders that way;
+      // this re-sorts anyway because a row saved before created_at had a
+      // default could carry null, and a null must not silently land wherever
+      // the database happened to put it. Nulls sort last — an undated win is
+      // the oldest thing in the case, since every dated one came after the
+      // column existed.
+      //
+      // Each entry carries its date now, not just the roster, so the card can
+      // say WHEN the win happened. `roster` keeps the old shape underneath so
+      // the grid below reads the same list it always did.
       const winRosters = rows
         .filter(r => r.result === 'win' && r.winning_roster)
-        .map(r => r.winning_roster)
+        .map(r => ({ roster: r.winning_roster, wonAt: r.created_at ?? null }))
+        .sort((a, b) => {
+          if (a.wonAt === b.wonAt) return 0
+          if (a.wonAt == null) return 1
+          if (b.wonAt == null) return -1
+          return new Date(b.wonAt) - new Date(a.wonAt)
+        })
 
-      setStats({ totalRuns, wins, losses, winRate, totalBadges, totalCatches, totalCashEarned, levelInfo, legendaries, shinies, winRosters, bestRun, topCaught, favouriteStarter })
+      setStats({ totalRuns, wins, losses, winRate, totalBadges, totalCatches, totalCashEarned, levelInfo, legendaries, shinies, winRosters, bestRun, topCaught, allCaught, favouriteStarter })
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -195,8 +224,9 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               onClick={() => setTab('stats')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'stats' ? textColor : mutedColor,
-                background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
-                borderBottom: tab === 'stats' ? `2px solid ${textColor}` : '2px solid transparent',
+                background: 'none', cursor: 'pointer', padding: '8px 14px',
+                border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
+                backgroundColor: tab === 'stats' ? (dark ? '#00558e' : '#fce329') : 'transparent',
               }}
             >
               Stats
@@ -205,8 +235,9 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
               onClick={() => setTab('halloffame')}
               style={{
                 fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'halloffame' ? textColor : mutedColor,
-                background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
-                borderBottom: tab === 'halloffame' ? `2px solid ${textColor}` : '2px solid transparent',
+                background: 'none', cursor: 'pointer', padding: '8px 14px',
+                border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
+                backgroundColor: tab === 'halloffame' ? (dark ? '#00558e' : '#fce329') : 'transparent',
               }}
             >
               Hall of Fame
@@ -219,8 +250,9 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                 onClick={() => setTab('balance')}
                 style={{
                   fontFamily: 'Upheaval', fontSize: '22px', color: tab === 'balance' ? '#facc15' : mutedColor,
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0',
-                  borderBottom: tab === 'balance' ? '2px solid #facc15' : '2px solid transparent',
+                  background: 'none', cursor: 'pointer', padding: '8px 14px',
+                  border: '2px solid #000', boxShadow: '-2px 3px 0 0 #000',
+                  backgroundColor: tab === 'balance' ? '#3a3a3a' : 'transparent',
                 }}
               >
                 Balance
@@ -408,15 +440,32 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                   Beat the Champion and the team that did it is enshrined here.
                 </span>
               ) : (
-                stats.winRosters.map((roster, i) => (
+                stats.winRosters.map((win, i) => {
+                  const wonOn = fmtWinDate(win.wonAt)
+                  return (
                   <div key={i} style={{
                     backgroundColor: innerBg, border: panelBorder,
                     boxShadow: dark ? '-2px 3px 0 0 #121212' : '-2px 3px 0 0 #2e2e2e',
                     padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
                   }}>
-                    <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: accent(dark) }}>
-                      Win #{i + 1}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+                      {/* The list runs newest-first, so the number counts DOWN:
+                          "Win #1" has to stay the first Champion you ever beat,
+                          not whichever one is currently on top. Numbering by
+                          position would renumber every past win each time you
+                          won again. */}
+                      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: accent(dark) }}>
+                        Win #{stats.winRosters.length - i}
+                      </span>
+                      {/* The date only appears once there is one. Wins recorded
+                          before created_at carried a value simply show no date
+                          rather than a fabricated one. */}
+                      {wonOn && (
+                        <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: mutedColor }}>
+                          {wonOn}
+                        </span>
+                      )}
+                    </div>
                     {/* Three across on desktop, two on mobile. A fixed count
                         rather than wrapping: six Pokémon divide evenly into
                         both, so no card is ever left orphaned on its own row
@@ -433,7 +482,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                           into winners and losers, which is the one thing this
                           room should never do. Level is the honest label — it is
                           what the Pokémon became over the run. */}
-                      {roster.map((p, j) => {
+                      {win.roster.map((p, j) => {
                         return (
                           <div
                             key={`${p.id}-${j}`}
@@ -573,7 +622,8 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                       })}
                     </div>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           ) : (
@@ -592,7 +642,11 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
         {detail && (
           <CollectionDetail
             kind={detail}
-            list={detail === 'shiny' ? stats?.shinies : stats?.legendaries}
+            list={
+              detail === 'shiny' ? stats?.shinies
+                : detail === 'legendary' ? stats?.legendaries
+                  : stats?.allCaught
+            }
             onClose={() => setDetail(null)}
           />
         )}

@@ -59,7 +59,10 @@ export default function GuestProfile({ username }) {
       // would multiply the time to first paint by four.
       const [profile, caught, rares, starter] = await Promise.all([
         supabase.rpc('player_profile', { uname: username }),
-        supabase.rpc('player_collections', { uname: username, starter_ids: STARTER_IDS }),
+        // limit_n: 0 means no cap — the whole species list in one call. The
+        // grid slices its ten from this rather than a second capped request,
+        // so the popup and the grid can never disagree about order or counts.
+        supabase.rpc('player_collections', { uname: username, starter_ids: STARTER_IDS, limit_n: 0 }),
         supabase.rpc('player_collection_rares', { uname: username, legendary_ids: LEGENDARY_IDS }),
         supabase.rpc('player_favourite_starter', { uname: username }),
       ])
@@ -128,7 +131,11 @@ export default function GuestProfile({ username }) {
       {detail && (
         <CollectionDetail
           kind={detail}
-          list={detail === 'shiny' ? stats.shinies : stats.legendaries}
+          list={
+            detail === 'shiny' ? stats.shinies
+              : detail === 'legendary' ? stats.legendaries
+                : stats.allCaught
+          }
           onClose={() => setDetail(null)}
         />
       )}

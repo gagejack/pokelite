@@ -82,6 +82,11 @@ export default function ProfilePanel({ stats, scope = 'self', onOpenDetail }) {
 
   const isSelf = scope === 'self'
   const bestTime = stats.bestRun ? fmtRunTime(stats.bestRun.elapsedMs) : null
+  // How many distinct species the player has caught. `allCaught` is the full
+  // ordering behind the ten-tile grid; falling back to the grid's own length
+  // means a caller that supplies only `topCaught` simply shows no "View all",
+  // rather than offering a popup with nothing extra in it.
+  const totalCaughtSpecies = stats.allCaught?.length ?? stats.topCaught?.length ?? 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -212,6 +217,29 @@ export default function ProfilePanel({ stats, scope = 'self', onOpenDetail }) {
               </div>
             ))}
           </div>
+        )}
+
+        {/* "View all" — only once there is more than the grid already shows.
+            The count is in the label rather than a bare "View all", because the
+            number IS the reason to tap: it says how much more there is.
+
+            Underlined text rather than a filled button. The two gradient boxes
+            further down are the loud controls in this column, and a third solid
+            button here would compete with them for the same job. */}
+        {totalCaughtSpecies > (stats.topCaught?.length ?? 0) && (
+          <button
+            onClick={() => onOpenDetail?.('caught')}
+            className="hover:opacity-70 transition-opacity"
+            style={{
+              fontFamily: 'Orange Kid', fontSize: '15px', color: mutedColor,
+              background: 'none', border: 'none', cursor: 'pointer',
+              alignSelf: 'flex-start', padding: '4px 0',
+              textDecoration: 'underline', textDecorationStyle: 'dotted',
+              textUnderlineOffset: '3px', textDecorationColor: mutedColor,
+            }}
+          >
+            {`View all ${totalCaughtSpecies} species`}
+          </button>
         )}
       </div>
 

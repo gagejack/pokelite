@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toProfileStats, toCollections } from './playerProfile.js'
+import { toProfileStats, toCollections, TOP_CAUGHT_LIMIT } from './playerProfile.js'
 
 // A representative RPC row. bigint columns arrive as STRINGS over PostgREST,
 // so the fixture uses strings where Postgres would send them — that is the
@@ -119,6 +119,24 @@ describe('toCollections', () => {
     expect(typeof c.topCaught[0].count).toBe('number')
   })
 
+  it('slices the grid from the full list rather than a second query', () => {
+    // The RPC is called uncapped and the grid takes its ten from the result, so
+    // the popup and the grid cannot disagree about order or counts.
+    const many = Array.from({ length: 14 }, (_, i) => ({
+      species_id: i + 1, name: `mon${i + 1}`, count: String(20 - i),
+    }))
+    const c = toCollections(many, [], null)
+    expect(c.allCaught).toHaveLength(14)
+    expect(c.topCaught).toHaveLength(TOP_CAUGHT_LIMIT)
+    // The grid is a prefix of the full list — same data, same order.
+    expect(c.topCaught).toEqual(c.allCaught.slice(0, TOP_CAUGHT_LIMIT))
+  })
+
+  it('leaves allCaught and topCaught equal when under the cap', () => {
+    const c = toCollections(caught, rares, null)
+    expect(c.allCaught).toEqual(c.topCaught)
+  })
+
   it('preserves the order SQL returned rather than re-sorting', () => {
     // Both surfaces must agree on ties, so the client never re-sorts.
     const c = toCollections(caught, rares, null)
@@ -139,6 +157,7 @@ describe('toCollections', () => {
     // must still render, with empty sections.
     const c = toCollections(undefined, undefined, null)
     expect(c.topCaught).toEqual([])
+    expect(c.allCaught).toEqual([])
     expect(c.legendaries).toEqual([])
     expect(c.shinies).toEqual([])
     expect(c.favouriteStarter).toBeNull()

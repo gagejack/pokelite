@@ -51,16 +51,27 @@ function toSpecies(row) {
   return { id: Number(row.species_id), name: row.name, count: Number(row.count) }
 }
 
-// The collection RPC rows → the three lists ProfilePanel renders.
+// How many species the Most Caught grid shows before "View all" takes over.
+// Ten fills two rows on desktop and holds the profile's shape; the rest live in
+// the popup. Exported so the grid and the popup agree on where the cut is.
+export const TOP_CAUGHT_LIMIT = 10
+
+// The collection RPC rows → the lists ProfilePanel renders.
 //
 // `rares` returns legendaries and shinies interleaved in one result, tagged by
 // `kind`, so this splits them back apart. Both arrive already ordered by count
 // from SQL; the client does not re-sort, or the two surfaces could disagree
 // about ties.
+//
+// `caughtRows` is the FULL species list (the RPC is called uncapped). The grid's
+// ten are sliced from it here rather than fetched separately, so the popup and
+// the grid are guaranteed to be the same data cut in two places.
 export function toCollections(caughtRows, rareRows, starterRow) {
   const rares = rareRows ?? []
+  const allCaught = (caughtRows ?? []).map(toSpecies)
   return {
-    topCaught: (caughtRows ?? []).map(toSpecies),
+    allCaught,
+    topCaught: allCaught.slice(0, TOP_CAUGHT_LIMIT),
     legendaries: rares.filter(r => r.kind === 'legendary').map(toSpecies),
     shinies: rares.filter(r => r.kind === 'shiny').map(toSpecies),
     // A player with no runs carrying a starter_id has no favourite yet, which

@@ -114,9 +114,22 @@ grant execute on function public.player_profile(text) to anon, authenticated;
 -- Returns one row per species, tagged by which list it belongs to. `kind` is
 -- 'caught' | 'legendary' | 'shiny'; a species can appear under more than one
 -- (a shiny legendary is both), exactly as the client's three maps do.
+-- The earlier two-argument version is dropped FIRST: `create or replace` does
+-- not replace a function whose signature changed, it adds an overload. Two
+-- versions differing only by a defaulted trailing argument make a two-argument
+-- call ambiguous, and PostgREST fails it. This must run before the create
+-- below, or it would drop the function this file just defined. Safe if the old
+-- version never existed.
+drop function if exists public.player_collections(text, integer[]);
+
+-- `limit_n` is what the profile grid shows (10) versus what the "View all"
+-- popup shows (the whole list). The cap exists so the grid keeps its shape on
+-- the profile, not because the rest of the data is withheld — passing a larger
+-- number returns more, and 0 or null returns everything.
 create or replace function public.player_collections(
   uname       text,
-  starter_ids integer[] default '{}'
+  starter_ids integer[] default '{}',
+  limit_n     integer default 10
 )
 returns table (
   kind       text,
@@ -158,7 +171,10 @@ as $$
   from per_species
   where not (species_id = any (starter_ids))
   order by total desc, species_id asc
-  limit 10
+  -- null (or 0, or a negative) means "no cap" — the popup asks for the whole
+  -- list that way rather than passing a magic large number that a prolific
+  -- player could one day exceed.
+  limit case when coalesce(limit_n, 0) > 0 then limit_n else null end
 $$;
 
 -- The three lists are unioned client-side rather than in one statement: a
@@ -236,6 +252,6 @@ as $$
   limit 1;
 $$;
 
-grant execute on function public.player_collections(text, integer[]) to anon, authenticated;
+grant execute on function public.player_collections(text, integer[], integer) to anon, authenticated;
 grant execute on function public.player_collection_rares(text, integer[]) to anon, authenticated;
 grant execute on function public.player_favourite_starter(text) to anon, authenticated;

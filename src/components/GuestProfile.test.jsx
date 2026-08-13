@@ -121,6 +121,38 @@ test('the legendaries popup opens on a guest profile with that player\'s species
   expect(screen.queryByText('magikarp')).toBeNull()
 })
 
+test('View all opens the full species list, beyond the ten in the grid', async () => {
+  // Fourteen species: the grid shows ten, the popup shows all fourteen.
+  const many = Array.from({ length: 14 }, (_, i) => ({
+    kind: 'caught', species_id: i + 1, name: `mon${i + 1}`, count: String(20 - i),
+  }))
+  rpc.mockImplementation(name => {
+    if (name === 'player_profile') return Promise.resolve({ data: [profileRow], error: null })
+    if (name === 'player_collections') return Promise.resolve({ data: many, error: null })
+    if (name === 'player_collection_rares') return Promise.resolve({ data: [], error: null })
+    if (name === 'player_favourite_starter') return Promise.resolve({ data: [], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  withTheme(<GuestProfile username="ash" />)
+
+  await waitFor(() => expect(screen.getByText('Most Caught')).toBeTruthy())
+  // The grid stops at ten, so the eleventh is not on the page yet.
+  expect(screen.getByText('mon10')).toBeTruthy()
+  expect(screen.queryByText('mon11')).toBeNull()
+
+  fireEvent.click(screen.getByText('View all 14 species'))
+  await waitFor(() => expect(screen.getByText('All Species Caught')).toBeTruthy())
+  expect(screen.getByText('mon14')).toBeTruthy()
+})
+
+test('View all stays hidden when the grid already shows everything', async () => {
+  mockBoard()   // two caught species, well under the cap
+  withTheme(<GuestProfile username="ash" />)
+  await waitFor(() => expect(screen.getByText('Most Caught')).toBeTruthy())
+  // A popup holding nothing the grid doesn't already show is not worth a control.
+  expect(screen.queryByText(/View all/)).toBeNull()
+})
+
 test('a collection query that fails leaves the profile standing', async () => {
   // The figures are the page; the collections are detail on it. A collections
   // outage must not replace a good profile with an error screen.
