@@ -23,6 +23,12 @@ Two facts shape the whole design:
   server-side admin check. The client-side `isAdmin` flag hides UI; it is not a
   security boundary.
 
+**Pre-existing schema drift this work must repair first.** `runs.elapsed_ms`,
+`runs.starter_id`, and the entire `catches` table are read by shipped code but
+defined by no file in `supabase/`. They exist only in the live database. This
+tab depends on all three, so committing their DDL is step one — not a tidy-up,
+a prerequisite.
+
 ## Naming
 
 Player-facing tab label: **Player Stats**. Code identifier: `'playerstats'`,
@@ -34,16 +40,58 @@ Three layers, mirroring the guest-profile work already in the tree.
 
 ### 1. Schema
 
-Two changes to `runs`:
+**Repairing existing drift first.** `runs.elapsed_ms` and `runs.starter_id` are
+read by `player_profile.sql` and written by `App.jsx`, but **no `alter table` in
+this repo ever adds them**. They exist only in the live database. A environment
+rebuilt from `supabase/*.sql` would break the shipped profile RPCs *and* this
+tab's backfill and Starters panel. `runs_tracking.sql` gains them:
 
 ```sql
 alter table public.runs
-  add column if not exists region text;
+  add column if not exists elapsed_ms  bigint,
+  add column if not exists starter_id  integer,
+  add column if not exists region      text;
 ```
 
-`region` is nullable by design. A null means "region unknown", which is a real
-state for historical rows and must stay distinguishable from any actual region
-name — never defaulted to 'Kanto'.
+All three are nullable, matching what the live table already holds for
+historical rows.
+
+**`catches` has no DDL anywhere in the repo** — only a comment in `App.jsx:824`.
+Every surface that reads it (the Pokédex, Stats, and four shipped SECURITY
+DEFINER RPCs) assumes a shape no committed file defines. A new
+`supabase/catches.sql` commits the authoritative table and its RLS policies:
+
+```sql
+create table if not exists public.catches (
+  id         bigserial primary key,
+  user_id    uuid references auth.users (id) on delete cascade,
+  region     text,
+  species_id integer,
+  name       text,
+  shiny      boolean not null default false,
+  caught_at  timestamptz not null default now()
+);
+alter table public.catches enable row level security;
+-- own-row-only, mirroring runs_tracking.sql
+```
+
+This is documentation of an existing table, not a new one. It must be verified
+against the live table before being applied — if the live shape differs, the
+live shape wins and this file is corrected to match.
+
+**Indexes.** The four RPCs filter `runs` by region and date on every control
+change, and the backfill scans `catches` by user and time:
+
+```sql
+create index if not exists runs_region_created_idx
+  on public.runs (region, created_at);
+create index if not exists catches_user_caught_idx
+  on public.catches (user_id, caught_at);
+```
+
+`region` is nullable by design. A null means "region unknown", a real state for
+historical rows that must stay distinguishable from any actual region name —
+never defaulted to 'Kanto'.
 
 `App.jsx recordRunEnd` writes `region: selectedRegion?.name ?? null` into the
 existing payload. This is the same value `recordCatch` already writes and the
@@ -105,6 +153,27 @@ there is no case for a logged-out caller here.
   another member of the same list.
 - `since timestamptz default null` — null means "all time".
 
+**Precedence, stated so it cannot be guessed at.** `unknown_only = true`
+**overrides `region` entirely**; `region` is ignored when it is set. The
+alternative — ANDing them — produces `region = 'Kanto' and region is null`,
+which is unsatisfiable and would render as a convincing but false "no data"
+state. Written as a single branch in SQL:
+
+```sql
+where (unknown_only and r.region is null)
+   or (not unknown_only and (region is null or r.region = region))
+```
+
+The UI cannot express the contradiction (the picker is one control whose
+Unknown entry sets the boolean and clears the name), but the SQL must not depend
+on the UI to stay correct.
+
+**`set search_path = public, pg_temp` on every function**, and every table
+reference schema-qualified. The existing functions in this repo already set
+`search_path = public`; adding `pg_temp` closes the remaining hijack vector,
+where an attacker-created temp object shadows an intended table inside a
+SECURITY DEFINER body.
+
 **Starter ids are a parameter**, not a literal, for the same reason as
 `player_collections`: `REGION_STARTERS` lives in `starters.js` and changes when
 a region is added. A copy in SQL would drift silently.
@@ -122,10 +191,44 @@ a region is added. A copy in SQL would drift silently.
   both are already at module scope, so this is a move, not a rewrite.
   `BalanceDashboard.jsx` imports them from the new location.
 
+  **The theme bundle moves with them.** It is currently built by a `useMemo`
+  inside `BalanceDashboard` (`:327`). If `PlayerStats` built its own, the two
+  admin surfaces would drift into slightly different panel styling. So
+  `AdminPanels.jsx` exports a `useAdminTheme()` hook holding that one
+  definition, and both dashboards call it. One source, no drift.
+
 **Why a sibling file, not a section of BalanceDashboard.** `BalanceDashboard.jsx`
 is 660 lines and is a *tuning-knob editor* — every panel writes. This tab is
 *read-only observation*. Four more panels would push that file past 900 lines
 and mix two jobs in one component.
+
+### 4. Stats.jsx integration
+
+Three touchpoints, all of which must change together — the third is the one
+that is easy to miss and causes a real bug:
+
+1. **Tab button** in the header row, beside Balance, gated on `isAdmin` and
+   styled the same yellow.
+2. **Body branch**: `tab === 'playerstats' && isAdmin ? <PlayerStats /> : …`.
+   The `&& isAdmin` is not redundant with the button being hidden — it is the
+   guard that keeps a stale tab value from rendering an admin surface.
+3. **The admin-lost reset effect** (`Stats.jsx:63`) currently reads
+   `t === 'balance' ? 'stats' : t`. It must become
+   `(t === 'balance' || t === 'playerstats') ? 'stats' : t`. Without this, a
+   role revoked mid-session while the tab is open leaves `tab` pointing at a
+   surface whose button is gone and whose branch now fails its guard — a blank
+   sheet with no way back.
+
+**The header tab row and mobile.** `AGENTS.md` puts mobile layout first, and
+`Stats.jsx:52` already carries a warning that the sub-tab row overflows on a
+phone. This adds a **fourth** top-level tab, and "Player Stats" is the longest
+label of the four.
+
+The header row gets `overflow-x: auto` with `flex-shrink: 0` on each button, so
+it scrolls horizontally rather than wrapping or clipping. Scrolling is chosen
+over shortening the label because the two admin tabs are only ever visible to
+admins — the common case is three tabs, which already fits — and an abbreviation
+like "Players" would read as a *player list* rather than aggregate statistics.
 
 ## The four panels
 
@@ -136,10 +239,25 @@ and **Unknown** entry.
 
 ### Engagement
 
-Total runs · active players · runs per player · new players in range ·
-returning-player rate (players with 2+ runs).
+Total runs · active players · runs per player · new players · returning-player
+rate.
 
 Answers: is anyone playing this region?
+
+**Every one of these is scoped to the selected range**, stated explicitly
+because each has a second plausible reading that yields a different number:
+
+| Figure | Definition |
+|---|---|
+| Total runs | Runs whose `created_at` is in range |
+| Active players | Distinct `user_id` with ≥1 run in range |
+| Runs per player | Total runs ÷ active players |
+| New players | Players whose **first-ever** run (`min(created_at)` across all time) falls in range |
+| Returning rate | Share of active players with **≥2 runs in range** |
+
+"New players" deliberately looks at all-time history to decide *first-ever*,
+then asks whether that first run lands in the window — otherwise every player
+would count as new in any range that excludes their debut.
 
 ### Difficulty
 
@@ -151,6 +269,18 @@ distribution as `Bar` rows.
 from a lost one — nothing records a quit. A death curve is a claim this data
 cannot support; the deepest-reached distribution is the same shape without the
 false precision.
+
+**"Deepest reached" is not `maps_cleared` — it is one more than that on any run
+that did not win.** A loss with `maps_cleared = 3` cleared three maps and then
+died on the fourth, so it *reached* map 4. Plotting raw `maps_cleared` under a
+"reached" label would shift every losing run one bin left and make the game look
+harder, earlier, than it is:
+
+```sql
+r.maps_cleared + case when r.result = 'win' then 0 else 1 end as deepest_map
+```
+
+A win reached exactly the maps it cleared, so it takes no increment.
 
 ### Starters
 
@@ -185,12 +315,45 @@ re-run a backfill months later over rows that are already correct.
 `caught_at` falls inside it. If every catch in the window names the same region,
 assign it. Otherwise leave the run null.
 
+**The empty-window case must be handled explicitly**, because it is the one that
+silently inflates `Unknown`. A run can carry `pokemon_caught > 0` and still have
+zero catches inside its computed window — if `elapsed_ms` measures something
+narrower than wall-clock time, or a catch landed on the boundary. Treating that
+as "no catches" would dump attributable runs into `Unknown` with no way to tell
+them apart from genuinely unattributable ones.
+
+The rule, in three tiers:
+
+1. **Catches in window, all agreeing** → assign that region. High confidence.
+2. **Window empty but `pokemon_caught > 0`** → do **not** assign. Count these
+   separately and report them as `needs-review` in the dry-run summary. A
+   non-zero count here means `elapsed_ms` does not mean what the window
+   assumes, and the rule needs revisiting before the write pass runs.
+3. **Everything else** (`pokemon_caught = 0`, no `elapsed_ms`, or catches in
+   window disagreeing) → leave null, bucket as `Unknown`.
+
+**Verify `elapsed_ms` semantics before trusting tier 1.** `App.jsx:772` computes
+it as `Date.now() - runStartedAt`, which is wall-clock and should cover the whole
+run — but that is an assumption this script depends on, and tier 2's count is
+what proves or disproves it against real data.
+
 **Accepted limitations**, stated plainly because the dashboard reports on them:
 
 - A run with **zero catches** cannot be attributed and stays `Unknown`.
 - Two runs in **different regions within one session** may be ambiguous at the
   boundary; the all-catches-agree rule leaves those null rather than guessing.
 - Runs recorded before `elapsed_ms` existed have no window and stay `Unknown`.
+
+**Credentials and safety.** The script reads every user's `catches` and writes
+`runs.region`, so it needs the service-role key to bypass RLS:
+
+- Key comes from an environment variable, **never committed** — same rule as
+  `.env.local`.
+- **Dry-run by default.** It prints the attribution counts (assigned /
+  needs-review / unknown, broken down by region) and writes nothing unless
+  explicitly passed a write flag.
+- **Batched updates**, 500 rows per transaction, so a large table is never
+  locked in one statement.
 
 The `Unknown` count is **shown in the dashboard**, not hidden. A visible bucket
 is honest about how much of the picture is inferred; a silently-dropped one
@@ -207,8 +370,15 @@ On mount, and on any change to region or range, the four RPCs fire together via
 serialising them would multiply time-to-paint by four.
 
 Each panel owns its own error state. One failed RPC renders that panel's error
-and leaves the other three standing, matching the collections fail-soft
-behaviour already in `GuestProfile`.
+and leaves the other three standing.
+
+**This is new behaviour, not an existing pattern to copy.** `GuestProfile` has
+one whole-profile failure flag and *swallows* its collection errors into silent
+empty sections (`GuestProfile.jsx:71-79`) — a failed collection query is
+indistinguishable there from a player who has caught nothing. That is
+acceptable when the missing piece is decorative detail; it is not acceptable
+here, where an empty Economy panel and a broken Economy panel would lead to
+opposite tuning decisions. Per-panel error UI must be built, not imitated.
 
 Switching region or range clears the previous result before the new request
 lands, so stale figures are never shown under a new region's heading — the same
@@ -237,15 +407,42 @@ defect the `GuestProfile` switching test pins.
 - Percentage rows sum to ~100% and handle a single-starter case
 - The `Unknown` bucket survives transform and is never merged into a named region
 - Empty result sets produce empty panels, not crashes
+- **Deepest-map derivation**: a loss with `maps_cleared = 3` lands in bin 4, a
+  win with `maps_cleared = 3` lands in bin 3. This is the off-by-one the
+  "reached" label depends on.
 
 **Component — `src/components/PlayerStats.test.jsx`:**
 - Changing region clears the previous figures while loading
 - One failed RPC leaves the other three panels rendered
 - A zero-run region renders its empty state
 
+**Component — `Stats.test.jsx` (or an addition to an existing suite):**
+- Losing the admin role while the Player Stats tab is open falls back to Stats
+  rather than leaving a blank sheet. This is the reset-effect bug in touchpoint
+  3 above, and it is invisible without a test.
+
 **Not tested:** the SQL itself and the backfill script, neither of which can run
-without a live database. The backfill's matching rule is the risky part and
-should be checked against a real table before it is run in anger.
+without a live database. The backfill's matching rule is the risky part; its
+dry-run `needs-review` count is the intended substitute for a test, and should
+be read before any write pass.
+
+## Deploy order
+
+**This sequence is not optional. Reversing the first two steps loses run data.**
+
+A PostgREST insert naming a column that does not exist fails the **entire**
+insert. `App.jsx:787-790` documents exactly this having happened before, when
+`pokemon_seen_shiny_ids` shipped ahead of its column and every run-end write
+failed unnoticed. If the client deploys first, every finished run is discarded
+until the SQL is applied.
+
+1. **Apply the SQL** — `runs_tracking.sql` (the three added columns),
+   `catches.sql`, then `player_stats.sql`. All idempotent, all safe to re-run.
+2. **Deploy the client** — only now does `recordRunEnd` start sending `region`,
+   into a column that already exists.
+3. **Run the backfill** — dry-run first, read the `needs-review` count, then
+   write. Last, because it is the only irreversible step and the only one that
+   benefits from the other two being settled.
 
 ## Out of scope
 
