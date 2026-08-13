@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { applyBattleVictory, evolveInto, checkEvolution, applyRareCandy, GEN_MAX_ID } from '../game/pokemon.js'
 import { BALANCE } from '../game/balance.js'
 import EvolutionAnimation from '../components/EvolutionAnimation'
@@ -24,6 +24,16 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
   // Pending multi-branch evolution picks (Eevee, Tyrogue…) — the popup shows
   // one at a time; the Pokémon stays un-evolved until the player chooses.
   const [evolutionChoices, setEvolutionChoices] = useState([])
+  // Monotonic id source for evolution notices, stamped as `_seq` at the point
+  // each notice is queued (see tagNotices below). Two DIFFERENT roster slots
+  // evolving into the SAME target species in one batch (e.g. two Pichus both
+  // becoming Pikachu off one battle win) produce notices with identical
+  // `pokeId`/`from`/`to` — a key built from those fields alone collides, so
+  // React won't remount EvolutionAnimation between them and the second popup
+  // opens already past its flash animation. `_seq` is unique per notice
+  // occurrence regardless of species content, so it's used as the React key.
+  const noticeSeq = useRef(0)
+  const tagNotices = list => list.map(n => ({ ...n, _seq: noticeSeq.current++ }))
 
   // Apply a battle victory: level-ups, heal, auto-evolutions, and multi-branch
   // choice detection. Records auto-evolved species as owned, updates the roster,
@@ -37,7 +47,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     // Each evolved form is a new owned species for the Pokédex.
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
     setRoster(updatedRoster)
-    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...notices])
+    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...tagNotices(notices)])
     if (choices.length > 0) setEvolutionChoices(choices)
     return updatedRoster
   }
@@ -60,7 +70,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (!used) return false
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
     setRoster(next)
-    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...notices])
+    if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...tagNotices(notices)])
     if (choices.length > 0) setEvolutionChoices(prev => [...prev, ...choices])
     return true
   }
@@ -80,11 +90,11 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (result?.evolved) {
       setRoster(prev => prev.map((p, i) => i === pokeIndex && p.pokeId === target.pokeId ? result.evolved : p))
       onSpeciesOwned?.(result.evolved.pokeId, !!result.evolved.shiny)
-      setEvolutionNotices(prev => [...prev, {
+      setEvolutionNotices(prev => [...prev, ...tagNotices([{
         from: target.name, to: result.evolved.name,
         fromSprite: target.sprite, toSprite: result.evolved.sprite,
         pokeId: result.evolved.pokeId,
-      }])
+      }])])
       return true
     }
     return false
@@ -101,13 +111,13 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (evolved) {
       setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
       onSpeciesOwned?.(evolved.pokeId, !!evolved.shiny)
-      setEvolutionNotices(prev => [...prev, {
+      setEvolutionNotices(prev => [...prev, ...tagNotices([{
         from: choice.fromName, to: evolved.name,
         // The choice popup already carries the pre-evolution sprite, so the
         // notice reuses it rather than re-deriving the old form.
         fromSprite: choice.sprite, toSprite: evolved.sprite,
         pokeId: evolved.pokeId,
-      }])
+      }])])
     }
     setEvolutionChoices(prev => prev.slice(1))
   }
@@ -131,7 +141,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     const notice = evolutionNotices[0]
     return (
       <EvolutionAnimation
-        key={`${notice.pokeId}-${notice.from}-${notice.to}`}
+        key={notice._seq}
         fromSprite={notice.fromSprite}
         toSprite={notice.toSprite}
         fromName={notice.from}
