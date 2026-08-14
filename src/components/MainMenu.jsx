@@ -11,6 +11,7 @@ import SafariRegionBar from './menu/SafariRegionBar'
 import UpdateNotice from './UpdateNotice'
 import { hasSeenUpdate, markUpdateSeen } from '../lib/updateSeen'
 import { VERSION } from '../game/version'
+import { UPDATE_HISTORY } from '../game/updates'
 import { REGIONS } from '../game/regions/regionList'
 import { regionNames } from '../game/regionRegistry'
 import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
@@ -94,11 +95,49 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
   // when unread; the badge reopens it forever after.
   const [unread, setUnread] = useState(() => !hasSeenUpdate())
   const [updateOpen, setUpdateOpen] = useState(() => !hasSeenUpdate())
+  // Which UPDATE_HISTORY entry to open UpdateNotice on. Null means "current"
+  // (the badge and the auto-open-on-unread path both want that); picking a
+  // version from the tag's dropdown sets this so the popup opens straight to
+  // the chosen patch notes instead.
+  const [pickedUpdateId, setPickedUpdateId] = useState(null)
 
   function closeUpdate() {
     markUpdateSeen()
     setUnread(false)
     setUpdateOpen(false)
+    setPickedUpdateId(null)
+  }
+
+  // The version tag, now a dropdown: picking any past version opens its
+  // patch notes directly, same popup the "WHAT'S NEW" badge opens. Selecting
+  // the CURRENT version also counts as reading it, so it clears the unread
+  // dot exactly like opening the badge does — a player who found the notes
+  // this way shouldn't still see "NEW" after closing them.
+  // `textColor`/`textShadow` differ between the mobile column (flat card
+  // background) and the desktop layout (photo background, needs a shadow to
+  // stay legible) — same two knobs the plain text span varied before this
+  // became a control, so the caller still supplies them.
+  function renderVersionSelect(textColor, textShadow) {
+    return (
+      <select
+        value={VERSION}
+        onChange={e => {
+          const picked = UPDATE_HISTORY.find(u => u.version === e.target.value)
+          setPickedUpdateId(picked?.id ?? null)
+          setUpdateOpen(true)
+        }}
+        aria-label="View patch notes for a version"
+        className="hover:opacity-80 transition-opacity"
+        style={{
+          fontFamily: 'Orange Kid', fontSize: '14px', color: textColor, textShadow,
+          backgroundColor: 'transparent', border: 'none', cursor: 'pointer',
+        }}
+      >
+        {UPDATE_HISTORY.map(u => (
+          <option key={u.id} value={u.version}>{u.version}</option>
+        ))}
+      </select>
+    )
   }
 
   // Sits with the version tag in both layouts: the tag says which build this
@@ -265,12 +304,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
 
       {/* Version tag — closes the column, with the patch-notes badge beside it. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{
-          fontFamily: 'Orange Kid', fontSize: '14px',
-          color: dark ? '#888' : '#999',
-        }}>
-          {VERSION}
-        </span>
+        {renderVersionSelect(dark ? '#888' : '#999', 'none')}
         {updateBadge}
       </div>
 
@@ -432,9 +466,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
             <WeeklyStat dark={dark} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: dark ? '#888' : '#ccc', textShadow: '1px 1px 0 rgba(0,0,0,0.9)' }}>
-                {VERSION}
-              </span>
+              {renderVersionSelect(dark ? '#888' : '#ccc', '1px 1px 0 rgba(0,0,0,0.9)')}
               {updateBadge}
             </div>
           </div>
@@ -453,7 +485,7 @@ export default function MainMenu({ onPlay, hasSavedRun, onResume, onOpenDaily, p
       {/* Rendered last so it overlays whichever layout is active. Suppressed
           while the Dex or Stats sheet is open — those are full-screen, and a
           patch note landing on top of one would read as a bug. */}
-      {updateOpen && !pokedexOpen && !statsOpen && !shopOpen && <UpdateNotice onClose={closeUpdate} />}
+      {updateOpen && !pokedexOpen && !statsOpen && !shopOpen && <UpdateNotice onClose={closeUpdate} initialId={pickedUpdateId} />}
       {/* MetaShop — full-screen overlay, matching the Pokédex/Stats pattern
           (spec §6c). profile is passed straight through; every purchase
           round-trips through App.jsx's onProfileChange so the SAME save/

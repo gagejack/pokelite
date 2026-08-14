@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../lib/theme'
 import { accent } from '../lib/colors'
 import { itemIconUrl, tierColor } from '../game/items'
-import { UPDATE, updateItems } from '../game/updates'
+import { UPDATE, UPDATE_HISTORY, updateItems } from '../game/updates'
 
 // Left-edge color per feature row, keyed by name so a reorder in updates.js
 // can't silently swap two rows' colors. Picked to sit apart from the item
@@ -17,7 +17,10 @@ const FEATURE_COLORS = {
 }
 
 // Patch notes for the main menu — shown once per device per UPDATE.id, and
-// reopenable from the menu's NEW badge afterwards (see MainMenu).
+// reopenable from the menu's NEW badge afterwards (see MainMenu). Opens on
+// the current (latest) entry; the version dropdown in the header band lets
+// the player switch to any past entry in UPDATE_HISTORY without leaving
+// the popup.
 //
 // Item rows read their icon, name, tier and description straight from
 // game/items.js, so the notice cannot describe an item differently from the
@@ -26,9 +29,17 @@ const FEATURE_COLORS = {
 // does the ranking that a 01/02 numbering would only imitate.
 //
 // Editing content: game/updates.js. This file is presentation only.
-export default function UpdateNotice({ onClose }) {
+export default function UpdateNotice({ onClose, initialId = null }) {
   const { dark } = useTheme()
   const closeRef = useRef(null)
+  // Which UPDATE_HISTORY entry is showing. Defaults to the current one
+  // (index 0 = UPDATE) — the auto-open-on-unread path and the "WHAT'S NEW"
+  // badge both want the newest notes first. `initialId` lets a caller (the
+  // menu's own version dropdown) open straight to a specific past version
+  // instead, with every other version still a pick away via the select below.
+  const [selected, setSelected] = useState(
+    () => UPDATE_HISTORY.find(u => u.id === initialId) ?? UPDATE
+  )
 
   const border = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadow = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
@@ -97,15 +108,31 @@ export default function UpdateNotice({ onClose }) {
           borderBottom: border,
         }}>
           <span id="update-notice-title" style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#1a1a1a', letterSpacing: '1px' }}>
-            New Update:
+            {selected.id === UPDATE.id ? 'New Update:' : 'Patch Notes:'}
           </span>
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a', flexShrink: 0 }}>
-            {UPDATE.version}
-          </span>
+          {/* Version picker — same band, same weight as the static text it
+              replaces, so choosing an old version doesn't visually demote
+              the header. Native <select>: this is a short, plain list with
+              no need for the app's own dropdown chrome, and it comes with
+              keyboard/screen-reader support for free. */}
+          <select
+            value={selected.id}
+            onChange={e => setSelected(UPDATE_HISTORY.find(u => u.id === e.target.value) ?? UPDATE)}
+            aria-label="Choose which version's patch notes to view"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '13px', color: '#1a1a1a',
+              backgroundColor: 'transparent', border: 'none', flexShrink: 0,
+              cursor: 'pointer', textAlignLast: 'right',
+            }}
+          >
+            {UPDATE_HISTORY.map(u => (
+              <option key={u.id} value={u.id}>{u.version}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {UPDATE.sections.map(section => {
+          {selected.sections.map(section => {
             const items = updateItems(section)
             const features = section.features ?? []
             if (items.length === 0 && features.length === 0) return null
