@@ -159,7 +159,7 @@ export const ITEMS = [
 export const MEGA_STONE_ITEM = {
   id: 'mega_stone', name: 'Mega Stone',
   description: "Mega Evolves the Pokémon it's given to, for as long as it's held",
-  tier: 'legendary', icon: 'mega-stone',
+  tier: 'legendary', icon: 'mega-ring',
 }
 
 // Consumables that route through App.applyConsumable — they share one contract

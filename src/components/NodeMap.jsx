@@ -43,7 +43,7 @@ const ITEM_ICONS = {
   [NODE_TYPES.MASTER_BALL]:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
   [NODE_TYPES.ITEM]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
   [NODE_TYPES.POWER_UPGRADE]: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
-  [NODE_TYPES.MEGA_STONE]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mega-stone.png',
+  [NODE_TYPES.MEGA_STONE]:    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mega-ring.png',
   [NODE_TYPES.POKECENTER]:    pokecenterIcon,
   [NODE_TYPES.POKEMART]:      pokemartIcon,
   [NODE_TYPES.BOSS]:          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',

@@ -46,7 +46,7 @@ export const BALANCE = deepFreeze({
     // nodeTypeChances table (which sums to 100 and is always active) — this
     // follows the SAME override pattern as masterBall above: randomNode
     // rolls a normal type first, then may steal that slot for MEGA_STONE.
-    megaStone: { startIndex: 2, chance: 0.03 },
+    megaStone: { startIndex: 2, chance: 0.01 },
     // Weight of the MASTER_BALL outcome when a Mystery node resolves, relative
     // to the other outcomes (which are weight 1 each). 4 non-legendary outcomes
     // + w must put legendary at 2%: w / (4 + w) = 0.02 → w = 4/49.
