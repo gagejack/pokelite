@@ -38,6 +38,11 @@ import pokemartIcon from '../assets/pokemart.png'
 let isTouchDevice = false
 window.addEventListener('touchstart', () => { isTouchDevice = true }, { once: true, passive: true })
 
+// Read once at module load: a map full of nodes that all grow under the finger
+// is exactly what this setting exists to opt out of. The nodes still change
+// size (the size IS the feedback) — only the ramp between sizes is dropped.
+const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
 const ITEM_ICONS = {
   [NODE_TYPES.POKEBALL]:      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
   [NODE_TYPES.MASTER_BALL]:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
@@ -61,6 +66,26 @@ const NODE_SCALE = 1.3
 // same size — both are major fights.
 const BOSS_SCALE = 1.4
 const isBossSized = type => type === NODE_TYPES.BOSS || type === NODE_TYPES.RIVAL
+// Interaction feedback scales, applied on top of the layout scales above by an
+// inner <g> so none of the positioning math is touched.
+//
+// Hover (desktop) and hold-for-tooltip (mobile) both grow the node — they are
+// the same "this node is under attention" state, and both already flow through
+// hoveredNode, so one value serves both.
+//
+// Press moves AWAY from wherever the node currently sits. On desktop the cursor
+// has already grown it on hover, so a press has to go the other way to read as a
+// separate event (press-in, like a key). On touch there is no hover baseline, so
+// the node starts at rest and growing is the only direction that registers.
+// Same idea, opposite signs, because the starting points differ.
+const HOVER_SCALE = 1.12
+const PRESS_SCALE_TOUCH = 1.15
+const PRESS_SCALE_MOUSE = 0.88
+// Fast out of the gate, long settle, no overshoot — the map's motion vocabulary
+// is restrained (one steady spinner), and elastic bounce would read as UI chrome
+// sitting on top of the hand-painted overworld rather than part of it.
+const NODE_ANIM_MS = 150
+const NODE_ANIM_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const ROW_HEIGHT = 200
 const COL_WIDTH = 200
 const PADDING_TOP = 150
@@ -78,9 +103,9 @@ const MAP_PAD_Y = 16
 function MapSvg({
   dark, borderStyle, shadowStyle,
   nodePositions, edges, svgWidth, svgHeight,
-  clearedNodes, currentNode, loadingNode, hoveredNode,
+  clearedNodes, currentNode, loadingNode, hoveredNode, pressed,
   mapContainerRef, holdTimerRef, holdActivatedRef,
-  setContainerSize, setHoveredNode,
+  setContainerSize, setHoveredNode, setPressed,
   handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
   mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY, background, bgKnown,
 }) {
@@ -349,8 +374,41 @@ function MapSvg({
           const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL
           // Gym leaders + rivals render larger than everything else.
           const nodeScale = NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
+          // Only nodes the player can actually act on animate, so growth MEANS
+          // "you can go here" rather than merely "you touched something". The
+          // mart you are standing on is cleared and unreachable but still
+          // clickable (see handleNodeClick), so it has to be let in explicitly —
+          // otherwise the animation would call a live node dead.
+          const animates = reachable || (node.type === NODE_TYPES.POKEMART && isCurrentNode)
+          // Press wins over hover so a desktop click reads through the hover
+          // growth. loadingNode sustains the touch grow past pointerup: a tap on
+          // a battle node fires handleNodeClick, which awaits the enemy team, and
+          // without this the grow would be cut off by the spinner ~100ms in —
+          // invisible on exactly the nodes players tap most. Desktop needs no
+          // such hold: its shrink has already finished by the time work starts.
+          const animScale = !animates ? 1
+            : pressed?.id === node.id ? pressed.scale
+            : (loadingNode === node.id && isTouchDevice) ? PRESS_SCALE_TOUCH
+            : isHovered ? HOVER_SCALE
+            : 1
           return (
             <g key={node.id} transform={`translate(${x}, ${y}) scale(${iconFixX * nodeScale}, ${iconFixY * nodeScale}) translate(${-NODE_SIZE / 2}, 0)`}>
+              {/* Interaction scale lives on its own <g> so the outer transform
+                  above stays a plain attribute. That matters for two reasons:
+                  attributes cannot be transitioned at all, and that matrix
+                  carries iconFixX/iconFixY, which change on every resize — a
+                  CSS transition over the combined matrix would animate nodes
+                  sliding across the map when the window is dragged.
+                  transformOrigin is given in explicit user units rather than
+                  fill-box + center: the trainer branch draws at 3.5x4.5
+                  NODE_SIZE and is then clipped, so a bounding-box origin is
+                  ambiguous about pre- vs post-clip geometry and would scale
+                  trainers off-centre. */}
+              <g style={{
+                transform: `scale(${animScale})`,
+                transformOrigin: `${NODE_SIZE / 2}px ${NODE_SIZE / 2}px`,
+                transition: prefersReducedMotion ? 'none' : `transform ${NODE_ANIM_MS}ms ${NODE_ANIM_EASE}`,
+              }}>
               {isCurrentNode ? (
                 <image href={icon}
                   x={-NODE_SIZE * 0.2} y={-NODE_SIZE * 0.2}
@@ -416,6 +474,7 @@ function MapSvg({
                   />
                 )
               })()}
+              </g>
             </g>
           )
         })}
@@ -424,6 +483,9 @@ function MapSvg({
       {mapScale > 0 && Object.values(nodePositions).map(({ x, y, node }) => {
         const cleared = clearedNodes.has(node.id)
         const reachable = !cleared && isReachable(node.id)
+        // Mirrors `animates` in the SVG loop above — the two must agree, or a
+        // node takes a press it never renders (or renders one it never took).
+        const animates = reachable || (node.type === NODE_TYPES.POKEMART && node.id === currentNode)
         // Tag the first reachable node so the first-run tutorial can spotlight it
         // ("click here to begin"). Only one node carries the marker.
         const isTutorialTarget = reachable && node.id === firstReachableNodeId
@@ -449,15 +511,44 @@ function MapSvg({
               handleNodeClick(node)
             }}
             onMouseEnter={() => { if (!isTouchDevice) setHoveredNode(node) }}
-            onMouseLeave={() => { if (!isTouchDevice) setHoveredNode(null) }}
-            onTouchStart={() => {
+            onMouseLeave={() => { if (!isTouchDevice) { setHoveredNode(null); setPressed(null) } }}
+            // Press and the touch hold-for-tooltip both run off pointer events
+            // rather than one using pointer and the other touch. Mixing them
+            // double-fires on every touch (pointerdown, touchstart, pointerup,
+            // touchend), and the two families then race to clear the same state:
+            // a finger drifting mid-hold raises pointerleave, which would drop
+            // the press while touchmove separately kills the tooltip timer.
+            // One family, one owner per piece of state.
+            onPointerDown={(e) => {
+              if (animates) {
+                setPressed({ id: node.id, scale: e.pointerType === 'touch' ? PRESS_SCALE_TOUCH : PRESS_SCALE_MOUSE })
+              }
+              // Hold-to-reveal is a touch affordance; a mouse gets its tooltip
+              // from hover, and starting the timer for it would pop a second
+              // tooltip mid-click.
+              if (e.pointerType !== 'touch') return
               holdTimerRef.current = setTimeout(() => {
                 holdActivatedRef.current = true
                 setHoveredNode(node)
               }, 400)
             }}
-            onTouchEnd={() => { clearTimeout(holdTimerRef.current); setHoveredNode(null) }}
-            onTouchMove={() => clearTimeout(holdTimerRef.current)}
+            onPointerUp={(e) => {
+              clearTimeout(holdTimerRef.current)
+              setPressed(null)
+              // Touch has no hover state to fall back to, so releasing also
+              // dismisses the tooltip. A mouse keeps its hover tooltip until the
+              // cursor actually leaves.
+              if (e.pointerType === 'touch') setHoveredNode(null)
+            }}
+            onPointerCancel={() => { clearTimeout(holdTimerRef.current); setPressed(null); setHoveredNode(null) }}
+            onPointerMove={(e) => { if (e.pointerType === 'touch') clearTimeout(holdTimerRef.current) }}
+            // A pointer that presses and then slides off releases somewhere
+            // else, so pointerup never reaches this node and it would sit stuck
+            // at its press scale. Touch is excluded: a finger wandering a few
+            // pixels mid-hold crosses the button edge constantly, and dropping
+            // the grow there is the drift bug this event model exists to avoid —
+            // pointerup and pointercancel already cover every real touch end.
+            onPointerLeave={(e) => { if (e.pointerType !== 'touch') setPressed(null) }}
             style={{
               position: 'absolute',
               left: px - size / 2,
@@ -639,6 +730,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }, [mapData, clearedNodes, currentNode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loadingNode, setLoadingNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
+  // The node currently held down, plus the scale its press should use:
+  // { id, scale } or null. The scale is chosen from the pointer's OWN type at
+  // press time rather than from the module-level isTouchDevice flag, which only
+  // flips after the first touchstart anywhere on the page — a hybrid laptop gets
+  // the shrink from its trackpad and the grow from its screen, in one session.
+  const [pressed, setPressed] = useState(null)
   const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned })
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
   // Aspect ratio (w/h) of the current map's background image. The card sizes
@@ -1289,9 +1386,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     // card visually left and eats the 5px gutter. The border stays.
     shadowStyle: isDesktop ? shadowStyle : 'none',
     nodePositions, edges, svgWidth, svgHeight,
-    clearedNodes, currentNode, loadingNode, hoveredNode,
+    clearedNodes, currentNode, loadingNode, hoveredNode, pressed,
     mapContainerRef, holdTimerRef, holdActivatedRef,
-    setContainerSize, setHoveredNode,
+    setContainerSize, setHoveredNode, setPressed,
     handleNodeClick, getIcon, getNodeLabel, isReachable, isLocked,
     mapScale, scaleX, scaleY, mapOffsetX, mapOffsetY,
     background: mapConfig.background,
