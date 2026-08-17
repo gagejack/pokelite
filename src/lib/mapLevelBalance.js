@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { BALANCE } from '../game/balance.js'
 
 // Per-map / per-row enemy level tuning, stored in the `map_level_balance`
 // table (see supabase/map_level_balance.sql). Everyone reads it; only admins
@@ -140,6 +141,43 @@ export async function saveRowOffset(mapIndex, rowIndex, offset) {
     }, { onConflict: 'region,map_index,row_index' })
   if (!error) offsetCache.set(offsetKey(mapIndex, rowIndex), value)
   return { error }
+}
+
+// Position weight of each node ROW, matching what generation computes per NODE
+// (node.id / totalNodes). A row spans a small range of weights since its nodes
+// have consecutive ids; the row's FIRST node id is used, so later nodes in a
+// wide row skew fractionally higher than the cell displays. Accepted — the
+// cell is a balancing reference, not a per-node oracle.
+export function rowPositionWeights() {
+  const widths = [...BALANCE.map.rowWidths, 2, 1] // + pokecenter row + boss row
+  const total = widths.reduce((n, w) => n + w, 0)
+  const weights = []
+  let firstId = 0
+  for (const width of widths) {
+    weights.push(firstId / total)
+    firstId += width
+  }
+  return weights
+}
+
+// The level range a row can actually produce: pickLevel's formula evaluated at
+// both extremes of its random term, then widened by the row's jitter offset
+// and clamped to [1, 100].
+//
+// This deliberately reports the TRUE reachable range INCLUDING clamps rather
+// than a naive interpolation. Because randOffset is 0.05, tLow clamps to 0 for
+// early rows, so several early rows on a map legitimately show the same floor
+// (the band minimum). That is what generation does — not a display bug, and
+// not to be "corrected" later.
+export function derivedRowRange([min, max], positionWeight, offset = 0) {
+  const { posFactor, randSpan, randOffset } = BALANCE.trainers.level
+  const clamp01 = t => Math.max(0, Math.min(1, t))
+  const tLow = clamp01(positionWeight * posFactor - randOffset)
+  const tHigh = clamp01(positionWeight * posFactor + randSpan - randOffset)
+  const span = max - min
+  const low = Math.round(min + span * tLow) - offset
+  const high = Math.round(min + span * tHigh) + offset
+  return [Math.max(1, low), Math.min(100, high)]
 }
 
 // ── Test seams ────────────────────────────────────────────────────────────

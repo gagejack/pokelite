@@ -15,6 +15,7 @@ vi.mock('./supabase.js', () => ({
 const {
   getMapLevelBand, getRowOffset, isCommittableLevel, loadMapLevelBalance,
   OFFSET_MIN, OFFSET_MAX, __setCacheForTests, __resetMapLevelBalanceForTests,
+  derivedRowRange, rowPositionWeights,
 } = await import('./mapLevelBalance.js')
 
 // getMapLevelBand no longer looks up a region's shipped ranges itself (that
@@ -155,4 +156,44 @@ test('loadMapLevelBalance clamps out-of-range values on load', async () => {
   await loadMapLevelBalance()
   expect(getMapLevelBand('Kanto', 5, KANTO_RANGES)).toEqual([1, 100])
   expect(getRowOffset(5, 1)).toBe(20)
+})
+
+// The cell shows the TRUE reachable range including clamps, not a naive
+// interpolation between band endpoints — see the spec's "Derived cell math".
+test('derivedRowRange clamps the low end for early rows', () => {
+  // randOffset is 0.05, so at positionWeight 0 the low end's t clamps to 0
+  // and the cell floors at the band minimum.
+  const [low, high] = derivedRowRange([10, 50], 0, 0)
+  expect(low).toBe(10)
+  expect(high).toBeGreaterThan(10)
+})
+
+test('derivedRowRange widens by the offset on both ends', () => {
+  const [lowA, highA] = derivedRowRange([10, 50], 0.5, 0)
+  const [lowB, highB] = derivedRowRange([10, 50], 0.5, 3)
+  expect(lowB).toBe(Math.max(1, lowA - 3))
+  expect(highB).toBe(highA + 3)
+})
+
+test('derivedRowRange never leaves [1, 100]', () => {
+  const [low] = derivedRowRange([1, 5], 0, 20)
+  const [, high] = derivedRowRange([95, 100], 1, 20)
+  expect(low).toBeGreaterThanOrEqual(1)
+  expect(high).toBeLessThanOrEqual(100)
+})
+
+test('derivedRowRange rises down the map', () => {
+  const early = derivedRowRange([10, 50], 0, 0)
+  const late = derivedRowRange([10, 50], 1, 0)
+  expect(late[1]).toBeGreaterThan(early[1])
+})
+
+test('rowPositionWeights returns one weight per row, ascending', () => {
+  const weights = rowPositionWeights()
+  // rowWidths [1,2,3,4,3,4,3] + pokecenter + boss = 9 rows.
+  expect(weights).toHaveLength(9)
+  for (let i = 1; i < weights.length; i++) {
+    expect(weights[i]).toBeGreaterThan(weights[i - 1])
+  }
+  expect(weights[0]).toBe(0)
 })

@@ -12,6 +12,12 @@ import { getRegionConfig, regionNames } from '../game/regionRegistry.js'
 import { getRegionBalance, saveRegionBalance, defaultsFor, BALANCE_MIN, BALANCE_MAX } from '../lib/regionBalance.js'
 import { getShopPrice, saveShopPrice, isCommittablePrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
 import { getGameTuning, saveGameTuning, isCommittableTuning, STARTER_BOOST_MIN, STARTER_BOOST_MAX } from '../lib/gameTuning.js'
+import {
+  getMapLevelBand, defaultBandFor, getRowOffset,
+  saveMapLevelBand, saveRowOffset, isCommittableLevel,
+  derivedRowRange, rowPositionWeights,
+  LEVEL_MIN, LEVEL_MAX, OFFSET_MIN, OFFSET_MAX,
+} from '../lib/mapLevelBalance.js'
 import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { SPRITE_TIERS } from '../game/spriteTiers.js'
 import { BALANCE } from '../game/balance.js'
@@ -253,6 +259,220 @@ function GlobalStarterBoostPanel({ theme }) {
             : status === 'error' ? 'Save failed (admin only, or run supabase/game_tuning.sql)'
             : '·'}
         </span>
+      </div>
+    </Panel>
+  )
+}
+
+// Enemy level pacing per map. Two knobs, deliberately separated:
+//   HEADER  — each region's [min, max] band for the selected map. These are
+//             the numbers being tuned.
+//   OFFSET  — a per-ROW jitter magnitude, universal across regions (hence one
+//             column, not one per region).
+// The table BODY is read-only: a row's level range is derived from the band
+// and the row's position down the map, not authored. Mixing inputs and
+// derived cells in one grid made it unclear which numbers were live, so the
+// editable band sits above the table.
+//
+// Band lookups pass the region's shipped mapLevelRanges explicitly
+// (getRegionConfig(region)?.mapLevelRanges) rather than letting the lib
+// module look them up itself — mapLevelBalance.js cannot import
+// game/regionRegistry.js without reopening a game -> lib -> game import
+// cycle, so the caller (this panel, which already has getRegionConfig)
+// supplies the fallback ranges on every call. See mapLevelBalance.js's own
+// comment on defaultBandFor/getMapLevelBand for the full story.
+function TrainerLevelsPanel({ theme, regions }) {
+  const { textColor, mutedColor, panelBorder, innerBg } = theme
+  const [mapIndex, setMapIndex] = useState(0)
+  const weights = useMemo(() => rowPositionWeights(), [])
+
+  const rangesFor = region => getRegionConfig(region)?.mapLevelRanges
+
+  // Band drafts keyed by region so switching maps re-reads rather than
+  // syncing through an effect — same approach as the damage sliders above.
+  const [bandDrafts, setBandDrafts] = useState({})   // 'Region:map' -> {min, max}
+  const [offsetDrafts, setOffsetDrafts] = useState({}) // 'map:row' -> string
+  const [status, setStatus] = useState({})           // key -> idle|saving|saved|error
+
+  const bandFor = region =>
+    bandDrafts[`${region}:${mapIndex}`] ?? {
+      min: String(getMapLevelBand(region, mapIndex, rangesFor(region))[0]),
+      max: String(getMapLevelBand(region, mapIndex, rangesFor(region))[1]),
+    }
+
+  const offsetFor = row =>
+    offsetDrafts[`${mapIndex}:${row}`] ?? String(getRowOffset(mapIndex, row))
+
+  async function commitBand(region, next) {
+    const key = `${region}:${mapIndex}`
+    if (!isCommittableLevel(next.min) || !isCommittableLevel(next.max)) {
+      setBandDrafts(prev => ({ ...prev, [key]: undefined }))
+      setStatus(prev => ({ ...prev, [key]: 'idle' }))
+      return
+    }
+    setStatus(prev => ({ ...prev, [key]: 'saving' }))
+    const { error } = await saveMapLevelBand(region, mapIndex, {
+      min: Number(next.min), max: Number(next.max),
+    })
+    // Drop the draft so the row re-reads the clamped value the cache now holds.
+    setBandDrafts(prev => ({ ...prev, [key]: undefined }))
+    setStatus(prev => ({ ...prev, [key]: error ? 'error' : 'saved' }))
+  }
+
+  async function commitOffset(row, draft) {
+    const key = `${mapIndex}:${row}`
+    if (!isCommittableLevel(draft)) {
+      setOffsetDrafts(prev => ({ ...prev, [key]: undefined }))
+      setStatus(prev => ({ ...prev, [key]: 'idle' }))
+      return
+    }
+    setStatus(prev => ({ ...prev, [key]: 'saving' }))
+    const { error } = await saveRowOffset(mapIndex, row, Number(draft))
+    setOffsetDrafts(prev => ({ ...prev, [key]: undefined }))
+    setStatus(prev => ({ ...prev, [key]: error ? 'error' : 'saved' }))
+  }
+
+  const cellStyle = {
+    fontFamily: 'Upheaval', fontSize: '11px', color: textColor,
+    padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap',
+  }
+  const headStyle = { ...cellStyle, color: mutedColor, fontSize: '10px' }
+  const numberInput = {
+    fontFamily: 'Upheaval', fontSize: '11px', color: textColor,
+    backgroundColor: innerBg, border: panelBorder,
+    padding: '3px 4px', width: '52px',
+  }
+  const statusColor = s =>
+    s === 'error' ? '#ef4444' : s === 'saved' ? '#22c55e' : 'transparent'
+
+  // Row labels mirror buildRows' layout: rowWidths, then the Pokécenter fork,
+  // then the boss.
+  const rowCount = weights.length
+  const rowLabel = row => {
+    if (row === 0) return 'Row 1 (start)'
+    if (row === rowCount - 1) return `Row ${row + 1} (boss)`
+    if (row === rowCount - 2) return `Row ${row + 1} (PC/mart)`
+    return `Row ${row + 1}`
+  }
+
+  return (
+    <Panel
+      theme={theme}
+      title="Trainer Levels"
+      subtitle="Per-map level bands, one column per playable region. The band is what you edit; each row's range below is DERIVED from it and the row's position down the map, so early rows sit near the floor and the boss row near the ceiling. The offset is a ± jitter applied to every level rolled on that row (0 = off), shared by all regions. Applies to trainers, grass, and catch offers — note a downward jitter on a catch node can offer an earlier evolution stage. Saved to Supabase and applied for everyone."
+    >
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor }}>Map</span>
+        <select
+          value={mapIndex}
+          onChange={e => setMapIndex(Number(e.target.value))}
+          style={{
+            fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+            backgroundColor: innerBg, border: panelBorder, padding: '4px 6px', cursor: 'pointer',
+          }}
+        >
+          {/* INVARIANT: every region ships exactly 8 maps, so this is a flat
+              8 rather than a per-region catchPools.length — the table shows
+              all regions side by side and they always agree. If a region ever
+              ships a different count, widen this AND the map_index check
+              constraint in supabase/map_level_balance.sql. */}
+          {Array.from({ length: 8 }, (_, i) => (
+            <option key={i} value={i}>Map {i + 1}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Header strip — the editable bands, one pair per region. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {regions.map(region => {
+          const draft = bandFor(region)
+          const key = `${region}:${mapIndex}`
+          const shipped = defaultBandFor(rangesFor(region), mapIndex)
+          return (
+            <div key={region} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{
+                fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+                width: theme.labelWidth, flexShrink: 0,
+              }}>
+                {region} band
+              </span>
+              <input
+                type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
+                value={draft.min}
+                onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, min: e.target.value } }))}
+                onBlur={() => commitBand(region, draft)}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                style={numberInput}
+              />
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor }}>–</span>
+              <input
+                type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
+                value={draft.max}
+                onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, max: e.target.value } }))}
+                onBlur={() => commitBand(region, draft)}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                style={numberInput}
+              />
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: mutedColor }}>
+                default {shipped[0]}–{shipped[1]}
+              </span>
+              <span style={{
+                fontFamily: 'Orange Kid', fontSize: '11px', minWidth: '52px',
+                color: statusColor(status[key]),
+              }}>
+                {status[key] === 'saving' ? 'Saving…' : status[key] === 'saved' ? 'Saved' : status[key] === 'error' ? 'Failed' : '·'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Derived table — read-only cells, one editable offset per row. */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ ...headStyle, textAlign: 'left' }}>Node row</th>
+              {regions.map(r => <th key={r} style={headStyle}>{r}</th>)}
+              <th style={headStyle}>± offset</th>
+            </tr>
+          </thead>
+          <tbody>
+            {weights.map((weight, row) => {
+              const offsetKey = `${mapIndex}:${row}`
+              const offset = Number(offsetFor(row)) || 0
+              return (
+                <tr key={row} style={{ borderTop: panelBorder }}>
+                  <td style={{ ...cellStyle, textAlign: 'left', color: mutedColor }}>
+                    {rowLabel(row)}
+                  </td>
+                  {regions.map(region => {
+                    const [low, high] = derivedRowRange(
+                      getMapLevelBand(region, mapIndex, rangesFor(region)),
+                      weight,
+                      offset,
+                    )
+                    return <td key={region} style={cellStyle}>Lv{low}–{high}</td>
+                  })}
+                  <td style={cellStyle}>
+                    <input
+                      type="number" min={OFFSET_MIN} max={OFFSET_MAX} step={1}
+                      // Row 0 is the pre-cleared START node (NodeMap seeds
+                      // clearedNodes with Set([0])) — nothing ever rolls a
+                      // level there, so an offset would be a lie.
+                      disabled={row === 0}
+                      value={offsetFor(row)}
+                      onChange={e => setOffsetDrafts(prev => ({ ...prev, [offsetKey]: e.target.value }))}
+                      onBlur={() => commitOffset(row, offsetFor(row))}
+                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                      style={{ ...numberInput, width: '46px', opacity: row === 0 ? 0.4 : 1 }}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </Panel>
   )
@@ -551,6 +771,10 @@ export default function BalanceDashboard() {
             </span>
           </div>
         </Panel>
+
+        {/* Level pacing — per-map bands + per-row jitter, all playable regions
+            side by side so a map can be balanced against its neighbours. */}
+        <TrainerLevelsPanel theme={theme} regions={regions} />
       </div>
     )
   }
