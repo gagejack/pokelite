@@ -60,6 +60,16 @@ test('getRowOffset defaults to 0 and reads the cache when present', () => {
   expect(getRowOffset(0, 4)).toBe(0)
 })
 
+test('getRowOffset forces row 0 to 0 even when the cache holds a non-zero value', () => {
+  // Classic pre-clears row 0 (the START node) so it's never fought, but
+  // Safari's bakeSafariSpecies bakes every row including row 0 — a row-0
+  // offset would consume a jitter rng() draw and shift every downstream
+  // draw in the shared stream. This must hold even if a row was written
+  // directly (e.g. a stray SQL insert), not just when the UI disables it.
+  __setCacheForTests({ bands: {}, offsets: { '0:0': 5 } })
+  expect(getRowOffset(0, 0)).toBe(0)
+})
+
 test('isCommittableLevel rejects an empty box but accepts 0', () => {
   // An empty input is mid-edit, not "set this to zero" — the Number('') === 0
   // trap isCommittablePrice exists for in metaShopBalance.js.

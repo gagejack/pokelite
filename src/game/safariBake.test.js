@@ -54,14 +54,15 @@ test('bakeSafariSpecies produces exact seeded output (offset 0, seed 42)', () =>
   ])
 })
 
-test('bakeSafariSpecies applies a cached row offset and consumes the jitter draw', () => {
+test('bakeSafariSpecies ignores a cached row-0 offset (getRowOffset forces it to 0)', () => {
   // Row 0 (node ids 0-1, both width-1 row 0 under BALANCE.map.rowWidths) gets
-  // a non-zero admin-tuned offset. Compared with the offset-0/seed-1 baseline
-  // above, the pokeball's level shifts (15 -> 16) even though nothing about
-  // the pokeball draw itself changed — that shift is only possible if the
-  // grass node's jitter branch consumed an extra rng() call, which moves
-  // every later draw in the shared stream. That's the proof the offset
-  // actually reaches pickLevel rather than being silently dropped.
+  // a non-zero admin-tuned offset in the cache. Classic pre-clears row 0 (it's
+  // the START node) so it's never fought there, but Safari bakes every row —
+  // if this offset reached pickLevel it would consume an extra rng() call and
+  // shift every later draw in the shared stream, changing the pokeball's
+  // species/level even though nothing about that draw itself changed.
+  // getRowOffset(mapIndex, 0) hard-codes 0 regardless of the cache, so this
+  // must reproduce the offset-0/seed-1 baseline above exactly.
   __setCacheForTests({ bands: {}, offsets: { '0:0': 5 } })
   seedRng(1)
   const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.POKEBALL)
@@ -70,7 +71,7 @@ test('bakeSafariSpecies applies a cached row offset and consumes the jitter draw
   __resetMapLevelBalanceForTests()
   expect(rows[0]).toEqual([
     { id: 0, type: NODE_TYPES.GRASS, species: { id: 4, level: 7 } },
-    { id: 1, type: NODE_TYPES.POKEBALL, species: { id: 7, rarity: 'rare', level: 16 } },
+    { id: 1, type: NODE_TYPES.POKEBALL, species: { id: 7, rarity: 'rare', level: 15 } },
   ])
 })
 

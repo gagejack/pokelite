@@ -68,6 +68,14 @@ export function getMapLevelBand(regionName, mapIndex, ranges) {
 
 // Cached jitter magnitude for a node row. 0 means no jitter.
 export function getRowOffset(mapIndex, rowIndex) {
+  // Row 0 is the map's START node. Classic pre-clears it (NodeMap seeds
+  // clearedNodes with Set([0])) so it is never fought — but Safari's
+  // bakeSafariSpecies bakes EVERY row, so a row-0 offset would consume a
+  // jitter draw and shift every downstream draw in the shared rng stream,
+  // changing species on nodes the offset was never meant to touch. The
+  // dashboard also disables this input; this is the guard that cannot be
+  // bypassed by a direct SQL write.
+  if (rowIndex === 0) return 0
   return offsetCache.get(offsetKey(mapIndex, rowIndex)) ?? 0
 }
 

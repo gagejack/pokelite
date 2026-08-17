@@ -7,7 +7,6 @@ import { catchOdds, CATCH_TIER_BUDGET } from '../game/catch.js'
 import { NODE_TYPE_CHANCES, masterBallChance } from '../game/nodeMap.js'
 import { TIER_BASE_POWER, tierForLevel } from '../game/typeMoves.js'
 import { calcStat, fetchPokemonBase, cachedName } from '../game/pokemon.js'
-import { mapLevelRange } from '../game/battleTeams.js'
 import { getRegionConfig, regionNames } from '../game/regionRegistry.js'
 import { getRegionBalance, saveRegionBalance, defaultsFor, BALANCE_MIN, BALANCE_MAX } from '../lib/regionBalance.js'
 import { getShopPrice, saveShopPrice, isCommittablePrice, PRICE_MIN, PRICE_MAX } from '../lib/metaShopBalance.js'
@@ -455,18 +454,32 @@ function TrainerLevelsPanel({ theme, regions }) {
                     return <td key={region} style={cellStyle}>Lv{low}–{high}</td>
                   })}
                   <td style={cellStyle}>
-                    <input
-                      type="number" min={OFFSET_MIN} max={OFFSET_MAX} step={1}
-                      // Row 0 is the pre-cleared START node (NodeMap seeds
-                      // clearedNodes with Set([0])) — nothing ever rolls a
-                      // level there, so an offset would be a lie.
-                      disabled={row === 0}
-                      value={offsetFor(row)}
-                      onChange={e => setOffsetDrafts(prev => ({ ...prev, [offsetKey]: e.target.value }))}
-                      onBlur={() => commitOffset(row, offsetFor(row))}
-                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                      style={{ ...numberInput, width: '46px', opacity: row === 0 ? 0.4 : 1 }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                      <input
+                        type="number" min={OFFSET_MIN} max={OFFSET_MAX} step={1}
+                        // Row 0 is the START node. Classic pre-clears it
+                        // (NodeMap seeds clearedNodes with Set([0])) so it's
+                        // never fought there — but Safari's bakeSafariSpecies
+                        // bakes EVERY row, so a row-0 offset would consume a
+                        // jitter rng() draw and shift every downstream draw in
+                        // the shared stream. Disabling here is UX only;
+                        // getRowOffset(mapIndex, 0) enforces the real 0
+                        // independently, so this can't be bypassed by a direct
+                        // SQL write.
+                        disabled={row === 0}
+                        value={offsetFor(row)}
+                        onChange={e => setOffsetDrafts(prev => ({ ...prev, [offsetKey]: e.target.value }))}
+                        onBlur={() => commitOffset(row, offsetFor(row))}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                        style={{ ...numberInput, width: '46px', opacity: row === 0 ? 0.4 : 1 }}
+                      />
+                      <span style={{
+                        fontFamily: 'Orange Kid', fontSize: '10px', flexShrink: 0, minWidth: '30px',
+                        color: statusColor(status[offsetKey]),
+                      }}>
+                        {status[offsetKey] === 'saving' ? '…' : status[offsetKey] === 'saved' ? 'OK' : status[offsetKey] === 'error' ? 'Err' : '·'}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               )
@@ -603,7 +616,7 @@ export default function BalanceDashboard() {
     [catchPool, config],
   )
   const maxCatchPct = Math.max(...catchRows.map(r => r.perSlotPct), 0.0001)
-  const band = config ? mapLevelRange(config.mapLevelRanges, safeMapIndex) : null
+  const band = config ? getMapLevelBand(region, safeMapIndex, config.mapLevelRanges) : null
 
   // Species names for the catch panel. They come from the local bundled
   // Pokédex, so this resolves instantly and offline; `names` re-renders once
