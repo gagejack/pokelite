@@ -26,6 +26,7 @@ import { createProfile, runEndPayout, unlockRegion, claimFirstSafariRegion, unlo
 import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from './game/metaModifiers.js'
 import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
+import { loadMapLevelBalance } from './lib/mapLevelBalance.js'
 import { loadShopPrices } from './lib/metaShopBalance.js'
 import { loadGameTuning, getGameTuning } from './lib/gameTuning.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
@@ -211,6 +212,11 @@ export default function App() {
   // Shared per-region damage tuning (admin balance dashboard). Fetched once on
   // start; failures are non-fatal — the region configs' own values apply.
   useEffect(() => { loadRegionBalance() }, [])
+
+  // Per-map level bands + per-row jitter offsets, same non-fatal-failure
+  // posture as loadRegionBalance above — an empty cache falls back to each
+  // region's shipped mapLevelRanges.
+  useEffect(() => { loadMapLevelBalance() }, [])
 
   // Admin-tunable shop prices (Balance Dashboard "Shop" tab). Fetched once on
   // start, same non-fatal-failure posture as loadRegionBalance above — a

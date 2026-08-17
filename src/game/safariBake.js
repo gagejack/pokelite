@@ -12,9 +12,10 @@
 // wasting rng() draws and making call order depend on per-region
 // post-processing.
 
-import { NODE_TYPES, pick } from './nodeMap.js'
+import { NODE_TYPES, pick, rowIndexForNodeId } from './nodeMap.js'
 import { mapLevelRange, pickLevel } from './battleTeams.js'
 import { rollStageForLevelSync } from './pokemon.js'
+import { getMapLevelBand, getRowOffset } from '../lib/mapLevelBalance.js'
 
 // Grass levels sit this far below the map's trainer band — mirrors the Classic
 // grass draw in NodeMap.fetchEnemyTeam.
@@ -37,16 +38,16 @@ function availableIn(pool, usedInRow) {
 // Draw one grass species. Mirrors the Classic grass path exactly: uniform pick
 // over the catch pool (grass ignores rarity — it is a forced fight, not a
 // reward) at the trainer band minus GRASS_LEVEL_OFFSET.
-function bakeGrass(config, mapIndex, positionWeight, usedInRow) {
+function bakeGrass(config, mapIndex, positionWeight, usedInRow, rowOffset = 0) {
   const pool = config.catchPools?.[mapIndex] ?? []
   const drawable = availableIn(pool, usedInRow)
   const id = drawable.length > 0 ? pick(drawable).id : (config.fallbackSpeciesId ?? 504)
-  const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+  const [min, max] = getMapLevelBand(config.name, mapIndex)
   const band = [
     Math.max(1, min - GRASS_LEVEL_OFFSET),
     Math.max(1, max - GRASS_LEVEL_OFFSET),
   ]
-  return { id, level: pickLevel(band, positionWeight) }
+  return { id, level: pickLevel(band, positionWeight, rowOffset) }
 }
 
 // Draw one catchable species. Mirrors Classic's fetchOfferedPokemon, except it
@@ -54,12 +55,12 @@ function bakeGrass(config, mapIndex, positionWeight, usedInRow) {
 // multi-Pokémon offer on any path, which is why Collector's Eye is inert here.
 // Levels come from the region's own catch bands so difficulty tuning cannot
 // move what the player catches.
-function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow) {
+function bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow, rowOffset = 0) {
   const pool = config.catchPools?.[mapIndex] ?? []
   if (pool.length === 0) return null
 
   const bands = config.catchLevelRanges ?? config.mapLevelRanges
-  const level = pickLevel(mapLevelRange(bands, mapIndex), positionWeight)
+  const level = pickLevel(mapLevelRange(bands, mapIndex), positionWeight, rowOffset)
   // Draw from the row's unused species so rarity weighting still applies,
   // just over a smaller pool — see availableIn.
   const [chosen] = config.pickCatchOffer(availableIn(pool, usedInRow), 1, config.catchTierBudget)
@@ -93,14 +94,15 @@ export function bakeSafariSpecies(rows, { config, mapIndex, maxSpeciesId = Infin
 
     row.forEach(node => {
       const positionWeight = totalNodes > 0 ? node.id / totalNodes : 0.5
+      const rowOffset = getRowOffset(mapIndex, rowIndexForNodeId(node.id))
 
       // One draw per node — availableIn has already removed this row's used
       // species from the pool, so there is nothing to retry.
       let species
       if (node.type === NODE_TYPES.GRASS) {
-        species = bakeGrass(config, mapIndex, positionWeight, usedInRow)
+        species = bakeGrass(config, mapIndex, positionWeight, usedInRow, rowOffset)
       } else if (node.type === NODE_TYPES.POKEBALL) {
-        species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow)
+        species = bakePokeball(config, mapIndex, positionWeight, maxSpeciesId, usedInRow, rowOffset)
       } else if (node.type === NODE_TYPES.MASTER_BALL) {
         species = bakeMasterBall(config, mapIndex)
       } else {

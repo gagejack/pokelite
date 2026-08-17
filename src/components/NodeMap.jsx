@@ -13,7 +13,7 @@ import PowerUpgradeNode from './PowerUpgradeNode'
 import MegaStoneNode from './MegaStoneNode'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
-import { NODE_TYPES, pick, resolveMysteryType } from '../game/nodeMap.js'
+import { NODE_TYPES, pick, resolveMysteryType, rowIndexForNodeId } from '../game/nodeMap.js'
 import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
@@ -23,6 +23,7 @@ import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
+import { getMapLevelBand, getRowOffset } from '../lib/mapLevelBalance.js'
 import { getTypeMove } from '../game/typeMoves.js'
 import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
@@ -860,6 +861,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isRival = node.type === NODE_TYPES.RIVAL
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
+    // The row's admin-tuned jitter magnitude (0 = shipped behaviour, and no
+    // rng draw). Rows are recoverable from the node id because buildRows
+    // assigns ids in row order — see rowIndexForNodeId.
+    const rowOffset = getRowOffset(mapIndex, rowIndexForNodeId(node.id))
 
     let specs
     if (isBoss) {
@@ -883,7 +888,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       }
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
-      const band = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const band = getMapLevelBand(config.name, mapIndex)
       // Prefer a pool themed to this trainer's class (e.g. Fisherman → Water);
       // themed pools are authored as base forms, so we roll each mon's evolution
       // stage by its level (same gating as catch nodes). Classes with no themed
@@ -898,7 +903,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const pool = themed?.length
         ? themed
         : config.trainerSpeciesPools?.[Math.min(mapIndex, (config.trainerSpeciesPools?.length ?? 1) - 1)] ?? []
-      specs = buildTrainerTeamSpec(pool, band, count, positionWeight)
+      specs = buildTrainerTeamSpec(pool, band, count, positionWeight, rowOffset)
       if (themed?.length) {
         specs = await Promise.all(
           specs.map(async s => ({ ...s, id: await rollStageForLevel(s.id, s.level, maxSpeciesId) }))
@@ -916,9 +921,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // it's a forced fight, not a reward — so pick a species uniformly.
       const pool = config.catchPools?.[mapIndex] ?? []
       const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
-      const [min, max] = mapLevelRange(config.mapLevelRanges, mapIndex)
+      const [min, max] = getMapLevelBand(config.name, mapIndex)
       const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
-      specs = [{ id, level: pickLevel(grassRange, positionWeight) }]
+      specs = [{ id, level: pickLevel(grassRange, positionWeight, rowOffset) }]
     }
 
     const team = await Promise.all(specs.map(async ({ id, level }) => {
@@ -957,13 +962,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
+    const rowOffset = getRowOffset(mapIndex, rowIndexForNodeId(node.id))
     // Catch levels scale per map, weighted by node position. They read the
     // region's OWN catch bands (config.catchLevelRanges), NOT the trainer/grass
     // bands: tuning a map's difficulty must not change what the player catches
     // there. Regions that omit the table fall back to the trainer bands.
     // Note this level also gates the evolution-stage roll below.
     const catchBands = config.catchLevelRanges ?? config.mapLevelRanges
-    const level = pickLevel(mapLevelRange(catchBands, mapIndex), positionWeight)
+    const level = pickLevel(mapLevelRange(catchBands, mapIndex), positionWeight, rowOffset)
 
     // Draw distinct species weighted by rarity tier. Collector's Eye (meta
     // upgrade) raises the offer count from 3 to 4 — see metaModifiers.js.
