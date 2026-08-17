@@ -1,20 +1,27 @@
 import { test, expect, beforeEach, vi } from 'vitest'
 
 // The module reads Supabase at load(); these tests only cover the cache and
-// fallback logic, so stub the client out entirely.
+// fallback logic, so stub the client out entirely. `selectMock` is a vi.fn()
+// so each test can control what the `select` call resolves to (default: an
+// empty result, matching an unmigrated/empty table).
+const selectMock = vi.fn(async () => ({ data: [], error: null }))
 vi.mock('./supabase.js', () => ({
   supabase: {
-    from: () => ({ select: async () => ({ data: [], error: null }) }),
+    from: () => ({ select: (...args) => selectMock(...args) }),
     auth: { getUser: async () => ({ data: { user: null } }) },
   },
 }))
 
 const {
-  getMapLevelBand, getRowOffset, isCommittableLevel,
+  getMapLevelBand, getRowOffset, isCommittableLevel, loadMapLevelBalance,
   OFFSET_MIN, OFFSET_MAX, __setCacheForTests, __resetMapLevelBalanceForTests,
 } = await import('./mapLevelBalance.js')
 
-beforeEach(() => { __resetMapLevelBalanceForTests() })
+beforeEach(() => {
+  __resetMapLevelBalanceForTests()
+  selectMock.mockReset()
+  selectMock.mockResolvedValue({ data: [], error: null })
+})
 
 test('getMapLevelBand falls back to the region config when the cache is empty', () => {
   // Kanto map 1 ships as [1, 8] (kanto.teams.js MAP_LEVEL_RANGES).
@@ -57,4 +64,88 @@ test('isCommittableLevel rejects an empty box but accepts 0', () => {
 test('offset bounds are the documented 0..20', () => {
   expect(OFFSET_MIN).toBe(0)
   expect(OFFSET_MAX).toBe(20)
+})
+
+test('loadMapLevelBalance loads a band row into the band cache', async () => {
+  selectMock.mockResolvedValue({
+    data: [{ region: 'Kanto', map_index: 2, row_index: -1, min_level: 15, max_level: 22, offset: null }],
+    error: null,
+  })
+  await loadMapLevelBalance()
+  // If the band row were dropped or mis-keyed, this would fall through to the
+  // config default [18, 28] instead.
+  expect(getMapLevelBand('Kanto', 2)).toEqual([15, 22])
+})
+
+test('loadMapLevelBalance loads an offset row into the offset cache', async () => {
+  selectMock.mockResolvedValue({
+    data: [{ region: '*', map_index: 1, row_index: 3, min_level: null, max_level: null, offset: 7 }],
+    error: null,
+  })
+  await loadMapLevelBalance()
+  // If the offset row were dropped or mis-keyed, this would fall through to 0.
+  expect(getRowOffset(1, 3)).toBe(7)
+})
+
+test('loadMapLevelBalance routes band and offset rows in the same response to the correct caches', async () => {
+  selectMock.mockResolvedValue({
+    data: [
+      { region: 'Unova', map_index: 4, row_index: -1, min_level: 30, max_level: 40, offset: null },
+      { region: '*', map_index: 4, row_index: 2, min_level: null, max_level: null, offset: 5 },
+    ],
+    error: null,
+  })
+  await loadMapLevelBalance()
+  // This is the branch split (row.region === OFFSET_REGION). If both rows
+  // were routed to the same cache, one of these would read back as the
+  // fallback value instead of the row's own value.
+  expect(getMapLevelBand('Unova', 4)).toEqual([30, 40])
+  expect(getRowOffset(4, 2)).toBe(5)
+  // And the offset row must not have also landed in the band cache under
+  // its sentinel region, nor the band row in the offset cache.
+  expect(getMapLevelBand('*', 4)).toEqual([1, 100])
+  expect(getRowOffset(4, -1)).toBe(0)
+})
+
+test('loadMapLevelBalance skips a band row with a null level and does not poison the cache', async () => {
+  selectMock.mockResolvedValue({
+    data: [{ region: 'Kanto', map_index: 3, row_index: -1, min_level: 26, max_level: null, offset: null }],
+    error: null,
+  })
+  await loadMapLevelBalance()
+  // A broken guard would either throw (NaN math) or cache a bogus band; the
+  // config default [26, 37] must still be what comes back.
+  expect(getMapLevelBand('Kanto', 3)).toEqual([26, 37])
+})
+
+test('loadMapLevelBalance leaves the caches empty on a Supabase error', async () => {
+  selectMock.mockResolvedValue({ data: null, error: { message: 'boom' } })
+  await loadMapLevelBalance()
+  expect(getMapLevelBand('Kanto', 0)).toEqual([1, 8])
+  expect(getRowOffset(0, 0)).toBe(0)
+})
+
+test('loadMapLevelBalance ignores rows when an error is present even if data is non-empty', async () => {
+  // Some client libraries populate stale/partial `data` alongside a non-null
+  // `error` (e.g. a partial response before a failure). The `error ||`
+  // half of the guard must win over `!data` here.
+  selectMock.mockResolvedValue({
+    data: [{ region: 'Kanto', map_index: 6, row_index: -1, min_level: 10, max_level: 20, offset: null }],
+    error: { message: 'boom' },
+  })
+  await loadMapLevelBalance()
+  expect(getMapLevelBand('Kanto', 6)).toEqual([50, 64])
+})
+
+test('loadMapLevelBalance clamps out-of-range values on load', async () => {
+  selectMock.mockResolvedValue({
+    data: [
+      { region: 'Kanto', map_index: 5, row_index: -1, min_level: 0, max_level: 999, offset: null },
+      { region: '*', map_index: 5, row_index: 1, min_level: null, max_level: null, offset: 99 },
+    ],
+    error: null,
+  })
+  await loadMapLevelBalance()
+  expect(getMapLevelBand('Kanto', 5)).toEqual([1, 100])
+  expect(getRowOffset(5, 1)).toBe(20)
 })
