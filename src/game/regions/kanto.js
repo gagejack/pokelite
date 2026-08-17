@@ -367,27 +367,36 @@ const TRAINER_TYPE_POOLS = {
 // The single 'legendary'-rarity entry per map is that map's chase mon.
 const CATCH_POOLS = [
   // Map 1 — Pewter / Routes 1–3 (base forms). Ekans (23) here so its
-  // evolution Arbok (24, map 5) is reachable by raising one.
-  [{ id: 16, rarity: 'common' }, { id: 19, rarity: 'common' }, { id: 10, rarity: 'common' }, { id: 13, rarity: 'common' }, { id: 21, rarity: 'common' }, { id: 29, rarity: 'common' }, { id: 32, rarity: 'common' }, { id: 23, rarity: 'common' }, { id: 129, rarity: 'rare' }, { id: 56, rarity: 'epic' }, { id: 25, rarity: 'legendary' }],
+  // evolution Arbok (24, map 5) is reachable by raising one. Zubat (41),
+  // Geodude (74) and Clefairy (35) are Mt. Moon's staple catches — Clefairy
+  // as the rare, its signature spot (~10% rate there in gen 1).
+  [{ id: 16, rarity: 'common' }, { id: 19, rarity: 'common' }, { id: 10, rarity: 'common' }, { id: 13, rarity: 'common' }, { id: 21, rarity: 'common' }, { id: 29, rarity: 'common' }, { id: 32, rarity: 'common' }, { id: 23, rarity: 'common' }, { id: 41, rarity: 'common' }, { id: 74, rarity: 'common' }, { id: 129, rarity: 'rare' }, { id: 35, rarity: 'rare' }, { id: 56, rarity: 'epic' }, { id: 25, rarity: 'legendary' }],
   // Map 2 — Cerulean / Routes 4, 24–25. Water routes: Tentacool (72),
   // Shellder (90) and Krabby (98) — the base forms whose evolutions appear
   // on maps 6–7.
   [{ id: 17, rarity: 'common' }, { id: 43, rarity: 'common' }, { id: 69, rarity: 'common' }, { id: 60, rarity: 'common' }, { id: 118, rarity: 'common' }, { id: 120, rarity: 'common' }, { id: 72, rarity: 'common' }, { id: 90, rarity: 'common' }, { id: 98, rarity: 'common' }, { id: 79, rarity: 'rare' }, { id: 54, rarity: 'rare' }, { id: 63, rarity: 'epic' }, { id: 58, rarity: 'legendary' }],
   // Map 3 — Vermilion / Routes 5–6, 11. Seel (86) — Dewgong is Lorelei's.
-  [{ id: 20, rarity: 'common' }, { id: 81, rarity: 'common' }, { id: 100, rarity: 'common' }, { id: 50, rarity: 'common' }, { id: 66, rarity: 'common' }, { id: 27, rarity: 'common' }, { id: 86, rarity: 'common' }, { id: 46, rarity: 'rare' }, { id: 84, rarity: 'rare' }, { id: 108, rarity: 'rare' }, { id: 26, rarity: 'epic' }, { id: 133, rarity: 'legendary' }],
-  // Map 4 — Celadon / Routes 7–8. Ditto (132) as an epic oddity.
-  [{ id: 44, rarity: 'common' }, { id: 70, rarity: 'common' }, { id: 37, rarity: 'common' }, { id: 96, rarity: 'common' }, { id: 52, rarity: 'common' }, { id: 102, rarity: 'common' }, { id: 61, rarity: 'rare' }, { id: 64, rarity: 'rare' }, { id: 45, rarity: 'epic' }, { id: 132, rarity: 'epic' }, { id: 123, rarity: 'legendary' }],
+  // Jigglypuff (39) roams Routes 5/6; Electabuzz (125) comes from the
+  // Power Plant, fitting the Electric gym city.
+  [{ id: 20, rarity: 'common' }, { id: 81, rarity: 'common' }, { id: 100, rarity: 'common' }, { id: 50, rarity: 'common' }, { id: 66, rarity: 'common' }, { id: 27, rarity: 'common' }, { id: 86, rarity: 'common' }, { id: 39, rarity: 'common' }, { id: 46, rarity: 'rare' }, { id: 84, rarity: 'rare' }, { id: 108, rarity: 'rare' }, { id: 26, rarity: 'epic' }, { id: 125, rarity: 'epic' }, { id: 133, rarity: 'legendary' }],
+  // Map 4 — Celadon / Routes 7–8. Ditto (132) as an epic oddity. Gastly (92)
+  // on Route 8, the road to Lavender's Pokemon Tower.
+  [{ id: 44, rarity: 'common' }, { id: 70, rarity: 'common' }, { id: 37, rarity: 'common' }, { id: 96, rarity: 'common' }, { id: 52, rarity: 'common' }, { id: 102, rarity: 'common' }, { id: 92, rarity: 'common' }, { id: 61, rarity: 'rare' }, { id: 64, rarity: 'rare' }, { id: 45, rarity: 'epic' }, { id: 132, rarity: 'epic' }, { id: 123, rarity: 'legendary' }],
   // Map 5 — Fuchsia / Routes 12–15 (Safari). The Safari Zone exclusives:
-  // Pinsir (127) and Tauros (128).
-  [{ id: 48, rarity: 'common' }, { id: 88, rarity: 'common' }, { id: 109, rarity: 'common' }, { id: 33, rarity: 'common' }, { id: 30, rarity: 'common' }, { id: 42, rarity: 'common' }, { id: 49, rarity: 'rare' }, { id: 24, rarity: 'rare' }, { id: 127, rarity: 'rare' }, { id: 128, rarity: 'rare' }, { id: 110, rarity: 'epic' }, { id: 113, rarity: 'legendary' }],
+  // Pinsir (127), Tauros (128), plus Cubone (104), Rhyhorn (111) and
+  // Kangaskhan (115) — the Zone's own mon. Ponyta (77) is the cycling-road
+  // Routes 17–18 catch; Farfetch'd (83) the 1% Route 12 encounter.
+  [{ id: 48, rarity: 'common' }, { id: 88, rarity: 'common' }, { id: 109, rarity: 'common' }, { id: 33, rarity: 'common' }, { id: 30, rarity: 'common' }, { id: 42, rarity: 'common' }, { id: 104, rarity: 'common' }, { id: 111, rarity: 'common' }, { id: 77, rarity: 'common' }, { id: 49, rarity: 'rare' }, { id: 24, rarity: 'rare' }, { id: 127, rarity: 'rare' }, { id: 128, rarity: 'rare' }, { id: 83, rarity: 'rare' }, { id: 115, rarity: 'rare' }, { id: 110, rarity: 'epic' }, { id: 113, rarity: 'legendary' }],
   // Map 6 — Saffron. Tentacruel (73) evolved-form slot.
   [{ id: 64, rarity: 'common' }, { id: 97, rarity: 'common' }, { id: 122, rarity: 'common' }, { id: 80, rarity: 'common' }, { id: 62, rarity: 'common' }, { id: 99, rarity: 'common' }, { id: 124, rarity: 'rare' }, { id: 106, rarity: 'rare' }, { id: 73, rarity: 'rare' }, { id: 107, rarity: 'epic' }, { id: 137, rarity: 'legendary' }],
   // Map 7 — Cinnabar (fire + the lab's fossil revivals). Omanyte (138) and
   // Kabuto (140) base forms; their evolutions come from raising them.
-  [{ id: 58, rarity: 'common' }, { id: 38, rarity: 'common' }, { id: 78, rarity: 'common' }, { id: 126, rarity: 'common' }, { id: 112, rarity: 'common' }, { id: 101, rarity: 'common' }, { id: 89, rarity: 'rare' }, { id: 91, rarity: 'rare' }, { id: 138, rarity: 'rare' }, { id: 140, rarity: 'rare' }, { id: 59, rarity: 'epic' }, { id: 142, rarity: 'legendary' }],
+  // Tangela (114) on Route 21; Lapras (131) from the Seafoam Islands.
+  [{ id: 58, rarity: 'common' }, { id: 38, rarity: 'common' }, { id: 78, rarity: 'common' }, { id: 126, rarity: 'common' }, { id: 112, rarity: 'common' }, { id: 101, rarity: 'common' }, { id: 114, rarity: 'common' }, { id: 89, rarity: 'rare' }, { id: 91, rarity: 'rare' }, { id: 138, rarity: 'rare' }, { id: 140, rarity: 'rare' }, { id: 131, rarity: 'rare' }, { id: 59, rarity: 'epic' }, { id: 142, rarity: 'legendary' }],
   // Map 8 — Viridian / Victory Road (finale). Dratini (147) as the late
-  // chase line — Dragonair (148) also here, Dragonite is Lance's.
-  [{ id: 34, rarity: 'common' }, { id: 31, rarity: 'common' }, { id: 51, rarity: 'common' }, { id: 76, rarity: 'common' }, { id: 28, rarity: 'common' }, { id: 68, rarity: 'common' }, { id: 130, rarity: 'rare' }, { id: 94, rarity: 'rare' }, { id: 147, rarity: 'rare' }, { id: 148, rarity: 'epic' }, { id: 143, rarity: 'legendary' }],
+  // chase line — Dragonair (148) also here, Dragonite is Lance's. Onix (95)
+  // from Victory Road's own walls; Horsea (116) off Route 23.
+  [{ id: 34, rarity: 'common' }, { id: 31, rarity: 'common' }, { id: 51, rarity: 'common' }, { id: 76, rarity: 'common' }, { id: 28, rarity: 'common' }, { id: 68, rarity: 'common' }, { id: 95, rarity: 'common' }, { id: 130, rarity: 'rare' }, { id: 94, rarity: 'rare' }, { id: 147, rarity: 'rare' }, { id: 116, rarity: 'rare' }, { id: 148, rarity: 'epic' }, { id: 143, rarity: 'legendary' }],
 ]
 
 // --- Legendary pools per map (Master Ball nodes) ---

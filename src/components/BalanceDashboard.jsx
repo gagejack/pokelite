@@ -312,12 +312,13 @@ function ShopPricesPanel({ theme }) {
 export default function BalanceDashboard() {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
-  // Top-level tab: 'tuning' is everything that existed before Task 10
-  // (difficulty sliders + read-only odds panels), 'shop' is the new
-  // admin price-editing tab. No tab system existed here before — kept to
-  // two flat buttons rather than a generic tab component since this file
-  // has no other multi-tab surface to share one with.
-  const [dashTab, setDashTab] = useState('tuning')
+  // Top-level tab: 'difficulty' is the region damage sliders (+ global
+  // starter boost), 'odds' is the read-only drop/catch/tier panels. Both
+  // used to be one 'tuning' tab; split so admins editing sliders aren't
+  // scrolling past unrelated read-only charts. 'shop' and 'players' are
+  // separate admin tabs. No generic tab component — kept to flat buttons
+  // since this file has no other multi-tab surface to share one with.
+  const [dashTab, setDashTab] = useState('difficulty')
 
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
@@ -440,7 +441,8 @@ export default function BalanceDashboard() {
         Admin Dashboard
       </span>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-        <button style={tabButtonStyle(dashTab === 'tuning')} onClick={() => setDashTab('tuning')}>Difficulty &amp; Odds</button>
+        <button style={tabButtonStyle(dashTab === 'difficulty')} onClick={() => setDashTab('difficulty')}>Difficulty</button>
+        <button style={tabButtonStyle(dashTab === 'odds')} onClick={() => setDashTab('odds')}>Odds</button>
         <button style={tabButtonStyle(dashTab === 'shop')} onClick={() => setDashTab('shop')}>Shop</button>
         <button style={tabButtonStyle(dashTab === 'players')} onClick={() => setDashTab('players')}>Player Stats</button>
       </div>
@@ -476,6 +478,83 @@ export default function BalanceDashboard() {
     )
   }
 
+  if (dashTab === 'difficulty') {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+
+        {/* Global (not per-region) — kept visually first and separate from every
+            region-scoped control below, so it never reads as "this region's
+            setting". See GlobalStarterBoostPanel's own comment for why. */}
+        <GlobalStarterBoostPanel theme={theme} />
+
+        {/* Region picker (drives the difficulty panel below) */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor }}>Region</span>
+          <select value={region} onChange={e => setRegion(e.target.value)} style={selectStyle}>
+            {regions.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+
+        {/* Difficulty — asymmetric damage multipliers, shared across all players */}
+        <Panel
+          theme={theme}
+          title={`Difficulty — ${region}`}
+          subtitle={`Separate damage multipliers per side. Lower ENEMY (or raise PLAYER) to make the run easier; move both together to change battle pacing only. Saved to Supabase and applied for everyone. Region default: ${defaultsFor(region).player}×.`}
+        >
+          {[
+            { key: 'player', label: 'Player damage', color: '#22c55e' },
+            { key: 'enemy', label: 'Enemy damage', color: '#ef4444' },
+          ].map(({ key, label, color }) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+                width: theme.labelWidth, flexShrink: 0,
+              }}>
+                {label}
+              </span>
+              <input
+                type="range"
+                min={BALANCE_MIN} max={BALANCE_MAX} step={0.05}
+                value={dmg[key]}
+                onChange={e => setDmg(d => ({ ...d, [key]: Number(e.target.value) }))}
+                onMouseUp={e => commitBalance({ ...dmg, [key]: Number(e.target.value) })}
+                onTouchEnd={e => commitBalance({ ...dmg, [key]: Number(e.target.value) })}
+                style={{ flex: 1, minWidth: 0, accentColor: color, cursor: 'pointer' }}
+              />
+              <span style={{
+                fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
+                width: '52px', textAlign: 'right', flexShrink: 0,
+              }}>
+                {Number(dmg[key]).toFixed(2)}×
+              </span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+            <button
+              onClick={() => commitBalance(defaultsFor(region))}
+              style={{
+                fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
+                backgroundColor: innerBg, border: panelBorder, padding: '5px 12px', cursor: 'pointer',
+              }}
+            >
+              Reset to default
+            </button>
+            <span style={{
+              fontFamily: 'Orange Kid', fontSize: '13px',
+              color: status === 'error' ? '#ef4444' : status === 'saved' ? '#22c55e' : mutedColor,
+            }}>
+              {status === 'saving' ? 'Saving…'
+                : status === 'saved' ? 'Saved — live for all players'
+                : status === 'error' ? 'Save failed (admin only, or run supabase/region_balance.sql)'
+                : `Ratio: player deals ${(dmg.player / dmg.enemy).toFixed(2)}× the enemy's output`}
+            </span>
+          </div>
+        </Panel>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {header}
@@ -483,11 +562,6 @@ export default function BalanceDashboard() {
         Read-only view of the live tuning values. Percentages are per-slot odds
         for a single weighted draw, so they sum to ~100 within a pool.
       </span>
-
-      {/* Global (not per-region) — kept visually first and separate from every
-          region-scoped control below, so it never reads as "this region's
-          setting". See GlobalStarterBoostPanel's own comment for why. */}
-      <GlobalStarterBoostPanel theme={theme} />
 
       {/* 1. Item drop odds */}
       <Panel
@@ -533,62 +607,6 @@ export default function BalanceDashboard() {
           </span>
         )}
       </div>
-
-      {/* Difficulty — asymmetric damage multipliers, shared across all players */}
-      <Panel
-        theme={theme}
-        title={`Difficulty — ${region}`}
-        subtitle={`Separate damage multipliers per side. Lower ENEMY (or raise PLAYER) to make the run easier; move both together to change battle pacing only. Saved to Supabase and applied for everyone. Region default: ${defaultsFor(region).player}×.`}
-      >
-        {[
-          { key: 'player', label: 'Player damage', color: '#22c55e' },
-          { key: 'enemy', label: 'Enemy damage', color: '#ef4444' },
-        ].map(({ key, label, color }) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
-              width: theme.labelWidth, flexShrink: 0,
-            }}>
-              {label}
-            </span>
-            <input
-              type="range"
-              min={BALANCE_MIN} max={BALANCE_MAX} step={0.05}
-              value={dmg[key]}
-              onChange={e => setDmg(d => ({ ...d, [key]: Number(e.target.value) }))}
-              onMouseUp={e => commitBalance({ ...dmg, [key]: Number(e.target.value) })}
-              onTouchEnd={e => commitBalance({ ...dmg, [key]: Number(e.target.value) })}
-              style={{ flex: 1, minWidth: 0, accentColor: color, cursor: 'pointer' }}
-            />
-            <span style={{
-              fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
-              width: '52px', textAlign: 'right', flexShrink: 0,
-            }}>
-              {Number(dmg[key]).toFixed(2)}×
-            </span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-          <button
-            onClick={() => commitBalance(defaultsFor(region))}
-            style={{
-              fontFamily: 'Upheaval', fontSize: '10px', color: textColor,
-              backgroundColor: innerBg, border: panelBorder, padding: '5px 12px', cursor: 'pointer',
-            }}
-          >
-            Reset to default
-          </button>
-          <span style={{
-            fontFamily: 'Orange Kid', fontSize: '13px',
-            color: status === 'error' ? '#ef4444' : status === 'saved' ? '#22c55e' : mutedColor,
-          }}>
-            {status === 'saving' ? 'Saving…'
-              : status === 'saved' ? 'Saved — live for all players'
-              : status === 'error' ? 'Save failed (admin only, or run supabase/region_balance.sql)'
-              : `Ratio: player deals ${(dmg.player / dmg.enemy).toFixed(2)}× the enemy's output`}
-          </span>
-        </div>
-      </Panel>
 
       {/* 2. Catch odds for the selected map */}
       <Panel
