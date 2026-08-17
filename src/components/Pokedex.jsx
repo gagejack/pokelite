@@ -34,6 +34,10 @@ export default function Pokedex({ onClose }) {
   const [shinyMode, setShinyMode] = useState(false)
   const [shinyCaughtSet, setShinyCaughtSet] = useState(() => new Set())
   const [shinySeenSet, setShinySeenSet] = useState(() => new Set())
+  // Species that have won a championship on this account's team AS A SHINY.
+  // Not gated by shinyMode: it is a fact about the species' history, not about
+  // which coat you are currently browsing, so the mark holds in both modes.
+  const [championSet, setChampionSet] = useState(() => new Set())
 
   // Aggregate the caught + seen sets from the logged-in user's saved run history.
   // Logged out → empty sets (everything blacked out). Requires the runs SELECT RLS policy.
@@ -52,7 +56,7 @@ export default function Pokedex({ onClose }) {
       // Dex's core data — always loads.
       let { data, error } = await supabase
         .from('runs')
-        .select('pokemon_caught_ids, pokemon_seen_ids, pokemon_seen_shiny_ids')
+        .select('pokemon_caught_ids, pokemon_seen_ids, pokemon_seen_shiny_ids, result, winning_roster')
         .eq('user_id', user.id)
       if (error) {
         ;({ data, error } = await supabase
@@ -71,6 +75,20 @@ export default function Pokedex({ onClose }) {
       caught.forEach(id => seen.add(id))
       setCaughtSet(caught)
       setSeenSet(seen)
+
+      // Species that beat the Champion AS A SHINY. Read from the same rows as
+      // caught/seen rather than a second query — the winning roster already
+      // rides along on the run that won, and each member carries the shiny
+      // flag it had at that moment. A normal-coat win does not count: the mark
+      // is for the rarer thing, a shiny that went the distance. Runs recorded
+      // before `winning_roster` existed, and the fallback query above that
+      // drops the column, simply contribute nothing here.
+      const champions = new Set()
+      data.forEach(row => {
+        if (row.result !== 'win') return
+        ;(row.winning_roster ?? []).forEach(p => { if (p?.id != null && p.shiny) champions.add(p.id) })
+      })
+      setChampionSet(champions)
 
       // Shiny caught comes from `catches` (which has carried a shiny flag all
       // along); shiny seen comes from the per-run array added alongside it.
@@ -235,6 +253,7 @@ export default function Pokedex({ onClose }) {
               {pokemon.map(p => {
                 const caught = activeCaught.has(p.id)
                 const seen = activeSeen.has(p.id)
+                const champion = championSet.has(p.id)
                 return (
                   <div
                     key={p.id}
@@ -246,6 +265,27 @@ export default function Pokedex({ onClose }) {
                     }}
                   >
                     <div className="relative flex items-center justify-center w-full">
+                      {/* Champion mark, opposite the Poké Ball: the ball says
+                          you caught it, the star says a shiny one won you the
+                          run. Two different facts, so they sit on two different
+                          sides of the number rather than stacking into one
+                          badge pile. Same ✦ and purple the Hall of Fame uses
+                          for shiny — here it carries that same shiny meaning,
+                          with the win as the thing that earned it a place. */}
+                      {champion && (
+                        <span
+                          title="Won a championship as a shiny"
+                          aria-label="Won a championship as a shiny"
+                          style={{
+                            position: 'absolute', left: '4px',
+                            fontSize: isDesktop ? '14px' : '11px', lineHeight: 1,
+                            color: '#a855f7',
+                            textShadow: '0 0 3px rgba(168,85,247,0.7)',
+                          }}
+                        >
+                          ✦
+                        </span>
+                      )}
                       {caught && (
                         <img
                           src={POKE_BALL_ICON}

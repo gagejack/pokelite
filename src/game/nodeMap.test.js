@@ -1,16 +1,22 @@
 import { test, expect } from 'vitest'
 import { megaStoneChance, buildRows, NODE_TYPES, rowIndexForNodeId } from './nodeMap.js'
 import { seedRng, clearRng } from './rng.js'
+import { BALANCE } from './balance.js'
 
 test('megaStoneChance is 0 before map index 2 (map 3)', () => {
   expect(megaStoneChance(0)).toBe(0)
   expect(megaStoneChance(1)).toBe(0)
 })
 
-test('megaStoneChance is flat 3% from map index 2 on', () => {
-  expect(megaStoneChance(2)).toBeCloseTo(0.03)
-  expect(megaStoneChance(5)).toBeCloseTo(0.03)
-  expect(megaStoneChance(7)).toBeCloseTo(0.03)
+// Reads the rate from BALANCE rather than hardcoding it: the chance is a tuning
+// knob (it has already moved once, 3% -> 1%), and a literal here means every
+// future tune shows up as a failing test rather than as the intended change.
+// What this guards is the SHAPE — flat from startIndex on, no ramp.
+test('megaStoneChance is flat at the balance rate from map index 2 on', () => {
+  const { chance } = BALANCE.map.megaStone
+  expect(megaStoneChance(2)).toBeCloseTo(chance)
+  expect(megaStoneChance(5)).toBeCloseTo(chance)
+  expect(megaStoneChance(7)).toBeCloseTo(chance)
 })
 
 test('buildRows never produces a MEGA_STONE node when megaStoneAvailable is false, regardless of map index', () => {

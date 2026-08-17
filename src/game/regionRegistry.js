@@ -1,5 +1,6 @@
 import { unovaConfig } from './regions/unova.js'
 import { kantoConfig } from './regions/kanto.js'
+import { johtoConfig } from './regions/johto.js'
 import { hoennConfig } from './regions/hoenn.js'
 import { sinnohConfig } from './regions/sinnoh.js'
 
@@ -53,6 +54,7 @@ import { sinnohConfig } from './regions/sinnoh.js'
 
 const REGION_CONFIGS = {
   Kanto:  kantoConfig,
+  Johto:  johtoConfig,
   Hoenn:  hoennConfig,
   Sinnoh: sinnohConfig,
   Unova:  unovaConfig,

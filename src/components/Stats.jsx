@@ -22,6 +22,17 @@ import { REGION_STARTERS } from '../game/starters.js'
 // question than the one that list asks.
 const STARTER_IDS = new Set(Object.values(REGION_STARTERS).flat())
 
+// Hall of Fame region label color, one per region so a trophy case with
+// several regions in it reads at a glance rather than requiring the eye to
+// read every label. Falls back to mutedColor for a null/unmapped region
+// (pre-region runs, or a future region not yet listed here) so a gap in this
+// map shrinks to "no color" rather than a crash.
+const REGION_COLORS = {
+  Kanto: '#ef4444',  // red — the original region's signature color
+  Johto: '#c084fc',  // lavender — matches its UpdateNotice feature-row color
+  Unova: '#38bdf8',  // sky blue — Unova's cool, modern city, contrast to Kanto/Johto
+}
+
 // STARTER_NAMES and fmtRunTime moved to ProfilePanel.jsx along with the markup
 // that reads them — the profile layout owns its own formatting now, so a guest
 // profile and your own can't format a run time two different ways.
@@ -84,7 +95,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
       // looked chronological only by accident of insertion.
       const { data, error } = await supabase
         .from('runs')
-        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster, elapsed_ms, starter_id, created_at')
+        .select('result, maps_cleared, pokemon_caught, pokemon_caught_ids, speed_cash_earned, winning_roster, elapsed_ms, starter_id, created_at, region')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
       if (cancelled) return
@@ -182,7 +193,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
       // the grid below reads the same list it always did.
       const winRosters = rows
         .filter(r => r.result === 'win' && r.winning_roster)
-        .map(r => ({ roster: r.winning_roster, wonAt: r.created_at ?? null }))
+        .map(r => ({ roster: r.winning_roster, wonAt: r.created_at ?? null, region: r.region ?? null }))
         .sort((a, b) => {
           if (a.wonAt === b.wonAt) return 0
           if (a.wonAt == null) return 1
@@ -213,7 +224,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
         style={{
           width: '90vw', maxWidth: isDesktop ? '900px' : '600px', height: '85vh',
           backgroundColor: cardBg, border: dark ? '2px solid #fce329' : '2px solid #2e2e2e',
-          boxShadow: dark ? '-4px 6px 0 0 #00558e' : '-4px 6px 0 0 #2e2e2e',
+          boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -454,8 +465,18 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
                           not whichever one is currently on top. Numbering by
                           position would renumber every past win each time you
                           won again. */}
-                      <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: accent(dark) }}>
-                        Win #{stats.winRosters.length - i}
+                      <span style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                        {win.region && (
+                          <span style={{
+                            fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px',
+                            color: REGION_COLORS[win.region] ?? mutedColor,
+                          }}>
+                            {win.region}
+                          </span>
+                        )}
+                        <span style={{ fontFamily: 'Upheaval', fontSize: isDesktop ? '15px' : '13px', color: accent(dark) }}>
+                          Win #{stats.winRosters.length - i}
+                        </span>
                       </span>
                       {/* The date only appears once there is one. Wins recorded
                           before created_at carried a value simply show no date

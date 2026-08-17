@@ -14,6 +14,7 @@ const FEATURE_COLORS = {
   'Safari Mode': '#34d399',           // teal-green — a place, not a system
   'Meta Progression Shop': '#fb923c', // orange — matches the shop/cash register feel
   'Leaderboards': '#f472b6',          // pink — stands apart from cash green and podium gold
+  'Johto': '#c084fc',                 // lavender — a new place, distinct from Safari's teal-green
 }
 
 // Patch notes for the main menu — shown once per device per UPDATE.id, and

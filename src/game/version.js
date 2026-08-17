@@ -5,4 +5,4 @@
 // never disagree with itself across the UI.
 //
 // Shipping a feature is two edits: this, and the notice in game/updates.js.
-export const VERSION = 'v1.3'
+export const VERSION = 'v1.4'

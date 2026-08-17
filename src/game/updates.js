@@ -36,8 +36,24 @@ const metaUpgrade = id => META_CATALOG.find(u => u.id === id)
 
 export const UPDATE_HISTORY = [
   {
-    id: '2026-08-mega-evolution',
+    id: '2026-08-johto',
     version: VERSION,
+    sections: [
+      {
+        title: 'New Region:',
+        features: [
+          {
+            name: 'Johto',
+            summary: "A second region joins Kanto — 8 gyms from Falkner to Clair, then the Elite Four and Lance. New trainer classes, new catches, and a shop stocked for each town, plus the roaming beasts and tower legendaries as the run climbs. Works in both Classic and Safari Mode.",
+            facts: [],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-08-mega-evolution',
+    version: 'v1.3',
     sections: [
       {
         title: 'New Features:',

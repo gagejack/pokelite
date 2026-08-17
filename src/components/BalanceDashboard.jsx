@@ -358,7 +358,7 @@ function TrainerLevelsPanel({ theme, regions }) {
     <Panel
       theme={theme}
       title="Trainer Levels"
-      subtitle="Per-map level bands, one column per playable region. The band is what you edit; each row's range below is DERIVED from it and the row's position down the map, so early rows sit near the floor and the boss row near the ceiling. The offset is a ± jitter applied to every level rolled on that row (0 = off), shared by all regions. Applies to trainers, grass, and catch offers — note a downward jitter on a catch node can offer an earlier evolution stage. Saved to Supabase and applied for everyone."
+      subtitle="Edit each region's level band above; the table shows the range each row derives from it. Offset is a shared ± jitter per row (0 = off). A downward jitter on a catch node can offer an earlier evolution stage."
     >
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: mutedColor }}>Map</span>

@@ -28,7 +28,7 @@ const ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 const API = 'https://pokeapi.co/api/v2'
 const OUT_DIR = path.join(ROOT, 'public', 'data')
 const ASSET_RE = /\.(webp|png|jpe?g|gif|svg|otf|ttf|woff2?)$/i
-const REGIONS = ['Kanto', 'Hoenn', 'Sinnoh', 'Unova']
+const REGIONS = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova']
 
 // ── 1. Load region configs + starters (assets stubbed) ──────────────────
 async function loadGameData() {

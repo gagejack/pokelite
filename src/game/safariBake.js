@@ -15,7 +15,11 @@
 import { NODE_TYPES, pick, rowIndexForNodeId } from './nodeMap.js'
 import { mapLevelRange, pickLevel } from './battleTeams.js'
 import { rollStageForLevelSync } from './pokemon.js'
-import { getMapLevelBand, getRowOffset } from '../lib/mapLevelBalance.js'
+// The CACHE module, not lib/mapLevelBalance.js: this file is on the map
+// generation path, so every region config imports it transitively. The cache
+// module is a leaf with no Supabase import, which keeps region configs loadable
+// in plain Node (scripts/buildPokedex.mjs). See mapLevelBalanceCache.js.
+import { getMapLevelBand, getRowOffset } from '../lib/mapLevelBalanceCache.js'
 
 // Grass levels sit this far below the map's trainer band — mirrors the Classic
 // grass draw in NodeMap.fetchEnemyTeam.

@@ -262,6 +262,24 @@ Each cell expands to the full move shape above (`name`, `tier`, `basePower`, `da
 * Leveling up changes **stats only** (HP, Attack, Defense, Sp. Attack, Sp. Defense, Speed). It **does not** change a Pokémon's move tier — the starting Pokémon keeps its Tier 1 move until a Power Upgrade node raises it. (A higher level still increases damage indirectly, because Attack/Sp. Attack scale with level and feed the damage formula.)
 * Leveling **never revives** a fainted Pokémon — its HP stays at 0 through the level-up. Only a Pokécenter (or a boss win) revives.
 
+### **Evolution Triggers**
+
+**Level-up is the only evolution trigger in the game.** There is no trading, no friendship/happiness, no time-of-day, and no location-based evolution. A run has no second player to trade with and no clock, so any trigger that depends on one is unreachable by design — not unimplemented.
+
+Species that evolve by a **non-level-up trigger in the real games** (trade, stone, friendship) are still reachable here, through **one substitute path**: the **Evolve Stone** item (in-game name *Moon Stone*, `evolve_stone`, rare tier). Applying it evolves the holder **on the spot, at any level**, and consumes the stone.
+
+This means:
+
+* **Machoke, Haunter, Kadabra, Graveler, Onix, Golbat, Pikachu, Scyther, Seadra, Porygon, Slowpoke** (Slowking) and every other trade/stone/friendship evolver need an Evolve Stone. They will **never** evolve from a battle win, at any level.
+* Lines that mix triggers work up to the wall. Machop → Machoke is level 28 and happens normally; Machoke → Machamp is a trade in canon, so it needs the stone.
+* A Pokémon behind such a step is **not** a dead end — it is a **stone sink**. This is the main thing Evolve Stones are for, and it is why they sit at rare tier rather than legendary.
+
+**The one exception is Eevee** (`AUTO_EVOLVE_NONLEVEL`, `BALANCE.pokemon.autoEvolveNonLevel`). Eevee auto-evolves at **level 20** (`BALANCE.pokemon.nonLevelEvoLevel`) on a battle win, branching through the EvolutionChoice popup like any multi-branch line. Eevee's whole identity is the branch, and gating it behind an item the player may never draw would remove that choice from most runs. It is an allowlist of exactly one species — adding a second is a balance decision, not a bug fix.
+
+**Region generation still applies on top of this.** Evolution options are capped at `GEN_MAX_ID[config.generation]`, so a Kanto (gen 1) Eevee cannot become Espeon or Umbreon, and a Johto (gen 2) run cannot reach a gen-3 form. The stone does not lift this cap.
+
+**Authoring consequence for region pools:** a species behind a trade/stone step is a legitimate pool entry, but treat it as a **terminal form** when picking catch and trainer pools — the player is not reliably going to evolve it. Do not build a map's difficulty curve on a trainer's Machamp appearing when the pool only holds Machoke. (The engine already enforces the other direction: `levelUpPathTo` in `evolutionChain.js` returns `null` for a species not reachable by a pure level-up chain, so the stage-downgrade logic leaves it alone instead of silently swapping in a form the player could never have.)
+
 ### **Starter Power Scale**
 
 * The chosen starter gets a **1.3× multiplier applied to all of its stats** (HP, Attack, Defense, Sp. Attack, Sp. Defense, Speed).
