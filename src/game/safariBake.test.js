@@ -2,6 +2,8 @@ import { test, expect } from 'vitest'
 import { bakeSafariSpecies } from './safariBake.js'
 import { NODE_TYPES } from './nodeMap.js'
 import { pickCatchOffer } from './catch.js'
+import { seedRng, clearRng } from './rng.js'
+import { __setCacheForTests, __resetMapLevelBalanceForTests } from '../lib/mapLevelBalance.js'
 
 // Minimal region config — only the fields the bake reads.
 const CONFIG = {
@@ -19,6 +21,58 @@ const CONFIG = {
 }
 
 const rowsWith = (...types) => [types.map((type, i) => ({ id: i, type }))]
+
+// ── Seeded regression: exact rng-stream output ──────────────────────────
+// Every other test in this file asserts loose properties only (set
+// membership, level > 0, "does not throw") and never calls seedRng, so none
+// of them can catch a shifted rng() draw sequence — a stream shift that still
+// lands every draw in a valid range passes them unchanged. These tests pin
+// exact species/level output for fixed seeds, so a regression in draw order
+// or draw count (e.g. Task 5's row-offset wiring drawing an extra rng() call
+// it shouldn't, or in the wrong place) fails loudly here.
+test('bakeSafariSpecies produces exact seeded output (offset 0, seed 1)', () => {
+  __resetMapLevelBalanceForTests()
+  seedRng(1)
+  const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.POKEBALL)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  clearRng()
+  expect(rows[0]).toEqual([
+    { id: 0, type: NODE_TYPES.GRASS, species: { id: 4, level: 7 } },
+    { id: 1, type: NODE_TYPES.POKEBALL, species: { id: 7, rarity: 'rare', level: 15 } },
+  ])
+})
+
+test('bakeSafariSpecies produces exact seeded output (offset 0, seed 42)', () => {
+  __resetMapLevelBalanceForTests()
+  seedRng(42)
+  const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.POKEBALL)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  clearRng()
+  expect(rows[0]).toEqual([
+    { id: 0, type: NODE_TYPES.GRASS, species: { id: 4, level: 8 } },
+    { id: 1, type: NODE_TYPES.POKEBALL, species: { id: 1, rarity: 'common', level: 16 } },
+  ])
+})
+
+test('bakeSafariSpecies applies a cached row offset and consumes the jitter draw', () => {
+  // Row 0 (node ids 0-1, both width-1 row 0 under BALANCE.map.rowWidths) gets
+  // a non-zero admin-tuned offset. Compared with the offset-0/seed-1 baseline
+  // above, the pokeball's level shifts (15 -> 16) even though nothing about
+  // the pokeball draw itself changed — that shift is only possible if the
+  // grass node's jitter branch consumed an extra rng() call, which moves
+  // every later draw in the shared stream. That's the proof the offset
+  // actually reaches pickLevel rather than being silently dropped.
+  __setCacheForTests({ bands: {}, offsets: { '0:0': 5 } })
+  seedRng(1)
+  const rows = rowsWith(NODE_TYPES.GRASS, NODE_TYPES.POKEBALL)
+  bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  clearRng()
+  __resetMapLevelBalanceForTests()
+  expect(rows[0]).toEqual([
+    { id: 0, type: NODE_TYPES.GRASS, species: { id: 4, level: 7 } },
+    { id: 1, type: NODE_TYPES.POKEBALL, species: { id: 7, rarity: 'rare', level: 16 } },
+  ])
+})
 
 test('bakes species onto grass nodes', () => {
   const rows = rowsWith(NODE_TYPES.GRASS)

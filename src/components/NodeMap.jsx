@@ -888,7 +888,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       }
     } else if (isTrainer) {
       const count = pickTrainerCount(mapIndex)
-      const band = getMapLevelBand(config.name, mapIndex)
+      const band = getMapLevelBand(config.name, mapIndex, config.mapLevelRanges)
       // Prefer a pool themed to this trainer's class (e.g. Fisherman → Water);
       // themed pools are authored as base forms, so we roll each mon's evolution
       // stage by its level (same gating as catch nodes). Classes with no themed
@@ -921,7 +921,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // it's a forced fight, not a reward — so pick a species uniformly.
       const pool = config.catchPools?.[mapIndex] ?? []
       const id = pool.length > 0 ? pick(pool).id : (config.fallbackSpeciesId ?? 504)
-      const [min, max] = getMapLevelBand(config.name, mapIndex)
+      const [min, max] = getMapLevelBand(config.name, mapIndex, config.mapLevelRanges)
       const grassRange = [Math.max(1, min - 3), Math.max(1, max - 3)]
       specs = [{ id, level: pickLevel(grassRange, positionWeight, rowOffset) }]
     }

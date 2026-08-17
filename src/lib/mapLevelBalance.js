@@ -1,5 +1,4 @@
 import { supabase } from './supabase.js'
-import { getRegionConfig } from '../game/regionRegistry'
 
 // Per-map / per-row enemy level tuning, stored in the `map_level_balance`
 // table (see supabase/map_level_balance.sql). Everyone reads it; only admins
@@ -39,25 +38,31 @@ const offsetKey = (mapIndex, rowIndex) => `${mapIndex}:${rowIndex}`
 const clampLevel = n => Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, Math.round(Number(n))))
 const clampOffset = n => Math.min(OFFSET_MAX, Math.max(OFFSET_MIN, Math.round(Number(n))))
 
-// The shipped band for a region/map, straight from its config. Unknown regions
-// yield the full range rather than undefined — a caller mid-render with a bad
-// region name must still get a usable [min, max] to destructure.
+// The shipped band for a region/map, straight from the caller-supplied
+// ranges (a region config's own mapLevelRanges). An empty/missing array
+// yields the full range rather than undefined — a caller mid-render with a
+// bad ranges value must still get a usable [min, max] to destructure.
 //
-// This deliberately inlines mapLevelRange's (game/battleTeams.js) clamp
-// instead of importing it: a later task makes game/safariBake.js import this
-// module, and this module importing back into game/ would close a
-// game -> lib -> game cycle. The whole contract being duplicated is "index
-// the array, clamping to the last entry for out-of-range indices."
-export function defaultBandFor(regionName, mapIndex) {
-  const ranges = getRegionConfig(regionName)?.mapLevelRanges
+// `ranges` is passed in rather than looked up via getRegionConfig here: this
+// module is imported by game/safariBake.js, and importing game/regionRegistry
+// back out of lib/ would close a game -> lib -> game cycle. Callers already
+// hold the region config object (NodeMap has `config`, safariBake has
+// `config`, the balance dashboard will have it too), so they pass
+// `config.mapLevelRanges` directly instead. The contract stays "index the
+// array, clamping to the last entry for out-of-range indices" — same as
+// game/battleTeams.js's mapLevelRange, just inlined for the same reason.
+export function defaultBandFor(ranges, mapIndex) {
   if (!ranges?.length) return [LEVEL_MIN, LEVEL_MAX]
   return ranges[Math.min(mapIndex, ranges.length - 1)]
 }
 
-// Cached band for a region/map, falling back to the config. Synchronous so map
-// generation call sites can read it without awaiting.
-export function getMapLevelBand(regionName, mapIndex) {
-  return bandCache.get(bandKey(regionName, mapIndex)) ?? defaultBandFor(regionName, mapIndex)
+// Cached band for a region/map, falling back to the caller-supplied shipped
+// ranges. Synchronous so map generation call sites can read it without
+// awaiting. `regionName` still keys the cache (bands are cached per region),
+// but the fallback source is `ranges`, not a regionRegistry lookup — see
+// defaultBandFor above.
+export function getMapLevelBand(regionName, mapIndex, ranges) {
+  return bandCache.get(bandKey(regionName, mapIndex)) ?? defaultBandFor(ranges, mapIndex)
 }
 
 // Cached jitter magnitude for a node row. 0 means no jitter.

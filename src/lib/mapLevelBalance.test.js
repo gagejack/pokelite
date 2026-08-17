@@ -17,32 +17,39 @@ const {
   OFFSET_MIN, OFFSET_MAX, __setCacheForTests, __resetMapLevelBalanceForTests,
 } = await import('./mapLevelBalance.js')
 
+// getMapLevelBand no longer looks up a region's shipped ranges itself (that
+// required importing game/regionRegistry.js, which closed an import cycle
+// back through safariBake.js -> mapLevelBalance.js). Callers now pass the
+// ranges in directly, same as production call sites pass `config.mapLevelRanges`.
+import { MAP_LEVEL_RANGES as KANTO_RANGES } from '../game/regions/kanto.teams.js'
+import { MAP_LEVEL_RANGES as UNOVA_RANGES } from '../game/regions/unova.teams.js'
+
 beforeEach(() => {
   __resetMapLevelBalanceForTests()
   selectMock.mockReset()
   selectMock.mockResolvedValue({ data: [], error: null })
 })
 
-test('getMapLevelBand falls back to the region config when the cache is empty', () => {
+test('getMapLevelBand falls back to the passed-in ranges when the cache is empty', () => {
   // Kanto map 1 ships as [1, 8] (kanto.teams.js MAP_LEVEL_RANGES).
-  expect(getMapLevelBand('Kanto', 0)).toEqual([1, 8])
+  expect(getMapLevelBand('Kanto', 0, KANTO_RANGES)).toEqual([1, 8])
   // Unova map 1 ships as [3, 10] (unova.teams.js).
-  expect(getMapLevelBand('Unova', 0)).toEqual([3, 10])
+  expect(getMapLevelBand('Unova', 0, UNOVA_RANGES)).toEqual([3, 10])
 })
 
 test('getMapLevelBand clamps an out-of-range map index to the last band', () => {
-  expect(getMapLevelBand('Kanto', 99)).toEqual([58, 73])
+  expect(getMapLevelBand('Kanto', 99, KANTO_RANGES)).toEqual([58, 73])
 })
 
-test('getMapLevelBand returns a safe default for an unknown region', () => {
-  expect(getMapLevelBand('Atlantis', 0)).toEqual([1, 100])
+test('getMapLevelBand returns a safe default when ranges are missing/empty', () => {
+  expect(getMapLevelBand('Atlantis', 0, undefined)).toEqual([1, 100])
 })
 
-test('a cached band wins over the config', () => {
+test('a cached band wins over the passed-in ranges', () => {
   __setCacheForTests({ bands: { 'Kanto:0': [20, 30] }, offsets: {} })
-  expect(getMapLevelBand('Kanto', 0)).toEqual([20, 30])
-  // Untouched maps still read from config.
-  expect(getMapLevelBand('Kanto', 1)).toEqual([8, 17])
+  expect(getMapLevelBand('Kanto', 0, KANTO_RANGES)).toEqual([20, 30])
+  // Untouched maps still fall back to the passed-in ranges.
+  expect(getMapLevelBand('Kanto', 1, KANTO_RANGES)).toEqual([8, 17])
 })
 
 test('getRowOffset defaults to 0 and reads the cache when present', () => {
@@ -74,7 +81,7 @@ test('loadMapLevelBalance loads a band row into the band cache', async () => {
   await loadMapLevelBalance()
   // If the band row were dropped or mis-keyed, this would fall through to the
   // config default [18, 28] instead.
-  expect(getMapLevelBand('Kanto', 2)).toEqual([15, 22])
+  expect(getMapLevelBand('Kanto', 2, KANTO_RANGES)).toEqual([15, 22])
 })
 
 test('loadMapLevelBalance loads an offset row into the offset cache', async () => {
@@ -99,11 +106,11 @@ test('loadMapLevelBalance routes band and offset rows in the same response to th
   // This is the branch split (row.region === OFFSET_REGION). If both rows
   // were routed to the same cache, one of these would read back as the
   // fallback value instead of the row's own value.
-  expect(getMapLevelBand('Unova', 4)).toEqual([30, 40])
+  expect(getMapLevelBand('Unova', 4, UNOVA_RANGES)).toEqual([30, 40])
   expect(getRowOffset(4, 2)).toBe(5)
   // And the offset row must not have also landed in the band cache under
   // its sentinel region, nor the band row in the offset cache.
-  expect(getMapLevelBand('*', 4)).toEqual([1, 100])
+  expect(getMapLevelBand('*', 4, undefined)).toEqual([1, 100])
   expect(getRowOffset(4, -1)).toBe(0)
 })
 
@@ -115,13 +122,13 @@ test('loadMapLevelBalance skips a band row with a null level and does not poison
   await loadMapLevelBalance()
   // A broken guard would either throw (NaN math) or cache a bogus band; the
   // config default [26, 37] must still be what comes back.
-  expect(getMapLevelBand('Kanto', 3)).toEqual([26, 37])
+  expect(getMapLevelBand('Kanto', 3, KANTO_RANGES)).toEqual([26, 37])
 })
 
 test('loadMapLevelBalance leaves the caches empty on a Supabase error', async () => {
   selectMock.mockResolvedValue({ data: null, error: { message: 'boom' } })
   await loadMapLevelBalance()
-  expect(getMapLevelBand('Kanto', 0)).toEqual([1, 8])
+  expect(getMapLevelBand('Kanto', 0, KANTO_RANGES)).toEqual([1, 8])
   expect(getRowOffset(0, 0)).toBe(0)
 })
 
@@ -134,7 +141,7 @@ test('loadMapLevelBalance ignores rows when an error is present even if data is 
     error: { message: 'boom' },
   })
   await loadMapLevelBalance()
-  expect(getMapLevelBand('Kanto', 6)).toEqual([50, 64])
+  expect(getMapLevelBand('Kanto', 6, KANTO_RANGES)).toEqual([50, 64])
 })
 
 test('loadMapLevelBalance clamps out-of-range values on load', async () => {
@@ -146,6 +153,6 @@ test('loadMapLevelBalance clamps out-of-range values on load', async () => {
     error: null,
   })
   await loadMapLevelBalance()
-  expect(getMapLevelBand('Kanto', 5)).toEqual([1, 100])
+  expect(getMapLevelBand('Kanto', 5, KANTO_RANGES)).toEqual([1, 100])
   expect(getRowOffset(5, 1)).toBe(20)
 })

@@ -42,7 +42,7 @@ function bakeGrass(config, mapIndex, positionWeight, usedInRow, rowOffset = 0) {
   const pool = config.catchPools?.[mapIndex] ?? []
   const drawable = availableIn(pool, usedInRow)
   const id = drawable.length > 0 ? pick(drawable).id : (config.fallbackSpeciesId ?? 504)
-  const [min, max] = getMapLevelBand(config.name, mapIndex)
+  const [min, max] = getMapLevelBand(config.name, mapIndex, config.mapLevelRanges)
   const band = [
     Math.max(1, min - GRASS_LEVEL_OFFSET),
     Math.max(1, max - GRASS_LEVEL_OFFSET),
