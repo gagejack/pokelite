@@ -581,7 +581,12 @@ function MapSvg({
             {isHovered && (
               <div style={{
                 position: 'absolute',
-                bottom: '110%',
+                // Tooltips sit above their node, except near the top of the
+                // map where there is no room for one — those flip below
+                // instead. Since the flip put the boss on the top row, its
+                // tooltip (the tallest, it lists the whole enemy team) would
+                // otherwise be cut off by the card edge.
+                ...(y <= PADDING_TOP ? { top: '110%' } : { bottom: '110%' }),
                 left: '50%',
                 transform: 'translateX(-50%)',
                 backgroundColor: dark ? 'rgba(30,30,30,0.92)' : 'rgba(220,220,220,0.95)',
@@ -810,18 +815,25 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // ready renders. So the layout math degrades to an empty map for those
   // frames and the early return happens just above the JSX instead.
   const rows = mapData?.rows ?? []
+  const totalRows = rows.length
   const nodePositions = {}
   rows.forEach((row, rowIndex) => {
     const totalCols = row.length
     const spread = ROW_SPREAD[rowIndex] ?? 1
     row.forEach((node, colIndex) => {
       const x = (colIndex - (totalCols - 1) / 2) * COL_WIDTH * spread
-      const y = rowIndex * ROW_HEIGHT + PADDING_TOP
+      // Rows run bottom-up on screen: row 0 (the start) sits at the bottom of
+      // the card and the last row (the gym leader) at the top, so the player
+      // climbs toward the boss. The data is untouched — buildRows, MAP_EDGES
+      // and every row-index lookup still treat row 0 as the entrance; only the
+      // screen-space y is mirrored here, and everything downstream (edges, hit
+      // targets, the current-node marker, tutorial spotlights) reads these
+      // positions rather than recomputing from rowIndex.
+      const y = (totalRows - 1 - rowIndex) * ROW_HEIGHT + PADDING_TOP
       nodePositions[node.id] = { x, y, node }
     })
   })
 
-  const totalRows = rows.length
   const svgHeight = totalRows * ROW_HEIGHT + NODE_SIZE + PADDING_TOP - 60
   const svgWidth = 4 * COL_WIDTH + NODE_SIZE * 2
 
@@ -1284,6 +1296,14 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   }
 
   function getNodeLabel(node) {
+    // The node you are standing on draws the player sprite (see getIcon), so its
+    // tooltip names the player rather than whatever the generator rolled
+    // underneath — the type there is spent and no longer actionable. The mart is
+    // the exception: standing on one keeps it clickable (handleNodeClick re-opens
+    // the shelf), so it must keep advertising itself.
+    if (node.id === currentNode && node.type !== NODE_TYPES.POKEMART) {
+      return { title: 'You', sub: 'You are here' }
+    }
     if (node.type === NODE_TYPES.TRAINER) {
       // Trainer teams are drawn at battle time, so the exact team isn't known
       // here — show the class's typical variety. A themed class shows its own

@@ -69,7 +69,7 @@ export default function EvolutionAnimation({ fromSprite, toSprite, fromName, toN
 
   const revealText = mode === 'mega'
     ? `${fromName} Mega Evolved!`
-    : `${fromName} is evolving into ${toName}!`
+    : `${fromName} evolved into ${toName}!`
 
   return (
     <div
