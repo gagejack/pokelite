@@ -75,6 +75,51 @@ test('bakeSafariSpecies ignores a cached row-0 offset (getRowOffset forces it to
   ])
 })
 
+test('bakeSafariSpecies applies a cached row-1 offset and consumes the jitter draw', () => {
+  // Row 0's guard (above) proves offsets are inert there — this proves the
+  // opposite for a row where they're supposed to apply. Node ids 1-2 fall in
+  // row 1 (width 2) under BALANCE.map.rowWidths [1,2,3,4,3,4,3]:
+  // rowIndexForNodeId(1) === rowIndexForNodeId(2) === 1. Compared with the
+  // offset-0 baseline immediately below, the pokeball's level and species
+  // shift even though nothing about the pokeball draw itself changed — that
+  // shift is only possible if the grass node's jitter branch consumed an
+  // extra rng() call, which moves every later draw in the shared stream.
+  // That's the proof a real offset actually reaches pickLevel end-to-end,
+  // not just that getRowOffset can read a cached value back (see
+  // mapLevelBalance.test.js's cache-only coverage of that).
+  __resetMapLevelBalanceForTests()
+  seedRng(4)
+  const baselineRows = [[{ id: 1, type: NODE_TYPES.GRASS }, { id: 2, type: NODE_TYPES.POKEBALL }]]
+  bakeSafariSpecies(baselineRows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  clearRng()
+  const baseline = baselineRows[0]
+
+  __setCacheForTests({ bands: {}, offsets: { '0:1': 5 } })
+  seedRng(4)
+  const offsetRows = [[{ id: 1, type: NODE_TYPES.GRASS }, { id: 2, type: NODE_TYPES.POKEBALL }]]
+  bakeSafariSpecies(offsetRows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
+  clearRng()
+  __resetMapLevelBalanceForTests()
+  const offset = offsetRows[0]
+
+  // Pin the exact baseline and offset outputs so a regression in either
+  // direction (offset stops applying, or applies somewhere it shouldn't)
+  // fails loudly rather than passing on a loose "differs somehow" check.
+  expect(baseline).toEqual([
+    { id: 1, type: NODE_TYPES.GRASS, species: { id: 7, level: 11 } },
+    { id: 2, type: NODE_TYPES.POKEBALL, species: { id: 1, rarity: 'common', level: 17 } },
+  ])
+  expect(offset).toEqual([
+    { id: 1, type: NODE_TYPES.GRASS, species: { id: 7, level: 8 } },
+    { id: 2, type: NODE_TYPES.POKEBALL, species: { id: 4, rarity: 'common', level: 13 } },
+  ])
+  // The grass node's own level moved by the offset (the direct effect)...
+  expect(offset[0].species.level).not.toBe(baseline[0].species.level)
+  // ...and the pokeball's species/level also moved, which is only possible
+  // if the offset consumed an extra rng() draw and shifted the stream.
+  expect(offset[1].species.id).not.toBe(baseline[1].species.id)
+})
+
 test('bakes species onto grass nodes', () => {
   const rows = rowsWith(NODE_TYPES.GRASS)
   bakeSafariSpecies(rows, { config: CONFIG, mapIndex: 0, maxSpeciesId: 151 })
