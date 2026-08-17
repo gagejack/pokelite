@@ -350,6 +350,10 @@ alter table public.map_level_balance
     "offset" is null or ("offset" >= 0 and "offset" <= 20)
   );
 
+-- INVARIANT: every region ships exactly 8 maps. If that ever stops being
+-- true, this constraint and the dashboard's map dropdown (BalanceDashboard
+-- TrainerLevelsPanel) both need widening — a 9-map region would otherwise be
+-- untunable past map 8, and the write would fail server-side here.
 alter table public.map_level_balance
   drop constraint if exists map_level_balance_map_index;
 alter table public.map_level_balance
@@ -1030,6 +1034,11 @@ function TrainerLevelsPanel({ theme, regions }) {
             backgroundColor: innerBg, border: panelBorder, padding: '4px 6px', cursor: 'pointer',
           }}
         >
+          {/* INVARIANT: every region ships exactly 8 maps, so this is a flat
+              8 rather than a per-region catchPools.length — the table shows
+              all regions side by side and they always agree. If a region ever
+              ships a different count, widen this AND the map_index check
+              constraint in supabase/map_level_balance.sql. */}
           {Array.from({ length: 8 }, (_, i) => (
             <option key={i} value={i}>Map {i + 1}</option>
           ))}
