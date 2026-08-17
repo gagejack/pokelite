@@ -202,3 +202,21 @@ export function buildRows(trainerPool, bossTrainer, mapIndex = 0, options = {}) 
   }
   return rows
 }
+
+// Row index containing a node id, for the layout buildRows produces:
+// BALANCE.map.rowWidths, then the appended Pokécenter/Pokémart fork (2 nodes)
+// and the boss (1 node). Call sites downstream of generation hold only
+// `node.id` but need the row to look up its admin-tuned level offset, and ids
+// are assigned in row order by buildRows, so the row is recoverable by walking
+// cumulative widths. Out-of-range ids clamp to the last row rather than
+// returning -1: a lookup miss must degrade to a real offset, never undefined.
+export function rowIndexForNodeId(nodeId) {
+  const widths = [...BALANCE.map.rowWidths, 2, 1] // + pokecenter row + boss row
+  if (nodeId < 0) return 0
+  let seen = 0
+  for (let row = 0; row < widths.length; row++) {
+    seen += widths[row]
+    if (nodeId < seen) return row
+  }
+  return widths.length - 1
+}

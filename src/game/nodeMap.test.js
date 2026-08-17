@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { megaStoneChance, buildRows, NODE_TYPES } from './nodeMap.js'
+import { megaStoneChance, buildRows, NODE_TYPES, rowIndexForNodeId } from './nodeMap.js'
 import { seedRng, clearRng } from './rng.js'
 
 test('megaStoneChance is 0 before map index 2 (map 3)', () => {
@@ -85,4 +85,30 @@ test('buildRows never produces more than one MEGA_STONE node across many seeds',
   } finally {
     clearRng()
   }
+})
+
+test('rowIndexForNodeId maps every generated node id to the row containing it', () => {
+  seedRng(42)
+  const rows = buildRows([1, 4, 7], 'Brock', 0, { megaStoneAvailable: false })
+  clearRng()
+
+  rows.forEach((row, expectedRow) => {
+    row.forEach(node => {
+      expect(rowIndexForNodeId(node.id)).toBe(expectedRow)
+    })
+  })
+})
+
+test('rowIndexForNodeId covers the appended pokecenter and boss rows', () => {
+  // rowWidths [1,2,3,4,3,4,3] = 20 nodes (ids 0-19), then the pokecenter row
+  // (ids 20-21, row 7) and the boss (id 22, row 8).
+  expect(rowIndexForNodeId(19)).toBe(6)
+  expect(rowIndexForNodeId(20)).toBe(7)
+  expect(rowIndexForNodeId(21)).toBe(7)
+  expect(rowIndexForNodeId(22)).toBe(8)
+})
+
+test('rowIndexForNodeId clamps out-of-range ids to the last row', () => {
+  expect(rowIndexForNodeId(999)).toBe(8)
+  expect(rowIndexForNodeId(-1)).toBe(0)
 })
