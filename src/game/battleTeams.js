@@ -17,18 +17,27 @@ export function mapLevelRange(ranges, mapIndex = 0) {
 // positionWeight 0.0 = early node (near the band floor) → 1.0 = late node (near
 // the band ceiling, approaching the map's gym leader). Position dominates, with
 // a loose random spread so nodes still vary.
-export function pickLevel([min, max], positionWeight = 0.5) {
+//
+// `offset` is the row's admin-tuned jitter MAGNITUDE (not a signed shift): the
+// result gets a uniform integer delta from [-offset, +offset]. The rng() draw
+// is guarded behind offset > 0 so an all-zero offset table consumes exactly
+// the same rng stream as before this parameter existed — existing seeds must
+// keep reproducing identically. Clamped to [1, 100] because jitter, unlike the
+// interpolation above it, can leave the band.
+export function pickLevel([min, max], positionWeight = 0.5, offset = 0) {
   const span = max - min
   const { posFactor, randSpan, randOffset } = BALANCE.trainers.level
   const t = Math.max(0, Math.min(1, positionWeight * posFactor + rng() * randSpan - randOffset))
-  return Math.round(min + span * t)
+  const level = Math.round(min + span * t)
+  const jitter = offset > 0 ? Math.floor(rng() * (2 * offset + 1)) - offset : 0
+  return Math.min(100, Math.max(1, level + jitter))
 }
 
 // Build raw team spec (id + level) for a trainer node.
 // `pool` is the current map's species pool and `band` is its [min, max] level
 // range — both supplied by the caller from the region config. Levels are scaled
 // by node position. The trainer type only determines the battle sprite.
-export function buildTrainerTeamSpec(pool, band, count, positionWeight = 0.5) {
+export function buildTrainerTeamSpec(pool, band, count, positionWeight = 0.5, offset = 0) {
   const src = pool && pool.length > 0 ? pool : [504]
   const specs = []
   const usedIds = new Set()
@@ -36,7 +45,7 @@ export function buildTrainerTeamSpec(pool, band, count, positionWeight = 0.5) {
     const available = src.filter(id => !usedIds.has(id))
     const id = available.length > 0 ? pick(available) : pick(src)
     usedIds.add(id)
-    specs.push({ id, level: pickLevel(band, positionWeight) })
+    specs.push({ id, level: pickLevel(band, positionWeight, offset) })
   }
   return specs
 }
