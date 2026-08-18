@@ -141,6 +141,7 @@ export const BALANCE = deepFreeze({
       grass: 50,
       trainer: 30,
       rival: 60,
+      miniBoss: 90,     // Rocket executive — boss-tier fight, no heal/levels
       boss: 120,        // gym leader
       legendary: 250,   // Master Ball node — paid on WIN, never on catch
       eliteFour: 200,

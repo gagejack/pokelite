@@ -33,8 +33,10 @@ import { healOne, reviveOne, reviveAll } from './game/roster.js'
 import { useIsDesktop } from './lib/useIsDesktop'
 import EvolutionAnimation from './components/EvolutionAnimation'
 import defaultCharacterSprite from './assets/regions/Unova/Character Full Sprites/Hilbert 1.webp'
+import { characterForProfile } from './game/playerCharacter.js'
 
-// Character select is skipped for now — every run uses this default protagonist.
+// Character select is skipped for now — every run uses this default protagonist
+// unless the player has equipped a Cosmetics-shop skin (see activeCharacter).
 const DEFAULT_CHARACTER = { id: 'Hilbert', name: 'Hilbert', sprite: defaultCharacterSprite }
 
 export default function App() {
@@ -1366,6 +1368,12 @@ export default function App() {
     return { ok: true }
   }
 
+  // Skin equipped in the Cosmetics shop wins over the run's stored character,
+  // on every region's map, in battle, and on the Elite Four screen. Computed
+  // here (not stored in run state) so an equip mid-save shows up the moment the
+  // profile updates — see characterForProfile.
+  const activeCharacter = characterForProfile(profile, selectedCharacter)
+
   return (
     <ThemeProvider>
     <SettingsProvider>
@@ -1446,7 +1454,7 @@ export default function App() {
           key={mapIndex}
           region={selectedRegion}
           starter={selectedStarter}
-          character={selectedCharacter}
+          character={activeCharacter}
           roster={roster}
           setRoster={setRoster}
           bag={bag}
@@ -1512,7 +1520,7 @@ export default function App() {
       {screen === 'elitefour' && (
         <EliteFour
           region={selectedRegion}
-          character={selectedCharacter}
+          character={activeCharacter}
           starter={selectedStarter}
           roster={roster}
           setRoster={setRoster}

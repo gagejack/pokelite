@@ -130,6 +130,9 @@ export async function prewarmCache(regionConfig) {
   Object.values(regionConfig.eliteFourTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   // Rival teams (keyed by variant → [{ id, level }])
   Object.values(regionConfig.rivalTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
+  // Mini boss teams (keyed by trainer name → [{ id, level }]). Warmed for the
+  // same reason as boss teams: the node tooltip reads types/names synchronously.
+  Object.values(regionConfig.miniBossTeams ?? {}).forEach(team => team.forEach(({ id }) => ids.add(id)))
   // Starter-counter aces (rival nodes + the champion) — spliced in at battle
   // time, so they aren't in the team arrays above. All branches warm: the
   // player's starter isn't known here.
@@ -640,6 +643,35 @@ export async function checkEvolution(instance, newLevel, { maxSpeciesId = Infini
   } catch {
     return null
   }
+}
+
+// Synchronous "would the Evolve Stone do anything here?" — mirrors
+// checkEvolution's `ignoreLevel` eligibility rule (any branch inside the
+// region's gen) so the UI can grey out the Use button and refuse a drop
+// without awaiting. Level is deliberately ignored: the stone doesn't care.
+//
+// Reads chainCache, which ensureLocalData() fills for EVERY species up front
+// (not evoCache, which is only populated per-species on the first
+// checkEvolution). On a cache miss it returns true — "maybe" — so a
+// cold-cache Pokémon is never wrongly reported as fully evolved; the async
+// checkEvolution in evolveWithStone remains the real gate and still keeps the
+// stone if there's nothing to evolve into.
+export function hasStoneEvolutionSync(instance, maxSpeciesId = Infinity) {
+  if (!instance) return false
+  const root = chainCache.get(instance.pokeId)
+  if (!root) return true
+
+  const findNode = node => {
+    if (node.id === instance.pokeId) return node
+    for (const child of node.evolvesTo ?? []) {
+      const hit = findNode(child)
+      if (hit) return hit
+    }
+    return null
+  }
+  const node = findNode(root)
+  if (!node) return true
+  return (node.evolvesTo ?? []).some(b => b.id <= maxSpeciesId)
 }
 
 // Evolve a Pokémon into the species the player CHOSE in the EvolutionChoice

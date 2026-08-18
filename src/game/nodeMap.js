@@ -15,6 +15,14 @@ export const NODE_TYPES = {
   // heal OR shop, never both. See buildRows below.
   POKEMART: 'pokemart',
   BOSS: 'boss',
+  // Mini boss — an authored-team villain fight (Johto's Rocket executives).
+  // Renders boss-sized and pays a boss-tier purse, but deliberately does NOT
+  // heal or grant the rival's +4 levels: two of these sit on one row, so
+  // rival-style rewards would hand out +8 levels and two full heals before the
+  // map's gym. Placed manually, never randomly rolled. A placed node is:
+  //   { id, type: NODE_TYPES.MINIBOSS, trainer: 'Archer' }
+  // where `trainer` keys both config.trainerSprites and config.miniBossTeams.
+  MINIBOSS: 'miniboss',
   MYSTERY: 'mystery',
   // Rival — a special trainer that heals + gives +4 levels to the whole roster
   // on defeat. Placed manually (never randomly rolled). A placed rival node is:

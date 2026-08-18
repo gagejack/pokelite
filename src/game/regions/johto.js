@@ -5,7 +5,7 @@
 
 import { buildRows, NODE_TYPES } from '../nodeMap.js'
 import { pickCatchOffer, CATCH_TIER_BUDGET } from '../catch.js'
-import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, RIVAL_STARTER_COUNTERS, MAP_LEVEL_RANGES, CATCH_LEVEL_RANGES, LANCE_STARTER_COUNTER } from './johto.teams.js'
+import { TRAINER_SPECIES_POOLS, BOSS_TEAMS, ELITE_FOUR_TEAMS, RIVAL_TEAMS, RIVAL_STARTER_COUNTERS, MINIBOSS_TEAMS, MAP_LEVEL_RANGES, CATCH_LEVEL_RANGES, LANCE_STARTER_COUNTER } from './johto.teams.js'
 import { bakeSafariSpecies } from '../safariBake.js'
 import { GEN_MAX_ID } from '../pokemon.js'
 
@@ -74,6 +74,9 @@ import owBruno from '../../assets/regions/Johto/Overworlds/ow_Bruno.webp'
 import owKaren from '../../assets/regions/Johto/Overworlds/ow_Karen.webp'
 import owLance from '../../assets/regions/Johto/Overworlds/ow_Lance.webp'
 import owSilver from '../../assets/regions/Johto/Overworlds/ow_Silver_1.webp'
+// Team Rocket executives (MINIBOSS nodes, map 7)
+import owArcher from '../../assets/regions/Johto/Overworlds/ow_Archer.webp'
+import owProton from '../../assets/regions/Johto/Overworlds/ow_Proton.webp'
 // Player-character portraits (CharacterSelect)
 import owEthan1 from '../../assets/regions/Johto/Overworlds/ow_Ethan_1.webp'
 import owLyra1 from '../../assets/regions/Johto/Overworlds/ow_Lyra_1.webp'
@@ -125,6 +128,11 @@ import fullBruno from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Bruno
 import fullKaren from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Karen.png'
 import fullLance from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Lance.png'
 import fullSilver from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Silver.png'
+// Rocket executives — .webp where the rest of this folder is .png (later asset
+// drop). The extension only matters to spriteIndex.js's cosmetics glob, which
+// matches *.png; these are imported directly, so the node/battle art works.
+import fullArcher from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Archer.webp'
+import fullProton from '../../assets/regions/Johto/Trainer Sprites/Spr_HGSS_Proton.webp'
 
 // --- Playable characters (CharacterSelect portraits) ---
 const CHARACTERS = [
@@ -179,6 +187,9 @@ const TRAINER_SPRITES = {
   'Karen':         owKaren,
   'Lance':         owLance,
   'Silver':        owSilver,
+  // Rocket executives (mini bosses)
+  'Archer':        owArcher,
+  'Proton':        owProton,
 }
 
 // --- Trainer full battle sprites (BattleCard) — same keys as TRAINER_SPRITES ---
@@ -227,6 +238,9 @@ const TRAINER_FULL_SPRITES = {
   'Karen':         fullKaren,
   'Lance':         fullLance,
   'Silver':        fullSilver,
+  // Rocket executives (mini bosses)
+  'Archer':        fullArcher,
+  'Proton':        fullProton,
 }
 
 // All three Johto starters map to Falkner (Violet Gym) — Johto has no
@@ -456,6 +470,8 @@ export const johtoConfig = {
   // Lance's ace is the fully-evolved Johto starter that counters the player's pick.
   blueStarterCounter: LANCE_STARTER_COUNTER,
   rivalTeams: RIVAL_TEAMS,
+  // Team Rocket executives fought on map 7's centre row (MINIBOSS nodes).
+  miniBossTeams: MINIBOSS_TEAMS,
   // Silver's map-3 ace: the mid-stage starter countering the player's pick,
   // appended at the roster's top level by game/rivals.js.
   rivalStarterCounters: RIVAL_STARTER_COUNTERS,
@@ -488,6 +504,15 @@ export const johtoConfig = {
       const rows = buildRows(TRAINER_POOLS[i], boss, i, { megaStoneAvailable })
       if (i === 2) {
         rows[4][1] = { id: rows[4][1].id, type: NODE_TYPES.RIVAL, trainer: 'Silver', rivalTeam: 'silverEarlyGame' }
+      }
+      // Map 7 (Mahogany) is the Rocket HQ map — a 3-wide row is flanked by two
+      // Rocket executives. Row 4 is the 3-node row (widths [1,2,3,4,3,4,3]), so
+      // these take the two ends and leave the single middle node as the
+      // generated alternative: the row stays a real choice (fight a Rocket, or
+      // walk between them). Teams are in MINIBOSS_TEAMS.
+      if (i === 6) {
+        rows[4][0] = { id: rows[4][0].id, type: NODE_TYPES.MINIBOSS, trainer: 'Archer' }
+        rows[4][2] = { id: rows[4][2].id, type: NODE_TYPES.MINIBOSS, trainer: 'Proton' }
       }
       if (mode === 'safari') {
         bakeSafariSpecies(rows, {

@@ -228,6 +228,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (item?.consumable === 'evolve') {
       const used = await evo.evolveWithStone(pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      else setNotice('This pokemon is the highest form')
       return
     }
     // Rare Candy: levels the target and may evolve it. Kept only at MAX_LEVEL.

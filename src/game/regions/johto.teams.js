@@ -128,6 +128,30 @@ export const RIVAL_STARTER_COUNTERS = {
   silverEarlyGame: SILVER_EARLY_STARTER_COUNTER,
 }
 
+// Team Rocket executives for MINIBOSS nodes — map 7 (Mahogany, band [50,64]),
+// the Rocket HQ map. Same flat { id, level } format as BOSS_TEAMS, ace last.
+//
+// Rosters are the executives' HGSS Rocket-HQ species, scaled up to sit in map
+// 7's band: canon fights them in the mid-30s, but by map 7 the player's roster
+// is L50+, so the authored gap is preserved rather than the raw canon levels —
+// each lands just UNDER Pryce's 62-64 gym so the gym stays the map's wall.
+export const MINIBOSS_TEAMS = {
+  // Archer — Rocket's acting leader. Houndour/Houndoom line is his signature
+  // in HGSS; Koffing rounds out the poison-and-fire executive theme.
+  'Archer': [
+    { id: 228, level: 56 }, // Houndour
+    { id: 109, level: 56 }, // Koffing
+    { id: 229, level: 58 }, // Houndoom (ace)
+  ],
+  // Proton — the "scariest" executive. Zubat line + Golbat ace, matching his
+  // HGSS HQ roster.
+  'Proton': [
+    { id: 41,  level: 55 }, // Zubat
+    { id: 109, level: 55 }, // Koffing
+    { id: 42,  level: 57 }, // Golbat (ace)
+  ],
+}
+
 // Per-map level ranges (indexed by mapIndex) for TRAINER and GRASS encounters.
 // Identical to Kanto's bands: Johto sits in the same slot of the run (a fresh
 // starter, eight gyms, an Elite Four) and the two regions should not disagree

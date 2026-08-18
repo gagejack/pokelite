@@ -5,12 +5,12 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { itemIconUrl, tierColor } from '../game/items'
 import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
-import { MAX_LEVEL } from '../game/pokemon.js'
+import { MAX_LEVEL, hasStoneEvolutionSync } from '../game/pokemon.js'
 import { alternateTypeFor } from '../game/attackTypes.js'
 import { PokemonCardContent } from './Roster'
 
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
-export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose, onReroll = null }) {
+export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClose, onReroll = null, maxSpeciesId = Infinity }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [stage, setStage] = useState('pick')
@@ -129,6 +129,13 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
                 // Rare Candy: mirrors applyRareCandy's only refusal.
                 if (c === 'level' && pokemon.level >= MAX_LEVEL) {
                   return 'Already max level'
+                }
+                // Evolve Stone: nothing left to evolve into (in this region's
+                // gen). The sync check answers "maybe" on a cold chain cache,
+                // so this only blocks when we positively know the line ends
+                // here — evolveWithStone still keeps the stone either way.
+                if (c === 'evolve' && !hasStoneEvolutionSync(pokemon, maxSpeciesId)) {
+                  return 'This pokemon is the highest form'
                 }
                 // Type Prism, and the Polarity Band's held-item equivalent:
                 // both need a second type to swap to. 209 of 371 species are

@@ -95,6 +95,8 @@ describe.each(playable)('%s', regionName => {
       team.forEach(m => check(m.id, `eliteFourTeams[${name}]`)))
     Object.entries(config.rivalTeams ?? {}).forEach(([variant, team]) =>
       team.forEach(m => check(m.id, `rivalTeams[${variant}]`)))
+    Object.entries(config.miniBossTeams ?? {}).forEach(([name, team]) =>
+      team.forEach(m => check(m.id, `miniBossTeams[${name}]`)))
 
     expect(offenders).toEqual([])
   })
@@ -119,6 +121,13 @@ describe.each(playable)('%s', regionName => {
         if (!config.trainerSprites?.[name]) missing.push(`overworld: ${name}`)
         if (!config.trainerFullSprites?.[name]) missing.push(`full: ${name}`)
       })
+
+    // Mini bosses render a node icon AND a battle card, same as a gym leader,
+    // so a missing half is the same bug here as it is above.
+    Object.keys(config.miniBossTeams ?? {}).forEach(name => {
+      if (!config.trainerSprites?.[name]) missing.push(`overworld: ${name}`)
+      if (!config.trainerFullSprites?.[name]) missing.push(`full: ${name}`)
+    })
 
     expect(missing).toEqual([])
   })

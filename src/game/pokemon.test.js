@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'vitest'
-import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, _clearChainCacheForTest, cachedSprite } from './pokemon.js'
+import { buildPokemonInstance, buildEvolvedInstance, levelUp, calcHP, calcStat, rollStageForLevelSync, rollStageForLevel, resolveEvolutionLine, _seedChainCacheForTest, _clearChainCacheForTest, cachedSprite, hasStoneEvolutionSync } from './pokemon.js'
 import { setActiveRunModifiers, clearActiveRunModifiers } from './metaModifiers.js'
 import { createProfile } from './metaProfile.js'
 import { BALANCE } from './balance.js'
@@ -367,4 +367,48 @@ test('resolveEvolutionLine with no level argument resolves from the requested id
 
 test('cachedSprite returns null for a species that was never warmed', () => {
   expect(cachedSprite(9999)).toBe(null)
+})
+
+// ── hasStoneEvolutionSync: the Evolve Stone's "would this do anything?" gate ──
+
+test('hasStoneEvolutionSync is true for a mid-line form that still has a branch', () => {
+  _seedChainCacheForTest(9001, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9002, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9003, THREE_STAGE_LINE)
+  expect(hasStoneEvolutionSync({ pokeId: 9002 })).toBe(true)
+})
+
+// The whole point of the feature: the final stage has no branches left, so the
+// UI can say "This pokemon is the highest form" instead of offering Use.
+test('hasStoneEvolutionSync is false for the final form of a line', () => {
+  _seedChainCacheForTest(9001, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9002, THREE_STAGE_LINE)
+  _seedChainCacheForTest(9003, THREE_STAGE_LINE)
+  expect(hasStoneEvolutionSync({ pokeId: 9003 })).toBe(false)
+})
+
+// Level is irrelevant to the stone — a Lv1 base form is still evolvable, so the
+// button must stay enabled where checkEvolution's ignoreLevel path would fire.
+test('hasStoneEvolutionSync ignores level entirely', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  expect(hasStoneEvolutionSync({ pokeId: 10, level: 1 })).toBe(true)
+})
+
+// Mirrors checkEvolution's maxSpeciesId filter: a branch outside the region's
+// generation isn't reachable, so the base form IS the highest form here.
+test('hasStoneEvolutionSync respects the generation ceiling', () => {
+  _seedChainCacheForTest(10, TWO_STAGE_LINE)
+  expect(hasStoneEvolutionSync({ pokeId: 10 }, 10)).toBe(false)
+  expect(hasStoneEvolutionSync({ pokeId: 10 }, 11)).toBe(true)
+})
+
+// Fail OPEN on a cold cache: reporting "highest form" for an unwarmed species
+// would wrongly disable a stone that actually works. The async checkEvolution
+// in evolveWithStone is the real gate and still keeps the item on a no-op.
+test('hasStoneEvolutionSync returns true for a species whose chain is not cached', () => {
+  expect(hasStoneEvolutionSync({ pokeId: 9999 })).toBe(true)
+})
+
+test('hasStoneEvolutionSync returns false for a missing Pokémon', () => {
+  expect(hasStoneEvolutionSync(null)).toBe(false)
 })

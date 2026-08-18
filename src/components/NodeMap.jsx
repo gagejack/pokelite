@@ -66,7 +66,7 @@ const NODE_SCALE = 1.3
 // bigger than regular nodes. Stacks on top of NODE_SCALE. Rivals render at the
 // same size — both are major fights.
 const BOSS_SCALE = 1.4
-const isBossSized = type => type === NODE_TYPES.BOSS || type === NODE_TYPES.RIVAL
+const isBossSized = type => type === NODE_TYPES.BOSS || type === NODE_TYPES.RIVAL || type === NODE_TYPES.MINIBOSS
 // Interaction feedback scales, applied on top of the layout scales above by an
 // inner <g> so none of the positioning math is touched.
 //
@@ -372,7 +372,7 @@ function MapSvg({
           const isHovered = hoveredNode?.id === node.id
           const icon = getIcon(node, isCurrentNode)
           const opacity = isCurrentNode ? 1 : cleared ? 0.8 : reachable ? 1 : locked ? 0.2 : .85
-          const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL
+          const isTrainerNode = node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL || node.type === NODE_TYPES.MINIBOSS
           // Gym leaders + rivals render larger than everything else.
           const nodeScale = NODE_SCALE * (isBossSized(node.type) ? BOSS_SCALE : 1)
           // Only nodes the player can actually act on animate, so growth MEANS
@@ -871,6 +871,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isTrainer = node.type === NODE_TYPES.TRAINER
     const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
     const isRival = node.type === NODE_TYPES.RIVAL
+    const isMiniBoss = node.type === NODE_TYPES.MINIBOSS
     const totalNodes = Object.keys(nodePositions).length
     const positionWeight = node.id / totalNodes
     // The row's admin-tuned jitter magnitude (0 = shipped behaviour, and no
@@ -881,6 +882,11 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     let specs
     if (isBoss) {
       specs = config.bossTeams?.[node.trainer] ?? []
+    } else if (isMiniBoss) {
+      // Mini boss: a fixed authored roster keyed by trainer name. No starter
+      // counter — unlike the rival, a Rocket executive's team is the same
+      // whichever starter the player picked.
+      specs = config.miniBossTeams?.[node.trainer] ?? []
     } else if (isRival) {
       // Rival: a fixed authored team selected by the node's rivalTeam variant,
       // plus the rival's own starter (counters the player's pick) as the ace.
@@ -1068,6 +1074,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       || node.type === NODE_TYPES.GRASS
       || node.type === NODE_TYPES.MASTER_BALL
       || node.type === NODE_TYPES.RIVAL
+      || node.type === NODE_TYPES.MINIBOSS
 
     if (isBattle) {
       setLoadingNode(node.id)
@@ -1147,6 +1154,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     const isBoss = node.type === NODE_TYPES.BOSS
     const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
     const isRival = node.type === NODE_TYPES.RIVAL
+    const isMiniBoss = node.type === NODE_TYPES.MINIBOSS
     const legendary = pendingBattle.enemyTeam[0]
     // Rival grants a full heal + the most levels; grass the fewest. See BALANCE.
     const lv = BALANCE.progression.levelsGained
@@ -1169,6 +1177,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const pay = BALANCE.economy.payouts
       onEarnCash?.(
         isRival ? pay.rival
+        : isMiniBoss ? pay.miniBoss
         : isMasterBall ? pay.legendary
         : isBoss ? pay.boss
         : node.type === NODE_TYPES.GRASS ? pay.grass
@@ -1288,7 +1297,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const sprite = cachedSprite(node.species.id)
       if (sprite) return sprite
     }
-    if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL) {
+    if (node.type === NODE_TYPES.TRAINER || node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.RIVAL || node.type === NODE_TYPES.MINIBOSS) {
       return config.trainerSprites[node.trainer] || ITEM_ICONS[NODE_TYPES.POKEBALL]
     }
     if (node.type === NODE_TYPES.GRASS) return mapConfig.grassIcon
@@ -1328,6 +1337,17 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         level: p.level,
       }))
       return { title: node.trainer ?? 'Gym Leader', sub: [...sub, `$${BALANCE.economy.payouts.boss}`] }
+    }
+    if (node.type === NODE_TYPES.MINIBOSS) {
+      // Boss-style team rows. The reward line omits any heal/level-bonus claim
+      // because a mini boss grants neither — only the default +2 and its purse.
+      const team = config.miniBossTeams?.[node.trainer] ?? []
+      const sub = team.map(p => ({
+        type: cachedType(p.id),
+        name: cachedName(p.id) ?? '???',
+        level: p.level,
+      }))
+      return { title: node.trainer ?? 'Team Rocket', sub: [...sub, `+2 levels to all mon · $${BALANCE.economy.payouts.miniBoss}`] }
     }
     if (node.type === NODE_TYPES.RIVAL) {
       // Same team-row format as a boss, plus the rival's reward line. Uses the
@@ -1458,6 +1478,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (item?.consumable === 'evolve') {
       const used = await evo.evolveWithStone(pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      else setNotice('This pokemon is the highest form')
       return
     }
     // Rare Candy: levels the target and may evolve it. Kept only if the target
@@ -1983,6 +2004,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         <ItemNode
           offered={pendingItem.offered}
           roster={roster}
+          maxSpeciesId={maxSpeciesId}
           onReroll={pendingItem.node.fromMystery ? rerollItemOffer : null}
           onAssign={async (item, pokemonIndex, swapBackItem) => {
             // The Evolve Stone is a consumable, not a held item: it evolves the
