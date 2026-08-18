@@ -3,6 +3,7 @@ import { useTheme } from '../lib/theme'
 import { muted, accent, twoTone, STAT_BAR_LIGHT, STAT_BAR_DARK } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
+import { isHeldItemLocked } from '../game/megas.js'
 import { itemIconUrl } from '../game/items'
 import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
@@ -78,9 +79,11 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: s(2),
           }}>
-            {onHeldItemClick ? (
+            {onHeldItemClick && !isHeldItemLocked(pokemon) ? (
               // Clicking the held item starts moving it: the card closes and the
               // player picks another roster slot (or the Bag) to give it to.
+              // A locked item (Mega Stone) falls to the plain <img> below —
+              // permanent, so there is nothing to start moving.
               <button
                 type="button"
                 onClick={() => onHeldItemClick(pokemon.heldItem)}
@@ -534,19 +537,25 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       </span>
       {pokemon.heldItem && (
         <div
-          draggable
+          // A Mega Stone is permanent once equipped, so its badge is inert:
+          // no drag, no grab cursor, and a title that says why rather than
+          // inviting a gesture that would be rejected downstream anyway.
+          draggable={!isHeldItemLocked(pokemon)}
           onDragStart={(e) => {
             e.stopPropagation();
+            if (isHeldItemLocked(pokemon)) return;
             onStartHeldItemDrag?.(slotIndex, pokemon.heldItem);
           }}
           onDragEnd={() => onStartHeldItemDrag?.(null)}
           onClick={(e) => e.stopPropagation()}
-          title={`${pokemon.heldItem.name} — drag to move`}
+          title={isHeldItemLocked(pokemon)
+            ? `${pokemon.heldItem.name} — cannot be removed`
+            : `${pokemon.heldItem.name} — drag to move`}
           style={{
             border: `2px solid ${dark ? '#535353' : '#999'}`,
             borderRadius: '2px',
             padding: '1px',
-            cursor: 'grab',
+            cursor: isHeldItemLocked(pokemon) ? 'default' : 'grab',
             display: 'flex',
             flexShrink: 0,
           }}

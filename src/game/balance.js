@@ -173,14 +173,30 @@ export const BALANCE = deepFreeze({
       muscle_band: 200,
       light_clay: 200,
       mega_revive: 900,
-      plate_rock: 300,
+      // All 18 plates, one rung, so no region's gym type can fall through.
+      // Originally only Kanto's eight were listed; Johto's shelves sell the
+      // flying/bug/normal/ghost/fighting/steel/ice/dragon plates, and an
+      // unpriced item is silently dropped by shop.js toEntry — those rows
+      // never rendered. A plate is a plate: same effect, same price, and the
+      // per-map choice is about which TYPE you need, never about cost.
+      plate_normal: 300,
+      plate_fire: 300,
       plate_water: 300,
       plate_electric: 300,
       plate_grass: 300,
+      plate_ice: 300,
+      plate_fighting: 300,
       plate_poison: 300,
-      plate_psychic: 300,
-      plate_fire: 300,
       plate_ground: 300,
+      plate_flying: 300,
+      plate_psychic: 300,
+      plate_bug: 300,
+      plate_rock: 300,
+      plate_ghost: 300,
+      plate_dragon: 300,
+      plate_dark: 300,
+      plate_steel: 300,
+      plate_fairy: 300,
 
       // ── Curated-shelf items (2026-07-31-map-shop-curation-design.md) ─────
       // Priced onto the EXISTING rungs rather than inventing new ones:
@@ -207,6 +223,38 @@ export const BALANCE = deepFreeze({
       // $900 ceiling recovers the whole team.
       type_prism: 600,
       focus_sash: 600,
+
+      // ── Remaining rare/epic/legendary items ─────────────────────────────
+      // Priced so the Johto random shop slot (game/shop.js pickRandomShopItem)
+      // can draw from a WHOLE tier. An unpriced item is silently skipped by
+      // toEntry, so a partially-priced tier would make the random slot
+      // sometimes render nothing — the draw must never land on a hole.
+      //
+      // Same rungs as above, no new ones: $200-250 rare, $400-450 epic,
+      // $600 legendary.
+      expert_belt: 250,
+      choice_band: 250,
+      choice_scarf: 250,
+      scope_lens: 250,
+      rocky_helmet: 250,
+      shell_bell: 250,
+      polarity_band: 250,
+      // The three rare CONSUMABLES sit at the heal's own rung rather than the
+      // held-item rung: each is a one-shot effect, and pricing a single use
+      // like a permanent held item would make it the worst buy on the shelf.
+      max_revive: 150,
+      // Above the heal, below the held items: a free evolution or three levels
+      // is worth more than one heal but is still spent the moment it is used.
+      evolve_stone: 200,
+      rare_candy: 200,
+      razor_claw: 450,
+      cell_battery: 400,
+      // The matchup pair — same price as each other because they are mirrors
+      // (one makes super-effective hits hurt more, the other less), and
+      // pricing them apart would make the choice about value, not about the
+      // team you are running.
+      weakness_policy: 600,
+      resist_charm: 600,
     },
     // Units a single shop stocks. Uncapped stock would turn a legendary
     // windfall into five heals and undo the attrition pressure.

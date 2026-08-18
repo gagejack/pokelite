@@ -7,6 +7,7 @@ import Layout from './Layout'
 import Roster from './Roster'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
+import MegaFormChoice from './MegaFormChoice'
 import BattleCard from './BattleCard'
 import RunEndScreen from './RunEndScreen.jsx'
 import { victoryVerdict } from '../game/runVerdict.js'
@@ -17,14 +18,15 @@ import { BALANCE } from '../game/balance.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { swapInRoster } from '../game/roster.js'
-import { itemIconUrl, isRosterConsumable } from '../game/items.js'
+import { itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
+import { megaRejectionReason, isHeldItemLocked, megaFormsFor } from '../game/megas.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMemberDefeated, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, onMegaEquip, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMemberDefeated, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -203,6 +205,11 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     return () => clearTimeout(t)
   }, [notice])
 
+  // Mega Stone dragged from the BAG onto a dual-form species (Charizard,
+  // Mewtwo) — the X/Y pick is owed before the stone is spent, so the equip
+  // waits here rather than committing to a form the player didn't choose.
+  const [bagMegaChoice, setBagMegaChoice] = useState(null)
+
   // Drop an item onto roster slot `pokeIndex`. Consumables are USED (and spent
   // only if they did something); everything else is equipped.
   //
@@ -210,6 +217,28 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // the touch path via useBagTouchDrag's onDrop. Keeping the decision in one
   // function is what stops the two from drifting, exactly as in NodeMap.
   async function applyConsumableTo(item, from, pokeIndex) {
+    // A Mega Stone already on a Pokémon is permanent — nothing may displace it.
+    if (isHeldItemLocked(roster[pokeIndex])) {
+      setNotice(`${roster[pokeIndex].name}'s Mega Stone cannot be removed`)
+      return
+    }
+    // Mega Stone: only a species with an official mega form that's also fully
+    // evolved can hold it — the same gate MegaStoneNode's greyed-out rows use,
+    // applied here so the bag/drag path can't equip it as a dead held item.
+    // Kept (not equipped) with a reason, mirroring the Evolve Stone's contract.
+    // Equipping goes through the mega flow (not onMoveItem): dropping the stone
+    // has to actually transform the Pokémon, and a dual-form species
+    // (Charizard, Mewtwo) opens the same X/Y picker the node uses.
+    if (item?.id === MEGA_STONE_ITEM.id) {
+      const target = roster[pokeIndex]
+      const reason = await megaRejectionReason(target)
+      if (reason) { setNotice(reason); return }
+      const forms = await megaFormsFor(target.pokeId)
+      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, from }); return }
+      onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      onMegaEquip?.(pokeIndex, forms[0])
+      return
+    }
     if (isRosterConsumable(item)) {
       const used = onApplyConsumable?.(item, pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
@@ -495,6 +524,21 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             badgesEarned={config?.badges?.length ?? 0}
           />
         </div>
+      )}
+
+      {bagMegaChoice && (
+        <MegaFormChoice
+          pokemonName={roster[bagMegaChoice.pokeIndex]?.name ?? ''}
+          forms={bagMegaChoice.forms}
+          onChoose={form => {
+            onMoveItem?.({ item: MEGA_STONE_ITEM, from: bagMegaChoice.from, to: { kind: 'consumed' } })
+            onMegaEquip?.(bagMegaChoice.pokeIndex, form)
+            setBagMegaChoice(null)
+          }}
+          // Cancelling leaves the stone exactly where it was — nothing was
+          // spent yet, so there is nothing to give back.
+          onCancel={() => setBagMegaChoice(null)}
+        />
       )}
 
       {evo.render()}

@@ -7,9 +7,10 @@ import MegaFormChoice from './MegaFormChoice'
 // "Mega Evolve" node popup. One row per roster Pokémon: ineligible species
 // grey out with a reason, eligible-single-form gets a direct Equip button,
 // eligible-dual-form (Charizard, Mewtwo) opens MegaFormChoice, and an
-// already-mega'd Pokémon shows Unequip instead. Modeled on
+// already-mega'd Pokémon shows a permanent "Equipped" tag instead — the
+// stone cannot be taken back off once it lands. Modeled on
 // PowerUpgradeNode.jsx's roster-list structure.
-export default function MegaStoneNode({ roster, onEquip, onUnequip, onKeepInBag, onClose }) {
+export default function MegaStoneNode({ roster, onEquip, onKeepInBag, onClose }) {
   const { dark } = useTheme()
   const [rows, setRows] = useState(null) // [{ forms: [...], fullyEvolved: bool }] | null while loading
   const [choosingIndex, setChoosingIndex] = useState(null) // roster index currently in the X/Y picker
@@ -80,7 +81,11 @@ export default function MegaStoneNode({ roster, onEquip, onUnequip, onKeepInBag,
             const row = rows?.[i]
             const eligible = row && row.forms.length > 0 && row.fullyEvolved
             const isMega = !!pokemon._megaBase
-            const reason = !row ? '' : row.forms.length === 0 ? 'No Mega Evolution' : !row.fullyEvolved ? 'Must be fully evolved' : ''
+            // Evolution state is checked BEFORE mega forms, for the reason
+            // megaRejectionReason spells out: forms are keyed by the CURRENT
+            // species, so an unevolved Charmander reports zero of them and
+            // would otherwise be told its line "has no Mega Evolution".
+            const reason = !row ? '' : !row.fullyEvolved ? 'Must be fully evolved' : row.forms.length === 0 ? 'No Mega Evolution' : ''
 
             return (
               <div key={i} style={{
@@ -101,13 +106,12 @@ export default function MegaStoneNode({ roster, onEquip, onUnequip, onKeepInBag,
                   </span>
                 </div>
                 {isMega ? (
-                  <button
-                    onClick={() => onUnequip(i)}
-                    className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]"
-                    style={{ fontFamily: 'Upheaval', fontSize: '14px', color: textColor, border: borderStyle, backgroundColor: innerBg, padding: '8px 14px', cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    Unequip
-                  </button>
+                  // Mega Evolution is permanent for the run — there is no
+                  // Unequip. The row still renders so the player can see which
+                  // Pokémon is already carrying the stone.
+                  <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: mutedColor, padding: '8px 14px', flexShrink: 0 }}>
+                    Equipped
+                  </span>
                 ) : (
                   <button
                     disabled={!eligible}

@@ -424,43 +424,36 @@ export const johtoConfig = {
   // each shop reads as THAT TOWN's shop.
   shopGeneric: ['max_heal'],
 
-  // One type-boost plate per map, matched to that map's GYM TYPE. Thematic, NOT
-  // counter-typed: the plate sold on a map is the one that helps least against
-  // that map's gym, which makes the shop where you invest in the NEXT map.
+  // Johto shelves are THREE rows: the gym-type plate, the universal Max Heal,
+  // and one RANDOM item spun between rare / epic / legendary at equal odds
+  // (see shopRandomSlot below).
   //
-  // The other two items per shelf come from what the TOWN is. Each shelf keeps
-  // the price ladder — roughly $150 heal / $200-300 mid / $400+ ceiling — so a
-  // player who does not know Johto still has a legible spread.
+  // This is deliberately a different shape from Kanto's five-row curated
+  // shelves. Kanto's shops are a fixed catalogue you learn across runs —
+  // "Celadon sells the Mega Revive" is knowledge you carry. Johto's are a
+  // reason to visit every mart in every run, because the third row is never
+  // the same twice. Keeping both shapes means the two regions shop
+  // differently rather than being reskins of one another.
+  //
+  // Each entry is the map's GYM TYPE plate. Thematic, NOT counter-typed: the
+  // plate sold on a map is the one that helps least against that map's own
+  // gym, which makes the shop where you invest in the NEXT map.
   shopPools: [
-    // Map 1 — Violet: Sprout Tower, the sages' training ground. Eviolite and
-    // Light Clay are the patient, defensive purchases the tower teaches.
-    ['plate_flying', 'light_clay', 'eviolite'],
-    // Map 2 — Azalea: Kurt's workshop, where apricorns become Poké Balls by
-    // hand. Shell Bell is the crafted-item slot; Sitrus is Ilex Forest's berry.
-    ['plate_bug', 'sitrus_berry', 'shell_bell'],
-    // Map 3 — Goldenrod: THE DEPARTMENT STORE and the Game Corner. The only
-    // Mega Revive vendor in the run, and the only shop that restocks the heal
-    // to three. Placed at map 3 rather than Kanto's map 4 because Goldenrod is
-    // Johto's own midpoint landmark — "save for Goldenrod" is the same strategy
-    // one map earlier.
-    ['plate_normal', 'mega_revive', { id: 'max_heal', stock: 3 }],
-    // Map 4 — Ecruteak: Burned Tower and the Bell Tower, a town of ghosts.
-    // Scope Lens is the medium's sight; Razor Claw the Sneasel line's own item.
-    ['plate_ghost', 'scope_lens', 'razor_claw'],
-    // Map 5 — Cianwood: the pharmacy town, reachable only by surf. Muscle Band
-    // is Chuck's dojo; Expert Belt the reward for hitting the right type.
-    ['plate_fighting', 'muscle_band', 'expert_belt'],
-    // Map 6 — Olivine: the Lighthouse and the port. Jasmine's Steelix is the
-    // wall — Rocky Helmet and Assault Vest are how you buy the same idea.
-    ['plate_steel', 'rocky_helmet', 'assault_vest'],
-    // Map 7 — Mahogany: the souvenir shop that is a Rocket front, and the Lake
-    // of Rage above it. Type Prism is the only item that permanently rewrites
-    // what a Pokémon is — sold by the town built on a disguise.
-    ['plate_ice', 'life_orb', 'type_prism'],
-    // Map 8 — Blackthorn: the dragon clan's town, last shop before the League.
-    // You buy your second life here or you do not get one.
-    ['plate_dragon', 'kings_rock', 'focus_sash'],
+    ['plate_flying'],    // Map 1 — Violet:     Falkner
+    ['plate_bug'],       // Map 2 — Azalea:     Bugsy
+    ['plate_normal'],    // Map 3 — Goldenrod:  Whitney
+    ['plate_ghost'],     // Map 4 — Ecruteak:   Morty
+    ['plate_fighting'],  // Map 5 — Cianwood:   Chuck
+    ['plate_steel'],     // Map 6 — Olivine:    Jasmine
+    ['plate_ice'],       // Map 7 — Mahogany:   Pryce
+    ['plate_dragon'],    // Map 8 — Blackthorn: Clair
   ],
+
+  // Opts this region into the random third slot (game/shop.js). The draw is
+  // seeded from the run seed + map index, so a given run always shows the same
+  // shelf — re-entering a mart cannot reroll it, and a seeded/daily run
+  // reproduces exactly.
+  shopRandomSlot: true,
   badges: BADGES,
   // Battle data (see johto.teams.js) — read by the generic loop via config.
   trainerSpeciesPools: TRAINER_SPECIES_POOLS,

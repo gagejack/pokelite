@@ -105,7 +105,11 @@ export function applyMega(instance, megaForm) {
   }
 }
 
-// Unequip: restore the pre-mega snapshot, preserving current HP ratio
+// NOTE: no production path calls this today — a Mega Stone is permanent once
+// equipped (see isHeldItemLocked), so nothing ever reverts a mega'd Pokémon.
+// Kept as applyMega's tested inverse, and as the hook if that rule is relaxed.
+//
+// Restores the pre-mega snapshot, preserving current HP ratio
 // against the restored maxHp (matches applyMega's own HP-ratio rule, and
 // buildEvolvedInstance's). No-op if the instance was never mega'd.
 //
@@ -137,19 +141,31 @@ export function revertMega(instance) {
   return next
 }
 
-// Decision helper for the GENERIC held-item paths (moveItem,
-// handleItemAssign in App.jsx) — those call sites know nothing about mega
-// evolution and treat the Mega Stone as just another held item. When one of
-// them is about to change what a Pokémon holds, this says whether that
-// change would leave the Pokémon mega'd (_megaBase set) while displaying a
-// different item — a corrupted state (mega stats/types/sprite stuck on,
-// stone gone) — and therefore whether revertMega must run first.
+// Why a Pokémon can't hold the Mega Stone, or null if it can. Used by the
+// generic bag/drag paths so a stone dropped on an ineligible target is KEPT
+// with a reason rather than equipped as a dead held item — the Evolve Stone's
+// contract, applied to mega eligibility.
 //
-// True only when the instance is CURRENTLY mega'd AND the incoming item is
-// not the Mega Stone itself (re-holding the same stone, or no change, isn't
-// a reason to revert). instance._megaBase is checked directly (not
-// heldItem.id) since it's the authoritative "is this Pokémon mega'd" signal
-// per the Task 8 report's own framing.
-export function shouldRevertMegaForItemChange(instance, incomingItem) {
-  return Boolean(instance?._megaBase) && incomingItem?.id !== MEGA_STONE_ITEM.id
+// Order matters. megaFormsFor is keyed by the instance's CURRENT species, and
+// an unevolved Pokémon never has mega forms under its own id — a Charmander
+// (4) returns [] even though Charizard (6) has two. Asking "no mega forms?"
+// first would therefore tell a Charmander it "has no Mega Evolution", which
+// is both wrong about its line and useless as advice. Checking evolution
+// state first means an unevolved Pokémon always gets the actionable message,
+// and "has no Mega Evolution" is only ever said about a species that really
+// is the end of its line.
+export async function megaRejectionReason(instance) {
+  if (!instance) return 'No Mega Evolution'
+  if (!(await isFullyEvolved(instance))) return `${instance.name} must be fully evolved`
+  const forms = await megaFormsFor(instance.pokeId)
+  if (forms.length === 0) return `${instance.name} has no Mega Evolution`
+  return null
+}
+
+// True if the instance's held item is locked in place and cannot be moved,
+// displaced, or unequipped. A Mega Stone is permanent once equipped: mega
+// evolution is a one-way commitment for the rest of the run, so every path
+// that would take an item off a Pokémon has to ask this first.
+export function isHeldItemLocked(instance) {
+  return instance?.heldItem?.id === MEGA_STONE_ITEM.id
 }

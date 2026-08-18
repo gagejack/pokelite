@@ -27,10 +27,10 @@ test('a win with no owned bonuses pays $200 and 1 key', () => {
   expect(payout.newWinStreak).toBe(1)
 })
 
-test('a loss pays $1 per map cleared and 0 keys', () => {
+test('a loss pays $2 per map cleared and 0 keys', () => {
   const profile = createProfile()
   const payout = runEndPayout('loss', 6, profile, 0)
-  expect(payout.metacash).toBe(6)
+  expect(payout.metacash).toBe(12)
   expect(payout.keys).toBe(0)
 })
 
@@ -38,7 +38,7 @@ test('a loss pays $5 per Elite Four member beaten, on top of the per-map rate', 
   const profile = createProfile()
   // Died to the champion after beating the first three members.
   const payout = runEndPayout('loss', 8, profile, 0, 3)
-  expect(payout.metacash).toBe(23) // 8*1 + 3*5
+  expect(payout.metacash).toBe(31) // 8*2 + 3*5
   expect(payout.keys).toBe(0)
 })
 
@@ -49,7 +49,7 @@ test('Elite Four members are not counted on a win, which pays the flat base', ()
 
 test('a loss defaults to 0 Elite Four members when the count is omitted', () => {
   const profile = createProfile()
-  expect(runEndPayout('loss', 6, profile, 0).metacash).toBe(6)
+  expect(runEndPayout('loss', 6, profile, 0).metacash).toBe(12)
 })
 
 test('a loss on map 0 pays $0, not a crash or negative number', () => {
@@ -102,7 +102,7 @@ test('Win Streak: the 5th consecutive win (3rd past threshold) earns +$150', () 
 test('Win Streak bonus is win-only: a loss never adds it even when owned', () => {
   const profile = { ...createProfile(), ownedUpgrades: ['win_streak'], winStreak: 4 }
   const payout = runEndPayout('loss', 4, profile, 0)
-  expect(payout.metacash).toBe(4) // pure 1*4, no streak math
+  expect(payout.metacash).toBe(8) // pure 2*4, no streak math
 })
 
 // ── runEndPayout: Dex Dividends ─────────────────────────────────────────
@@ -128,7 +128,7 @@ test('Dex Dividends: 60 species is two tiers (floor(60/25)=2), +4%', () => {
 test('Dex Dividends bonus is win-only: a loss never adds it even when owned', () => {
   const profile = { ...createProfile(), ownedUpgrades: ['dex_dividends'] }
   const payout = runEndPayout('loss', 4, profile, 100)
-  expect(payout.metacash).toBe(4)
+  expect(payout.metacash).toBe(8)
 })
 
 // ── runEndPayout: Win Streak + Dex Dividends interaction ───────────────

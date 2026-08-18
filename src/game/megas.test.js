@@ -1,6 +1,6 @@
 import { test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { _seedChainCacheForTest, _clearChainCacheForTest, levelUp, calcHP, calcStat, swapIntoRoster } from './pokemon.js'
-import { applyMega, revertMega, shouldRevertMegaForItemChange } from './megas.js'
+import { applyMega, revertMega, isHeldItemLocked } from './megas.js'
 import { MEGA_STONE_ITEM } from './items.js'
 
 // Fake megas.json fetch — same pattern pokemon.test.js uses for local data.
@@ -246,31 +246,49 @@ test('revertMega does not downgrade the tier if no upgrade happened while mega\'
   expect(reverted.move.tier).toBe(3)
 })
 
-// ── shouldRevertMegaForItemChange ──────────────────────────────────────────
-// Decision helper consumed by App.jsx's generic held-item paths (moveItem,
-// handleItemAssign) so a Pokémon dragged a non-stone item while mega'd
-// doesn't get stuck with mega stats/types/sprite but a different held item.
+// ── isHeldItemLocked ───────────────────────────────────────────────────────
+// A Mega Stone is permanent once equipped. Every path that would take an item
+// off a Pokémon (moveItem / handleItemAssign in App.jsx, the roster drag
+// badge, the stat card's tap-to-move, ItemNode's offer rows) asks this first,
+// which is what replaced the old revert-on-item-change behavior.
 
-test('shouldRevertMegaForItemChange is true when a mega\'d Pokémon is about to receive a non-stone item', () => {
+test('isHeldItemLocked is true for a Pokémon holding the Mega Stone', () => {
   const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
-  const leftovers = { id: 'leftovers', name: 'Leftovers' }
-  expect(shouldRevertMegaForItemChange(mega, leftovers)).toBe(true)
+  expect(isHeldItemLocked(mega)).toBe(true)
 })
 
-test('shouldRevertMegaForItemChange is true when a mega\'d Pokémon is losing its item outright (incoming null)', () => {
-  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
-  expect(shouldRevertMegaForItemChange(mega, null)).toBe(true)
+test('isHeldItemLocked is false for a Pokémon holding an ordinary item', () => {
+  const holder = { ...CHARIZARD_INSTANCE, heldItem: { id: 'leftovers', name: 'Leftovers' } }
+  expect(isHeldItemLocked(holder)).toBe(false)
 })
 
-test('shouldRevertMegaForItemChange is false when the incoming item is the Mega Stone itself (no real change)', () => {
-  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
-  expect(shouldRevertMegaForItemChange(mega, MEGA_STONE_ITEM)).toBe(false)
+test('isHeldItemLocked is false for an empty slot and for a Pokémon holding nothing', () => {
+  expect(isHeldItemLocked(undefined)).toBe(false)
+  expect(isHeldItemLocked({ ...CHARIZARD_INSTANCE, heldItem: null })).toBe(false)
 })
 
-test('shouldRevertMegaForItemChange is false for a Pokémon that was never mega\'d, regardless of incoming item', () => {
-  const leftovers = { id: 'leftovers', name: 'Leftovers' }
-  expect(shouldRevertMegaForItemChange(CHARIZARD_INSTANCE, leftovers)).toBe(false)
-  expect(shouldRevertMegaForItemChange(CHARIZARD_INSTANCE, null)).toBe(false)
+// ── megaRejectionReason ────────────────────────────────────────────────────
+// Same gate MegaStoneNode's greyed-out rows use, reused by the bag/drag paths
+// so a stone dropped on an ineligible Pokémon is KEPT with a reason rather
+// than equipped as a dead held item — the Evolve Stone's contract, applied to
+// mega eligibility.
+
+test('megaRejectionReason names the species when it has no Mega Evolution at all', async () => {
+  const { megaRejectionReason } = await import('./megas.js')
+  const noMega = { ...makeInstance(999998, 100), name: 'Pidgeot' }
+  await expect(megaRejectionReason(noMega)).resolves.toBe('Pidgeot has no Mega Evolution')
+})
+
+test('megaRejectionReason asks for full evolution when the line HAS a mega but this stage is not the last', async () => {
+  const { megaRejectionReason } = await import('./megas.js')
+  const charmander = { ...makeInstance(4, 5), name: 'Charmander' }
+  await expect(megaRejectionReason(charmander)).resolves.toBe('Charmander must be fully evolved')
+})
+
+test('megaRejectionReason is null for a fully-evolved species with a mega form', async () => {
+  const { megaRejectionReason } = await import('./megas.js')
+  const charizard = { ...makeInstance(6, 50), name: 'Charizard' }
+  await expect(megaRejectionReason(charizard)).resolves.toBeNull()
 })
 
 test('applyMega on a retyped form (e.g. mega Gyarados, water/dark) rebuilds the move on the mega-form-aware attack type', () => {

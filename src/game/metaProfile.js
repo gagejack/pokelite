@@ -123,9 +123,11 @@ function roundMoney(amount) {
  * @returns {{ metacash: number, keys: number, newWinStreak: number }}
  */
 export function runEndPayout(result, mapsCleared, profile, dexCount, eliteFourDefeated = 0) {
+  const LOSS_PAYOUT_PER_MAP = 3
+
   if (result === 'loss') {
     return {
-      metacash: roundMoney(1 * mapsCleared + 5 * eliteFourDefeated),
+      metacash: roundMoney(LOSS_PAYOUT_PER_MAP * mapsCleared + 5 * eliteFourDefeated),
       keys: 0,
       newWinStreak: 0, // a loss resets the streak regardless of prior length
     }

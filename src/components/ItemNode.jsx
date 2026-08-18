@@ -7,6 +7,7 @@ import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { MYSTERY_REROLLS } from '../game/nodeMap.js'
 import { MAX_LEVEL, hasStoneEvolutionSync } from '../game/pokemon.js'
 import { alternateTypeFor } from '../game/attackTypes.js'
+import { isHeldItemLocked } from '../game/megas.js'
 import { PokemonCardContent } from './Roster'
 
 // Mystery-node offers pass onReroll: MYSTERY_REROLLS refreshes of the set.
@@ -116,6 +117,10 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
               // reviveAll) so the UI never offers a tap that does nothing.
               const blocked = (() => {
                 const c = selectedItem.consumable
+                // A Mega Stone is permanent once equipped, so nothing may
+                // displace it — the whole slot is off-limits for every item
+                // (see isHeldItemLocked / moveItem's guard in App.jsx).
+                if (isHeldItemLocked(pokemon)) return 'Holding a Mega Stone'
                 if (c === 'heal') {
                   if (pokemon.fainted) return 'Fainted — needs a revive'
                   if (pokemon.stats.hp >= pokemon.stats.maxHp) return 'Already at full HP'

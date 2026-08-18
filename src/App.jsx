@@ -12,8 +12,7 @@ import DailyChallenge from './components/DailyChallenge'
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
-import { applyMega, revertMega, shouldRevertMegaForItemChange } from './game/megas.js'
-import { MEGA_STONE_ITEM } from './game/items.js'
+import { applyMega, isHeldItemLocked } from './game/megas.js'
 import { NODE_TYPES } from './game/nodeMap.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
@@ -80,9 +79,8 @@ export default function App() {
   const [bag, setBag] = useState([])
   // One-off flash animation for a successful Mega Stone equip — separate from
   // any post-battle notice queue, since mega equip is a single immediate
-  // event, not something that can stack up between screens. Unequip
-  // (handleMegaUnequip) deliberately does NOT set this — a quiet, instant
-  // revert with no ceremony.
+  // event, not something that can stack up between screens. There is no
+  // unequip counterpart: a Mega Stone is permanent once equipped.
   const [pendingMegaAnimation, setPendingMegaAnimation] = useState(null)
   const [mapIndex, setMapIndex] = useState(0)
   const [user, setUser] = useState(null)
@@ -952,17 +950,19 @@ export default function App() {
   // Equip straight from an item offer. This path bypasses moveItem, so it has
   // to apply the Polarity Band's move retype itself — including releasing the
   // one being swapped out, or a band displaced here would leave its retyped
-  // move behind on a Pokémon no longer holding it. Same story for the Mega
-  // Stone: this generic path knows nothing about mega evolution, so a
-  // currently-mega'd Pokémon must be reverted before a non-stone item lands
-  // on it, or it's left with mega stats/types/sprite but a different held
-  // item (see shouldRevertMegaForItemChange in game/megas.js).
+  // move behind on a Pokémon no longer holding it.
+  //
+  // A Pokémon holding a Mega Stone is skipped entirely: the stone is permanent
+  // once equipped, so no offer item may displace it. The offer UI already greys
+  // those slots out; this is the backstop that keeps the rule true even if a
+  // call slips through, since equipping over the stone would strand the Pokémon
+  // mega'd (stats/types/sprite transformed) with a different item in its slot.
   function handleItemAssign(item, pokemonIndex, swapBackItem) {
+    if (isHeldItemLocked(roster[pokemonIndex])) return
     setRoster(prev => prev.map((p, i) => {
       if (i !== pokemonIndex) return p
       let next = p
       if (swapBackItem?.retype === 'move') next = retypeMove(next, false)
-      if (shouldRevertMegaForItemChange(next, item)) next = { ...revertMega(next), heldItem: null }
       next = { ...next, heldItem: item }
       if (item?.retype === 'move') next = retypeMove(next, true)
       return next
@@ -995,15 +995,6 @@ export default function App() {
     setPendingMegaAnimation({ fromSprite: before.sprite, toSprite: mega.sprite, name: before.name })
   }
 
-  // Unequip: revert to the pre-mega snapshot and return the Mega Stone
-  // itself to the bag (mirrors how moveItem returns a displaced held item).
-  function handleMegaUnequip(pokemonIndex) {
-    const target = roster[pokemonIndex]
-    if (!target?._megaBase) return
-    setRoster(prev => prev.map((p, i) => i === pokemonIndex ? { ...revertMega(p), heldItem: null } : p))
-    setBag(prev => [...prev, MEGA_STONE_ITEM])
-  }
-
   // Move an already-owned item between the bag and roster Pokémon.
   //   from: { kind: 'bag', index } | { kind: 'pokemon', pokeIndex }
   //   to:   { kind: 'bag' }        | { kind: 'pokemon', pokeIndex }
@@ -1017,6 +1008,15 @@ export default function App() {
     // No-op: dropping an item back onto the same Pokémon it came from.
     if (from.kind === 'pokemon' && to.kind === 'pokemon' && from.pokeIndex === to.pokeIndex) return
 
+    // A Mega Stone is permanent once equipped, so neither end of a move may
+    // disturb one: the FROM side can't drag it off its holder, and the TO side
+    // can't displace it with something else. The screens block both paths with
+    // a notice; this is the backstop that keeps the invariant true for every
+    // caller. `from.kind === 'bag'` is deliberately NOT blocked — that's the
+    // stone travelling from the bag to a Pokémon, which is how it gets equipped.
+    if (from.kind === 'pokemon' && isHeldItemLocked(roster[from.pokeIndex])) return
+    if (to.kind === 'pokemon' && isHeldItemLocked(roster[to.pokeIndex])) return
+
     // Compute the displaced item (target's current held item) once, up front,
     // from current roster — so the two state updaters below stay pure. React
     // may invoke updaters more than once (StrictMode); nesting setBag inside
@@ -1029,16 +1029,12 @@ export default function App() {
     // type, and the one gaining it switches to its alternate. Rebuilding here
     // rather than reading the item during battle keeps the displayed move name
     // honest — a move that says "Body Slam" always deals Normal damage.
-    // The Mega Stone gets the same treatment: this generic drag path has no
-    // idea what a Mega Stone does, so either end of the move can strand a
-    // Pokémon mega'd (types/stats/sprite still transformed) with a different
-    // item now in its held-item slot — the FROM side, dragging its stone
-    // elsewhere, or the TO side, having a different item dragged onto it and
-    // displacing the stone. Both must revertMega first.
+    // No mega handling is needed here any more: the guard above already
+    // rejected every move that touches a mega'd Pokémon, so nothing this
+    // updater sees can strand one mega'd while holding a different item.
     setRoster(prev => prev.map((p, i) => {
       let next = p
       if (from.kind === 'pokemon' && i === from.pokeIndex) {
-        if (shouldRevertMegaForItemChange(next, null)) next = revertMega(next)
         next = { ...next, heldItem: null }
         if (item.retype === 'move') next = retypeMove(next, false)
       }
@@ -1046,7 +1042,6 @@ export default function App() {
         // A displaced Polarity Band also has to release its hold on the move
         // before the incoming item is applied.
         if (displaced?.retype === 'move') next = retypeMove(next, false)
-        if (shouldRevertMegaForItemChange(next, item)) next = revertMega(next)
         next = { ...next, heldItem: item }
         if (item.retype === 'move') next = retypeMove(next, true)
       }
@@ -1462,7 +1457,6 @@ export default function App() {
           onItemKeepInBag={handleItemKeepInBag}
           onMoveItem={moveItem}
           onMegaEquip={handleMegaEquip}
-          onMegaUnequip={handleMegaUnequip}
           megaStoneAvailable={!megaStoneSpawnedThisRun.current}
           onMapGenerated={rows => {
             if (rows.some(row => row.some(n => n.type === NODE_TYPES.MEGA_STONE))) {
@@ -1527,6 +1521,7 @@ export default function App() {
           bag={bag}
           onMoveItem={moveItem}
           onApplyConsumable={applyConsumable}
+          onMegaEquip={handleMegaEquip}
           speedCash={speedCash}
           cashEarned={cashEarned}
           metacashEarned={metacashEarned}

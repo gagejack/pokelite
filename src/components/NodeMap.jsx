@@ -11,6 +11,7 @@ import ItemNode from './ItemNode'
 import PokemartNode from './PokemartNode'
 import PowerUpgradeNode from './PowerUpgradeNode'
 import MegaStoneNode from './MegaStoneNode'
+import MegaFormChoice from './MegaFormChoice'
 import BadgeList from './BadgeList'
 import ItemInfoCard from './ItemInfoCard'
 import { NODE_TYPES, pick, resolveMysteryType, rowIndexForNodeId } from '../game/nodeMap.js'
@@ -18,6 +19,7 @@ import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
+import { megaRejectionReason, isHeldItemLocked, megaFormsFor } from '../game/megas.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
@@ -632,7 +634,7 @@ function MapSvg({
   )
 }
 
-export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onMegaEquip, onMegaUnequip, megaStoneAvailable = true, onMapGenerated, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
+export default function NodeMap({ region, starter, character, roster, setRoster, bag, onItemAssign, onItemKeepInBag, onMoveItem, onMegaEquip, megaStoneAvailable = true, onMapGenerated, onApplyConsumable, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onSpendCash, mapIndex = 0, onBack, onRestart, runItBackAvailable = false, onRunItBack, onAdvanceMap, onEnterEliteFour, onPokemonCaught, onCatchRecorded, onSpeciesOwned, onSpeciesSeen, caughtSet, onMapCleared, onBadgeEarned, onRunEnd, onProgressChange, initialMapData, initialClearedNodes, initialCurrentNode, pokedexOpen, setPokedexOpen, seedCode, seed, mode = 'classic', prewarmReady = false }) {
   const { dark } = useTheme()
   // Item currently being placed via bag-drag or the stat-card "move" picker.
   // { item, from: {kind:'bag',index} | {kind:'pokemon',pokeIndex} } or null.
@@ -681,6 +683,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     [mapConfig, prewarmReady] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  // Seed for the shop's random slot (Johto). A seeded run uses its own seed, so
+  // the shelf reproduces with the rest of the run. An UNSEEDED run has none —
+  // but the slot still has to be stable, or the shelf would reroll on every
+  // re-render (each purchase re-renders the mart) and let a player reshuffle it
+  // by buying and leaving.
+  //
+  // The fallback is drawn once per mount and kept in a ref rather than
+  // recomputed: it must survive re-renders but change between runs. Keyed off
+  // mapIndex too, so two marts in one run spin independently.
+  const unseededShopSeedRef = useRef(null)
+  if (unseededShopSeedRef.current == null) {
+    unseededShopSeedRef.current = (Math.random() * 0xffffffff) >>> 0
+  }
+  const shopSeed = seed != null ? seed : unseededShopSeedRef.current
+
   // Report the generated rows back up to App so it can flip
   // megaStoneSpawnedThisRun if this map happened to roll one. Deliberately a
   // separate effect from the useMemo above (which must stay a pure
@@ -709,6 +726,10 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [pendingItem, setPendingItem] = useState(null)
   const [pendingPower, setPendingPower] = useState(null)
   const [pendingMega, setPendingMega] = useState(null)
+  // Mega Stone dragged from the BAG onto a dual-form species (Charizard,
+  // Mewtwo) — the X/Y pick is owed before the stone is spent, so the equip
+  // waits here rather than committing to a form the player didn't choose.
+  const [bagMegaChoice, setBagMegaChoice] = useState(null)
   const [pendingMart, setPendingMart] = useState(null)
   // Remaining shop stock per mart node id, so a shelf survives Leave and
   // re-entry. Lives here rather than in PokemartNode because that component
@@ -1056,7 +1077,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
     if (rawNode.type === NODE_TYPES.POKEMART && rawNode.id === currentNode) {
       setPendingMart({
         node: rawNode,
-        inventory: getShopInventory(config, mapIndex),
+        inventory: getShopInventory(config, mapIndex, shopSeed),
         stock: martStock[rawNode.id] ?? null,
       })
       return
@@ -1133,7 +1154,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       // Seeded from the inventory on first visit, then carried.
       setPendingMart({
         node,
-        inventory: getShopInventory(config, mapIndex),
+        inventory: getShopInventory(config, mapIndex, shopSeed),
         stock: martStock[node.id] ?? null,
       })
     } else if (node.type === NODE_TYPES.POWER_UPGRADE) {
@@ -1457,6 +1478,28 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   // what stops the two from drifting: the touch path used to equip consumables as
   // dead held items because it only knew how to call onMoveItem.
   async function applyConsumableTo(item, from, pokeIndex) {
+    // A Mega Stone already on a Pokémon is permanent — nothing may displace it.
+    if (isHeldItemLocked(roster[pokeIndex])) {
+      setNotice(`${roster[pokeIndex].name}'s Mega Stone cannot be removed`)
+      return
+    }
+    // Mega Stone: only a species with an official mega form that's also fully
+    // evolved can hold it — the same gate MegaStoneNode's greyed-out rows use,
+    // applied here so the bag/drag path can't equip it as a dead held item.
+    // Kept (not equipped) with a reason, mirroring the Evolve Stone's contract.
+    // Equipping goes through the mega flow (not onMoveItem): dropping the stone
+    // has to actually transform the Pokémon, and a dual-form species
+    // (Charizard, Mewtwo) opens the same X/Y picker the node uses.
+    if (item?.id === MEGA_STONE_ITEM.id) {
+      const target = roster[pokeIndex]
+      const reason = await megaRejectionReason(target)
+      if (reason) { setNotice(reason); return }
+      const forms = await megaFormsFor(target.pokeId)
+      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, from }); return }
+      onMoveItem?.({ item, from, to: { kind: 'consumed' } })
+      onMegaEquip?.(pokeIndex, forms[0])
+      return
+    }
     // Healing consumables. A no-op (target already at full HP) KEEPS the item
     // rather than wasting it. Mega Revive ignores the target and heals all.
     if (isRosterConsumable(item)) {
@@ -2069,6 +2112,21 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
         />
       )}
 
+      {bagMegaChoice && (
+        <MegaFormChoice
+          pokemonName={roster[bagMegaChoice.pokeIndex]?.name ?? ''}
+          forms={bagMegaChoice.forms}
+          onChoose={form => {
+            onMoveItem?.({ item: MEGA_STONE_ITEM, from: bagMegaChoice.from, to: { kind: 'consumed' } })
+            onMegaEquip?.(bagMegaChoice.pokeIndex, form)
+            setBagMegaChoice(null)
+          }}
+          // Cancelling leaves the stone exactly where it was — nothing was
+          // spent yet, so there is nothing to give back.
+          onCancel={() => setBagMegaChoice(null)}
+        />
+      )}
+
       {pendingMega && (
         <MegaStoneNode
           roster={roster}
@@ -2077,11 +2135,6 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             setClearedNodes(prev => new Set([...prev, pendingMega.node.id]))
             setCurrentNode(pendingMega.node.id)
             setPendingMega(null)
-          }}
-          onUnequip={(pokeIndex) => {
-            onMegaUnequip(pokeIndex)
-            // Unequip doesn't close the node — the player may still want to
-            // equip a different roster member before leaving.
           }}
           onKeepInBag={() => {
             onItemKeepInBag(MEGA_STONE_ITEM)
