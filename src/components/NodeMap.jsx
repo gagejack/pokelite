@@ -1723,9 +1723,9 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'flex-start',
-          // No TOP padding: the map card butts against the nav row. The 8px
+          // No TOP padding: the roster stack butts against the nav row. The 8px
           // that used to sit here read as a gap, since the nav is top-aligned
-          // and the card starts immediately below it. Bottom padding stays.
+          // and the content starts immediately below it. Bottom padding stays.
           padding: '0 5px 8px',
         }}>
           {/* The ruler. Invisible and out of flow, so it contributes NO height,
@@ -1741,40 +1741,27 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
               negative margin (no effect — margin does not shrink a `flex: 1`
               item; the flex algorithm hands back the freed space).
 
-              `bottom` leaves room for the bars so the ruler never over-reports:
-              it spans the column minus the stack's measured height. */}
+              `top` leaves room for the bars so the ruler never over-reports:
+              it spans the column minus the stack's measured height. The stack
+              sits ABOVE the map on mobile, so the reservation is on the top
+              edge (it was `bottom` when the bars were beneath the card). */}
           <div
             ref={mobileSlotRef}
             aria-hidden="true"
             style={{
-              position: 'absolute', left: 0, right: 0, top: 0,
-              bottom: `${mobileBarsHeight}px`,
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              top: `${mobileBarsHeight}px`,
               pointerEvents: 'none', visibility: 'hidden',
             }}
           />
-          {/* The map card. Sized to mobileCard, NOT flex:1 — it hugs its own
-              height so the bars below sit 2px beneath it instead of after a
-              column's worth of leftover space. */}
-          <div style={{
-            width: '100%',
-            flexShrink: 0, marginBottom: '2px',
-            height: mobileCard ? `${mobileCard.height}px` : '100%',
-            display: 'flex', justifyContent: 'center',
-          }}>
-            <div style={{
-              width: mobileCard ? `${mobileCard.width}px` : '100%',
-              height: '100%',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              <MapSvg {...mapSvgProps} />
-            </div>
-          </div>
-          {/* Bottom bars (constrained to the map width): roster, then bag, then a
-              horizontal gym-badge bar — all full-width, stacked. */}
-          {/* Measured so the map ruler above can reserve exactly this much
-              height and no more. */}
+          {/* Top bars (constrained to the map width): roster, then bag, then a
+              horizontal gym-badge bar — all full-width, stacked, with the map
+              beneath them. */}
+          {/* Measured so the map ruler can reserve exactly this much height and
+              no more. */}
           <div ref={mobileBarsRef} style={{
             width: mobileCard ? `${mobileCard.width}px` : '100%', maxWidth: '100%',
+            flexShrink: 0, marginBottom: '2px',
             display: 'flex', flexDirection: 'column', gap: '6px',
           }}>
             <Roster
@@ -1859,6 +1846,23 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             </div>
             {/* Gym badges earned this run — horizontal bar. */}
             <BadgeList badges={config.badges ?? []} earned={mapIndex} layout="horizontal" />
+          </div>
+          {/* The map card. Sized to mobileCard, NOT flex:1 — it hugs its own
+              height so it sits 2px beneath the bars instead of after a
+              column's worth of leftover space. */}
+          <div style={{
+            width: '100%',
+            flexShrink: 0,
+            height: mobileCard ? `${mobileCard.height}px` : '100%',
+            display: 'flex', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: mobileCard ? `${mobileCard.width}px` : '100%',
+              height: '100%',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <MapSvg {...mapSvgProps} />
+            </div>
           </div>
         </div>
       )}

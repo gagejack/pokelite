@@ -45,8 +45,34 @@ function mockAll({ failing = null } = {}) {
   })
 }
 
+// Per-region responses keyed by the p_region argument, so a test can give each
+// region genuinely different numbers and prove they are not being combined.
+function mockPerRegion(byRegion) {
+  rpc.mockImplementation((name, args) => {
+    const scoped = args?.p_region
+    if (scoped && byRegion[scoped]) {
+      const r = byRegion[scoped]
+      if (r.error) return Promise.resolve({ data: null, error: new Error('boom') })
+      if (name === 'admin_player_difficulty') return Promise.resolve({ data: [r.difficulty], error: null })
+      if (name === 'admin_player_depth') return Promise.resolve({ data: r.depth, error: null })
+      if (name === 'admin_player_starters') return Promise.resolve({ data: r.starters, error: null })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_depth') return Promise.resolve({ data: DEPTH, error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+}
+
 const renderPanel = () =>
   render(<ThemeProvider><PlayerStatsPanel theme={theme} /></ThemeProvider>)
+
+// Region headings inside the breakdown, excluding the <select>'s own <option>
+// for the same region — both carry the region's name as their text.
+const regionHeadings = name =>
+  screen.queryAllByText(name).filter(el => el.tagName !== 'OPTION')
 
 test('renders every panel figure once the queries land', async () => {
   mockAll()
@@ -143,4 +169,110 @@ test('changing the range sends a p_since, and All time sends null', async () => 
   const [, args] = rpc.mock.calls.find(c => c[0] === 'admin_player_engagement')
   expect(typeof args.p_since).toBe('string')
   expect(Number.isNaN(Date.parse(args.p_since))).toBe(false)
+})
+
+test('All regions asks for each region separately, not just one combined set', async () => {
+  // The bug this fixes: difficulty and starters were a single blended set of
+  // bars, so "which map do Johto players quit on" was unanswerable.
+  mockAll()
+  renderPanel()
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+
+  const scopedRegions = new Set(
+    rpc.mock.calls
+      .filter(c => c[0] === 'admin_player_depth' && c[1]?.p_region)
+      .map(c => c[1].p_region)
+  )
+
+  // More than one region is asked for individually — that is the fix. (Counts
+  // aren't asserted: the effect runs twice under StrictMode, so the same
+  // region legitimately appears in the call log more than once.)
+  expect(scopedRegions.size).toBeGreaterThan(1)
+  expect(scopedRegions.has('Kanto')).toBe(true)
+  // The scoped calls never carry the unknown-only flag — that bucket is a
+  // separate selection, not a region.
+  rpc.mock.calls
+    .filter(c => c[1]?.p_region)
+    .forEach(c => expect(c[1].p_unknown_only).toBe(false))
+})
+
+test('each region depth curve is scoped to that region own runs', async () => {
+  // Kanto and Johto get different shapes; both must survive to the screen
+  // intact rather than being averaged into one curve.
+  mockPerRegion({
+    Kanto: {
+      difficulty: { total_runs: '100', wins: '10', avg_maps: '3', avg_elapsed_ms: '700000' },
+      depth: [{ deepest_map: 1, runs: '75' }, { deepest_map: 2, runs: '25' }],
+      starters: [{ starter_id: 4, picks: '100', wins: '10' }],
+    },
+    Johto: {
+      difficulty: { total_runs: '10', wins: '5', avg_maps: '4', avg_elapsed_ms: '900000' },
+      depth: [{ deepest_map: 6, runs: '10' }],
+      starters: [{ starter_id: 155, picks: '10', wins: '5' }],
+    },
+  })
+  renderPanel()
+
+  await waitFor(() => expect(regionHeadings('Kanto').length).toBeGreaterThan(0))
+  expect(regionHeadings('Johto').length).toBeGreaterThan(0)
+
+  // Kanto's 75/100 is 75% of Kanto — not 75/110 of the combined field.
+  expect(screen.getByText('75% · 75')).toBeTruthy()
+  // Johto's single bin is 100% of Johto, though it is only 10 runs overall.
+  expect(screen.getByText('100% · 10')).toBeTruthy()
+  // Per-region run counts and win rates are labelled, so a 100% bar on ten
+  // runs can't be mistaken for a 100% bar on a thousand.
+  expect(screen.getByText('100 runs · 10% win')).toBeTruthy()
+  expect(screen.getByText('10 runs · 50% win')).toBeTruthy()
+})
+
+test('one broken region does not blank the others', async () => {
+  mockPerRegion({
+    Kanto: {
+      difficulty: { total_runs: '100', wins: '10', avg_maps: '3', avg_elapsed_ms: '700000' },
+      depth: [{ deepest_map: 1, runs: '100' }],
+      starters: [{ starter_id: 4, picks: '100', wins: '10' }],
+    },
+    Johto: { error: true },
+  })
+  renderPanel()
+
+  await waitFor(() => expect(regionHeadings('Kanto').length).toBeGreaterThan(0))
+  // Johto is still listed, marked broken — dropping it would read as
+  // "nobody plays Johto", the opposite of "the Johto query failed".
+  expect(regionHeadings('Johto').length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/This region didn't load/).length).toBeGreaterThan(0)
+})
+
+test('picking a single region drops the breakdown and shows just that region', async () => {
+  mockAll()
+  renderPanel()
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+
+  rpc.mockClear()
+  mockAll()
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+
+  await waitFor(() => expect(rpc).toHaveBeenCalled())
+  // No per-region fan-out: every scoped call is for the selected region only.
+  const scoped = rpc.mock.calls.filter(c => c[1]?.p_region)
+  scoped.forEach(c => expect(c[1].p_region).toBe('Kanto'))
+  // No per-region headings remain — the breakdown is gone, not just refiltered.
+  await waitFor(() => expect(regionHeadings('Johto').length).toBe(0))
+  expect(regionHeadings('Kanto').length).toBe(0)
+})
+
+test('Unknown does not fan out per region', async () => {
+  // Unattributed runs have no region to split by; asking per region would
+  // return five empty blocks that say nothing.
+  mockAll()
+  renderPanel()
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+
+  rpc.mockClear()
+  mockAll()
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: '__unknown__' } })
+
+  await waitFor(() => expect(rpc).toHaveBeenCalled())
+  expect(rpc.mock.calls.filter(c => c[1]?.p_region).length).toBe(0)
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  pct, toEngagement, toDifficulty, toDepth, toStarters, toEconomy, RANGES, sinceFor,
+  pct, toEngagement, toDifficulty, toDepth, toStarters, toEconomy, toRegionBreakdown,
+  RANGES, sinceFor,
 } from './playerStats.js'
 
 // Every fixture uses STRINGS for bigint columns, because that is what
@@ -225,5 +226,73 @@ describe('sinceFor', () => {
     const expected = Date.now() - 30 * 86400000
     const actual = new Date(sinceFor('30d')).getTime()
     expect(Math.abs(actual - expected)).toBeLessThan(5000)
+  })
+})
+
+describe('toRegionBreakdown', () => {
+  const kanto = {
+    region: 'Kanto',
+    difficulty: { total_runs: '100', wins: '10', avg_maps: '3.40', avg_elapsed_ms: '760000' },
+    depth: [{ deepest_map: 1, runs: '60' }, { deepest_map: 2, runs: '40' }],
+    starters: [{ starter_id: 4, picks: '80', wins: '8' }, { starter_id: 1, picks: '20', wins: '2' }],
+  }
+  const johto = {
+    region: 'Johto',
+    difficulty: { total_runs: '10', wins: '5', avg_maps: '4.00', avg_elapsed_ms: '900000' },
+    depth: [{ deepest_map: 1, runs: '2' }, { deepest_map: 5, runs: '8' }],
+    starters: [{ starter_id: 155, picks: '10', wins: '5' }],
+  }
+
+  it('keeps each region separate rather than combining them', () => {
+    // The whole reason this exists: a single merged set of bars cannot answer
+    // "which map are people dying on in Johto".
+    const out = toRegionBreakdown([kanto, johto])
+    expect(out).toHaveLength(2)
+    expect(out[0].region).toBe('Kanto')
+    expect(out[1].region).toBe('Johto')
+    expect(out[0].difficulty.totalRuns).toBe(100)
+    expect(out[1].difficulty.totalRuns).toBe(10)
+  })
+
+  it('scopes each region depth curve to that region own runs', () => {
+    // Johto's 8 runs at map 5 are 80% of Johto, not 8% of the 110-run total.
+    // Sharing a denominator would flatten every small region into noise.
+    const [, jo] = toRegionBreakdown([kanto, johto])
+    expect(jo.depth.find(d => d.deepestMap === 5).pct).toBe(80)
+    expect(jo.depth.find(d => d.deepestMap === 1).pct).toBe(20)
+  })
+
+  it('scopes starter pick share per region too', () => {
+    const [ka, jo] = toRegionBreakdown([kanto, johto])
+    expect(ka.starters.find(s => s.starterId === 4).pickPct).toBe(80)
+    // Johto's only starter is 100% of Johto picks, not 10% of all picks.
+    expect(jo.starters[0].pickPct).toBe(100)
+  })
+
+  it('marks a failed region broken instead of dropping it', () => {
+    // A dropped region reads as "nobody plays it" — the opposite of the truth.
+    const out = toRegionBreakdown([kanto, { region: 'Hoenn', error: new Error('boom') }])
+    expect(out).toHaveLength(2)
+    expect(out[1].region).toBe('Hoenn')
+    expect(out[1].error).toBe(true)
+    expect(out[1].difficulty).toBeNull()
+    expect(out[1].depth).toEqual([])
+    expect(out[0].error).toBe(false)
+  })
+
+  it('handles a region with no runs without producing NaN', () => {
+    const out = toRegionBreakdown([{
+      region: 'Sinnoh',
+      difficulty: { total_runs: '0', wins: '0', avg_maps: null, avg_elapsed_ms: null },
+      depth: [], starters: [],
+    }])
+    expect(out[0].difficulty.totalRuns).toBe(0)
+    expect(out[0].difficulty.winRate).toBe(0)
+    expect(Number.isNaN(out[0].difficulty.winRate)).toBe(false)
+    expect(out[0].depth).toEqual([])
+  })
+
+  it('returns an empty list for null', () => {
+    expect(toRegionBreakdown(null)).toEqual([])
   })
 })

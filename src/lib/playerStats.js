@@ -119,6 +119,31 @@ export function toStarters(rows) {
   }))
 }
 
+// Fold the per-region RPC results into one list, one entry per region, for the
+// side-by-side breakdown shown when no single region is selected.
+//
+// `results` is [{ region, difficulty, depth, starters, error }], already one
+// per region — this only shapes them; it never sums across regions. That is
+// deliberate: a combined figure is exactly what the breakdown exists to
+// replace, and re-deriving a total here would invite reading one region's
+// depth curve against another's denominator.
+//
+// Regions whose request failed keep `error: true` and are rendered as a broken
+// row rather than dropped. A silently missing region reads as "nobody plays
+// Hoenn", which is the opposite of "the Hoenn query failed".
+export function toRegionBreakdown(results) {
+  return (results ?? []).map(r => ({
+    region: r.region,
+    error: !!r.error,
+    difficulty: r.error ? null : toDifficulty(r.difficulty ?? null),
+    // Each region's depth bins are percentages of THAT region's own runs, so a
+    // low-traffic region still shows a readable curve instead of a flat line
+    // next to a popular one.
+    depth: r.error ? [] : toDepth(r.depth),
+    starters: r.error ? [] : toStarters(r.starters),
+  }))
+}
+
 export function toEconomy(row) {
   if (!row) return null
   const totalRuns = num(row.total_runs)
