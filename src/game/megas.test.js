@@ -2,6 +2,7 @@ import { test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { _seedChainCacheForTest, _clearChainCacheForTest, levelUp, calcHP, calcStat, swapIntoRoster } from './pokemon.js'
 import { applyMega, revertMega, isHeldItemLocked } from './megas.js'
 import { MEGA_STONE_ITEM } from './items.js'
+import { healOne, reviveOne, reviveAll } from './roster.js'
 
 // Fake megas.json fetch — same pattern pokemon.test.js uses for local data.
 const FAKE_MEGAS = {
@@ -244,6 +245,53 @@ test('revertMega does not downgrade the tier if no upgrade happened while mega\'
   // No upgrade occurred — both the live move and the snapshot are tier 3 — so
   // the restored tier is unchanged at 3, matching pre-mega behavior exactly.
   expect(reverted.move.tier).toBe(3)
+})
+
+// ── restoratives on a mega'd Pokémon ──────────────────────────────────────
+// A Mega Stone is permanent, but that lock is about the HELD-ITEM SLOT only.
+// Heals and revives are used ON the Pokémon and never touch the slot, so a
+// mega'd Pokémon must stay healable and revivable like any other. These pin
+// that down at the roster layer; the drop paths exempt them from the equip
+// lock (see applyConsumableTo in NodeMap/EliteFour and ItemNode's `blocked`).
+
+test('healOne restores a damaged mega\'d Pokémon and leaves its mega state intact', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const { roster: next, used } = healOne([mega], 0)
+
+  expect(used).toBe(true)
+  expect(next[0].stats.hp).toBe(next[0].stats.maxHp)
+  // The stone stays put and the mega form survives the heal untouched.
+  expect(next[0].heldItem).toBe(MEGA_STONE_ITEM)
+  expect(next[0]._megaBase).toEqual(mega._megaBase)
+  expect(next[0]._megaFormId).toBe(MEGA_X_FORM.formId)
+  expect(next[0].types).toEqual(['fire', 'dragon'])
+  expect(next[0].sprite).toBe('mega-x-sprite')
+  expect(next[0].stats.maxHp).toBe(mega.stats.maxHp)
+})
+
+test('reviveOne brings back a fainted mega\'d Pokémon still mega evolved', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const fainted = { ...mega, fainted: true, stats: { ...mega.stats, hp: 0 } }
+  const { roster: next, used } = reviveOne([fainted], 0)
+
+  expect(used).toBe(true)
+  expect(next[0].fainted).toBe(false)
+  expect(next[0].stats.hp).toBe(next[0].stats.maxHp)
+  expect(next[0].heldItem).toBe(MEGA_STONE_ITEM)
+  expect(next[0]._megaFormId).toBe(MEGA_X_FORM.formId)
+  expect(next[0].types).toEqual(['fire', 'dragon'])
+})
+
+test('reviveAll heals a fainted mega\'d Pokémon without disturbing its mega form', () => {
+  const mega = applyMega(CHARIZARD_INSTANCE, MEGA_X_FORM)
+  const fainted = { ...mega, fainted: true, stats: { ...mega.stats, hp: 0 } }
+  const { roster: next, used } = reviveAll([fainted])
+
+  expect(used).toBe(true)
+  expect(next[0].fainted).toBe(false)
+  expect(next[0].stats.hp).toBe(next[0].stats.maxHp)
+  expect(next[0].heldItem).toBe(MEGA_STONE_ITEM)
+  expect(next[0]._megaFormId).toBe(MEGA_X_FORM.formId)
 })
 
 // ── isHeldItemLocked ───────────────────────────────────────────────────────

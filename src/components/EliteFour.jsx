@@ -217,11 +217,6 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // the touch path via useBagTouchDrag's onDrop. Keeping the decision in one
   // function is what stops the two from drifting, exactly as in NodeMap.
   async function applyConsumableTo(item, from, pokeIndex) {
-    // A Mega Stone already on a Pokémon is permanent — nothing may displace it.
-    if (isHeldItemLocked(roster[pokeIndex])) {
-      setNotice(`${roster[pokeIndex].name}'s Mega Stone cannot be removed`)
-      return
-    }
     // Mega Stone: only a species with an official mega form that's also fully
     // evolved can hold it — the same gate MegaStoneNode's greyed-out rows use,
     // applied here so the bag/drag path can't equip it as a dead held item.
@@ -237,6 +232,14 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, from }); return }
       onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       onMegaEquip?.(pokeIndex, forms[0])
+      return
+    }
+    // Type Prism on a mega'd Pokémon: refused. It's a roster consumable, but
+    // unlike a heal or revive it overwrites `types` and rebuilds the move,
+    // which would strip the mega's typing while _megaBase still holds the
+    // pre-mega snapshot. Restoratives fall through and apply normally.
+    if (item?.consumable === 'retype' && isHeldItemLocked(roster[pokeIndex])) {
+      setNotice(`${roster[pokeIndex].name} is Mega Evolved — its typing is locked`)
       return
     }
     if (isRosterConsumable(item)) {
@@ -265,6 +268,16 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       const used = await evo.useRareCandy(pokeIndex)
       if (used) onMoveItem?.({ item, from, to: { kind: 'consumed' } })
       else setNotice(`${roster[pokeIndex]?.name ?? 'That Pokémon'} is already max level`)
+      return
+    }
+    // Everything past this point EQUIPS, so it would have to displace whatever
+    // the target already holds — and a Mega Stone is permanent once equipped.
+    // The guard sits here rather than at the top of the function on purpose:
+    // consumables (heals, revives, Evolve Stone, Rare Candy) are USED on the
+    // Pokémon and never touch its held-item slot, so a mega'd Pokémon must
+    // still be healable and revivable like any other.
+    if (isHeldItemLocked(roster[pokeIndex])) {
+      setNotice(`${roster[pokeIndex].name}'s Mega Stone cannot be removed`)
       return
     }
     onMoveItem?.({ item, from, to: { kind: 'pokemon', pokeIndex } })
@@ -367,17 +380,17 @@ export default function EliteFour({ region, character, starter, roster, setRoste
               {bag && bag.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '5px 4px', gap: '2px', boxSizing: 'border-box' }}>
                   {bag.map((item, i) => {
-                    const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+                    const picked = movingItem?.from?.kind === 'bag' && movingItem.from.uid === item.uid
                     return (
                       <div
-                        key={i}
+                        key={item.uid ?? i}
                         draggable
-                        onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
+                        onDragStart={() => setMovingItem({ item, from: { kind: 'bag', uid: item.uid, index: i } })}
                         onDragEnd={() => setMovingItem(null)}
                         // Click opens the item's info popup (with an Equip action);
                         // dragging (mouse OR touch) equips directly onto a Pokémon.
-                        onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
-                        {...bagTouchProps(item, { kind: 'bag', index: i })}
+                        onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', uid: item.uid, index: i } }) }}
+                        {...bagTouchProps(item, { kind: 'bag', uid: item.uid, index: i })}
                         title={`${item.name} — drag onto a Pokémon or click for info`}
                         style={{
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
@@ -444,18 +457,18 @@ export default function EliteFour({ region, character, starter, roster, setRoste
             >
               <span style={{ fontFamily: 'Upheaval', fontSize: '11px', color: '#1a1a1a', backgroundColor: '#facc15', padding: '2px 6px', flexShrink: 0 }}>BAG</span>
               {bag && bag.length > 0 ? bag.map((item, i) => {
-                const picked = movingItem?.from?.kind === 'bag' && movingItem.from.index === i
+                const picked = movingItem?.from?.kind === 'bag' && movingItem.from.uid === item.uid
                 return (
                   <img
-                    key={i}
+                    key={item.uid ?? i}
                     src={itemIconUrl(item)}
                     alt={item.name}
                     title={item.name}
                     draggable
-                    onDragStart={() => setMovingItem({ item, from: { kind: 'bag', index: i } })}
+                    onDragStart={() => setMovingItem({ item, from: { kind: 'bag', uid: item.uid, index: i } })}
                     onDragEnd={() => setMovingItem(null)}
-                    onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', index: i } }) }}
-                    {...bagTouchProps(item, { kind: 'bag', index: i })}
+                    onClick={e => { e.stopPropagation(); setInfoItem({ item, from: { kind: 'bag', uid: item.uid, index: i } }) }}
+                    {...bagTouchProps(item, { kind: 'bag', uid: item.uid, index: i })}
                     style={{
                       width: '22px', height: '22px', imageRendering: 'pixelated', flexShrink: 0, cursor: 'grab',
                       outline: picked ? '2px solid #facc15' : 'none', opacity: picked ? 0.6 : 1,

@@ -118,9 +118,17 @@ export default function ItemNode({ offered, roster, onAssign, onKeepInBag, onClo
               const blocked = (() => {
                 const c = selectedItem.consumable
                 // A Mega Stone is permanent once equipped, so nothing may
-                // displace it — the whole slot is off-limits for every item
-                // (see isHeldItemLocked / moveItem's guard in App.jsx).
-                if (isHeldItemLocked(pokemon)) return 'Holding a Mega Stone'
+                // displace it (see isHeldItemLocked / moveItem's guard in
+                // App.jsx). RESTORATIVES are exempt: a heal or revive is used
+                // ON the Pokémon and never touches its held-item slot, so a
+                // mega'd Pokémon stays healable and revivable like any other.
+                // Type Prism is deliberately NOT exempt despite also being a
+                // roster consumable — it overwrites `types` and rebuilds the
+                // move, which would strip a mega's typing while _megaBase still
+                // holds the pre-mega snapshot.
+                if (isHeldItemLocked(pokemon) && c !== 'heal' && c !== 'revive' && c !== 'revive_all') {
+                  return 'Holding a Mega Stone'
+                }
                 if (c === 'heal') {
                   if (pokemon.fainted) return 'Fainted — needs a revive'
                   if (pokemon.stats.hp >= pokemon.stats.maxHp) return 'Already at full HP'

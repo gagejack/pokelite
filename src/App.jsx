@@ -13,6 +13,7 @@ const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
 import { applyMega, isHeldItemLocked } from './game/megas.js'
+import { toBagItem, ensureBagUids } from './game/bagItem.js'
 import { NODE_TYPES } from './game/nodeMap.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
@@ -570,7 +571,7 @@ export default function App() {
     setSelectedCharacter(run.character ?? DEFAULT_CHARACTER)
     setSelectedStarter(run.starter)
     setRoster(run.roster ?? [])
-    setBag(run.bag ?? [])
+    setBag(ensureBagUids(run.bag))
     setMapIndex(run.mapIndex ?? 0)
     setRunSeed(run.runSeed ?? null)
     setRunMode(run.runMode ?? 'normal')
@@ -653,7 +654,7 @@ export default function App() {
     setSelectedCharacter(snapshot.character ?? DEFAULT_CHARACTER)
     setSelectedStarter(snapshot.starter)
     setRoster(snapshot.roster ?? [])
-    setBag(snapshot.bag ?? [])
+    setBag(ensureBagUids(snapshot.bag))
     setMapIndex(snapshot.mapIndex ?? 0)
     setRunSeed(snapshot.runSeed ?? null)
     setRunMode(snapshot.runMode ?? 'normal')
@@ -967,11 +968,11 @@ export default function App() {
       if (item?.retype === 'move') next = retypeMove(next, true)
       return next
     }))
-    if (swapBackItem) setBag(prev => [...prev, swapBackItem])
+    if (swapBackItem) setBag(prev => [...prev, toBagItem(swapBackItem)])
   }
 
   function handleItemKeepInBag(item) {
-    setBag(prev => [...prev, item])
+    setBag(prev => [...prev, toBagItem(item)])
   }
 
   // Mega Evolve: rewrite the roster slot's types/stats/sprite/move via
@@ -991,7 +992,7 @@ export default function App() {
     const displaced = before.heldItem ?? null
     const mega = applyMega(before, megaForm)
     setRoster(prev => prev.map((p, i) => i === pokemonIndex ? mega : p))
-    if (displaced) setBag(prev => [...prev, displaced])
+    if (displaced) setBag(prev => [...prev, toBagItem(displaced)])
     setPendingMegaAnimation({ fromSprite: before.sprite, toSprite: mega.sprite, name: before.name })
   }
 
@@ -1051,9 +1052,11 @@ export default function App() {
     // Bag: remove the source item (if it came from the bag), then add the item
     // (if it's going to the bag) and any displaced target item.
     setBag(prev => {
-      let next = from.kind === 'bag' ? prev.filter((_, i) => i !== from.index) : [...prev]
-      if (to.kind === 'bag') next = [...next, item]
-      if (displaced) next = [...next, displaced]
+      // Remove by uid, not index: `from` was captured when the bag rendered
+      // and may be stale by the time this runs (see game/bagItem.js).
+      let next = from.kind === 'bag' ? prev.filter(x => x.uid !== item.uid) : [...prev]
+      if (to.kind === 'bag') next = [...next, item.uid ? item : toBagItem(item)]
+      if (displaced) next = [...next, toBagItem(displaced)]
       return next
     })
   }
