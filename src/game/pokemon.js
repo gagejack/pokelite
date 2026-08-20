@@ -674,6 +674,62 @@ export function hasStoneEvolutionSync(instance, maxSpeciesId = Infinity) {
   return (node.evolvesTo ?? []).some(b => b.id <= maxSpeciesId)
 }
 
+// Every species a Pokémon can only reach through evolutions it will NEVER
+// trigger by leveling — stone, trade and friendship branches. Returns the ids
+// after the instance's own species, nearest first; [] if its next step is a
+// level-up it can still earn on its own.
+//
+// Used by the Mega Stone (megas.js) to look past a stone/trade evolution: a
+// Kadabra has no mega form under its own id, but the Alakazam it is one such
+// step away from does. Level-up branches deliberately stop the walk — a
+// Charmander is not "stuck", it just has not leveled yet, so the stone must
+// not skip that growth. Allowlisted auto-evolvers (AUTO_EVOLVE_NONLEVEL, i.e.
+// Eevee) stop it too: those DO fire on their own at NON_LEVEL_EVO_LEVEL.
+//
+// A split returns BOTH sides (Scyther yields Scizor and Kleavor) rather than
+// stopping — the caller decides, since only it knows what makes one branch the
+// answer. Callers that cannot disambiguate should treat 2+ hits as "ask the
+// player" rather than picking the first.
+export async function forcedEvolutionPath(instance, { maxSpeciesId = Infinity } = {}) {
+  if (!instance) return []
+  const root = await loadEvolutionChain(instance.pokeId)
+  if (!root) return []
+
+  const findNode = node => {
+    if (node.id === instance.pokeId) return node
+    for (const child of node.evolvesTo ?? []) {
+      const hit = findNode(child)
+      if (hit) return hit
+    }
+    return null
+  }
+  let node = findNode(root)
+  if (!node) return []
+
+  // Breadth-first so the ids come back nearest-first across every branch.
+  // `seen` guards against a malformed cyclic chain.
+  const path = []
+  const seen = new Set([instance.pokeId])
+  let frontier = [node]
+  while (frontier.length > 0) {
+    const next = []
+    for (const current of frontier) {
+      // Reachable without the stone? Then it is not the stone's job to grant
+      // it — an allowlisted auto-evolver gets there on its own at
+      // NON_LEVEL_EVO_LEVEL, and a level-up branch is growth to be earned.
+      if (AUTO_EVOLVE_NONLEVEL.has(current.id)) continue
+      for (const child of current.evolvesTo ?? []) {
+        if (child.id > maxSpeciesId || child.levelUp || seen.has(child.id)) continue
+        seen.add(child.id)
+        path.push(child.id)
+        next.push(child)
+      }
+    }
+    frontier = next
+  }
+  return path
+}
+
 // Evolve a Pokémon into the species the player CHOSE in the EvolutionChoice
 // popup (multi-branch lines — see checkEvolution). Returns the evolved
 // instance, or null on failure.

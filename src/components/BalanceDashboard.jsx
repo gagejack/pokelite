@@ -17,6 +17,10 @@ import {
   derivedRowRange, rowPositionWeights,
   LEVEL_MIN, LEVEL_MAX, OFFSET_MIN, OFFSET_MAX,
 } from '../lib/mapLevelBalance.js'
+import {
+  getBossLevel, saveBossLevel, isCommittableBossLevel,
+  BOSS_LEVEL_MIN, BOSS_LEVEL_MAX,
+} from '../lib/bossLevelBalance.js'
 import { METACASH_ITEMS, KEY_ITEMS, SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { SPRITE_TIERS } from '../game/spriteTiers.js'
 import { BALANCE } from '../game/balance.js'
@@ -292,6 +296,24 @@ function TrainerLevelsPanel({ theme, regions }) {
   const [bandDrafts, setBandDrafts] = useState({})   // 'Region:map' -> {min, max}
   const [offsetDrafts, setOffsetDrafts] = useState({}) // 'map:row' -> string
   const [status, setStatus] = useState({})           // key -> idle|saving|saved|error
+  const [bossDrafts, setBossDrafts] = useState({})   // 'Region:Boss:slot' -> string
+
+  // The gym leader guarding the selected map, plus that leader's authored team.
+  // Map 0's boss is starter-dependent (STARTER_BOSS), so mapBosses[0] is null;
+  // any starter maps to the same leader in every shipped region, so the first
+  // starterBoss value is the right label there.
+  const bossFor = region => {
+    const config = getRegionConfig(region)
+    if (!config) return null
+    const name = config.mapBosses?.[mapIndex]
+      ?? Object.values(config.starterBoss ?? {})[0]
+      ?? null
+    if (!name) return null
+    return { name, team: config.bossTeams?.[name] ?? [] }
+  }
+
+  const bossLevelFor = (region, boss, slot, authored) =>
+    bossDrafts[`${region}:${boss}:${slot}`] ?? String(getBossLevel(region, boss, slot, authored))
 
   const bandFor = region =>
     bandDrafts[`${region}:${mapIndex}`] ?? {
@@ -331,6 +353,19 @@ function TrainerLevelsPanel({ theme, regions }) {
     setStatus(prev => ({ ...prev, [key]: error ? 'error' : 'saved' }))
   }
 
+  async function commitBossLevel(region, boss, slot, draft) {
+    const key = `${region}:${boss}:${slot}`
+    if (!isCommittableBossLevel(draft)) {
+      setBossDrafts(prev => ({ ...prev, [key]: undefined }))
+      setStatus(prev => ({ ...prev, [key]: 'idle' }))
+      return
+    }
+    setStatus(prev => ({ ...prev, [key]: 'saving' }))
+    const { error } = await saveBossLevel(region, boss, slot, Number(draft))
+    setBossDrafts(prev => ({ ...prev, [key]: undefined }))
+    setStatus(prev => ({ ...prev, [key]: error ? 'error' : 'saved' }))
+  }
+
   const cellStyle = {
     fontFamily: 'Upheaval', fontSize: '11px', color: textColor,
     padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap',
@@ -344,15 +379,21 @@ function TrainerLevelsPanel({ theme, regions }) {
   const statusColor = s =>
     s === 'error' ? '#ef4444' : s === 'saved' ? '#22c55e' : 'transparent'
 
-  // Row labels mirror buildRows' layout: rowWidths, then the Pokécenter fork,
-  // then the boss.
-  const rowCount = weights.length
-  const rowLabel = row => {
-    if (row === 0) return 'Row 1 (start)'
-    if (row === rowCount - 1) return `Row ${row + 1} (boss)`
-    if (row === rowCount - 2) return `Row ${row + 1} (PC/mart)`
-    return `Row ${row + 1}`
-  }
+  // Only the rows this panel can actually tune are listed.
+  //
+  // rowPositionWeights() returns a weight for EVERY row buildRows produces —
+  // BALANCE.map.rowWidths, then the Pokécenter/Pokémart fork, then the boss.
+  // The last two are dropped here because neither derives its levels from the
+  // band:
+  //   - the PC/mart row holds no trainer at all, so it has no level to show;
+  //   - the boss row is an AUTHORED team (BOSS_TEAMS), passed to the battle
+  //     verbatim without ever calling pickLevel. Its old row showed a derived
+  //     range that generation never consulted — an inert control. Boss levels
+  //     are edited per Pokémon under each region's band above.
+  // Slicing the display list (rather than rowPositionWeights itself) keeps the
+  // row INDICES aligned with buildRows, which the offset writes depend on.
+  const tunableWeights = weights.slice(0, weights.length - 2)
+  const rowLabel = row => (row === 0 ? 'Row 1 (start)' : `Row ${row + 1}`)
 
   return (
     <Panel
@@ -381,46 +422,134 @@ function TrainerLevelsPanel({ theme, regions }) {
         </select>
       </div>
 
-      {/* Header strip — the editable bands, one pair per region. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {regions.map(region => {
+      {/* Header strip — one group per region: the level band, then that map's
+          gym leader team beneath it. Regions are separated by a hairline rather
+          than by gap alone. Each group is two rows tall now, and at this
+          density spacing by itself let three regions read as one block. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {regions.map((region, idx) => {
           const draft = bandFor(region)
           const key = `${region}:${mapIndex}`
           const shipped = defaultBandFor(rangesFor(region), mapIndex)
           return (
-            <div key={region} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{
-                fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
-                width: theme.labelWidth, flexShrink: 0,
-              }}>
-                {region} band
-              </span>
-              <input
-                type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
-                value={draft.min}
-                onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, min: e.target.value } }))}
-                onBlur={() => commitBand(region, draft)}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                style={numberInput}
-              />
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor }}>–</span>
-              <input
-                type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
-                value={draft.max}
-                onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, max: e.target.value } }))}
-                onBlur={() => commitBand(region, draft)}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                style={numberInput}
-              />
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: mutedColor }}>
-                default {shipped[0]}–{shipped[1]}
-              </span>
-              <span style={{
-                fontFamily: 'Orange Kid', fontSize: '11px', minWidth: '52px',
-                color: statusColor(status[key]),
-              }}>
-                {status[key] === 'saving' ? 'Saving…' : status[key] === 'saved' ? 'Saved' : status[key] === 'error' ? 'Failed' : '·'}
-              </span>
+            <div
+              key={region}
+              style={{
+                display: 'flex', flexDirection: 'column', gap: '7px',
+                // The band and its boss team belong together; the rule above
+                // each later region is what makes that grouping visible.
+                ...(idx > 0 ? { borderTop: panelBorder, paddingTop: '12px' } : null),
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+                  width: theme.labelWidth, flexShrink: 0,
+                }}>
+                  {region} band
+                </span>
+                <input
+                  type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
+                  value={draft.min}
+                  onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, min: e.target.value } }))}
+                  onBlur={() => commitBand(region, draft)}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  style={numberInput}
+                />
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor }}>–</span>
+                <input
+                  type="number" min={LEVEL_MIN} max={LEVEL_MAX} step={1}
+                  value={draft.max}
+                  onChange={e => setBandDrafts(prev => ({ ...prev, [key]: { ...draft, max: e.target.value } }))}
+                  onBlur={() => commitBand(region, draft)}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  style={numberInput}
+                />
+                <span style={{ fontFamily: 'Orange Kid', fontSize: '11px', color: mutedColor }}>
+                  default {shipped[0]}–{shipped[1]}
+                </span>
+                <span style={{
+                  fontFamily: 'Orange Kid', fontSize: '11px', minWidth: '52px',
+                  color: statusColor(status[key]),
+                }}>
+                  {status[key] === 'saving' ? 'Saving…' : status[key] === 'saved' ? 'Saved' : status[key] === 'error' ? 'Failed' : '·'}
+                </span>
+              </div>
+
+              {/* Gym leader team for this map — one level input per Pokémon.
+                  These are the ONLY control over boss levels: the band above
+                  drives generated route trainers, never the authored boss
+                  team. Team sizes differ per leader (Brock fields 2, most
+                  field 3), so this maps the authored array rather than
+                  assuming a fixed count. */}
+              {(() => {
+                const boss = bossFor(region)
+                if (!boss || boss.team.length === 0) return null
+                return (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+                    // Wider than the 5px binding each mon's own parts together,
+                    // so a team reads as N groups rather than one long strip.
+                    gap: '14px',
+                    // No left inset: the leader-name column below matches the
+                    // band label's width, so both rows share one left edge.
+                  }}>
+                    <span style={{
+                      fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor,
+                      width: theme.labelWidth, flexShrink: 0,
+                    }}>
+                      {boss.name}
+                    </span>
+                    {boss.team.map((spec, slot) => {
+                      const bKey = `${region}:${boss.name}:${slot}`
+                      const value = bossLevelFor(region, boss.name, slot, spec.level)
+                      const tuned = Number(value) !== spec.level
+                      return (
+                        <span key={bKey} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <img
+                            src={SPRITE(spec.id)}
+                            alt=""
+                            style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }}
+                          />
+                          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor }}>
+                            {cachedName(spec.id) ?? `#${spec.id}`}
+                          </span>
+                          <input
+                            type="number" min={BOSS_LEVEL_MIN} max={BOSS_LEVEL_MAX} step={1}
+                            value={value}
+                            onChange={e => setBossDrafts(prev => ({ ...prev, [bKey]: e.target.value }))}
+                            onBlur={() => commitBossLevel(region, boss.name, slot, value)}
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                            style={{ ...numberInput, width: '46px' }}
+                          />
+                          {/* The authored level, shown only when overridden, so
+                              there is always a way back to shipped behaviour.
+                              Both this and the status below RENDER ONLY when
+                              they have something to say — reserving width for
+                              them left ~54px of dead space beside every
+                              untuned Pokémon, which is what pushed the teams
+                              apart. */}
+                          {tuned && (
+                            <span style={{
+                              fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor,
+                            }}>
+                              was {spec.level}
+                            </span>
+                          )}
+                          {status[bKey] && status[bKey] !== 'idle' && (
+                            <span style={{
+                              fontFamily: 'Orange Kid', fontSize: '10px',
+                              color: statusColor(status[bKey]),
+                            }}>
+                              {status[bKey] === 'saving' ? '…' : status[bKey] === 'saved' ? 'OK' : 'Err'}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )
         })}
@@ -437,7 +566,7 @@ function TrainerLevelsPanel({ theme, regions }) {
             </tr>
           </thead>
           <tbody>
-            {weights.map((weight, row) => {
+            {tunableWeights.map((weight, row) => {
               const offsetKey = `${mapIndex}:${row}`
               const offset = Number(offsetFor(row)) || 0
               return (

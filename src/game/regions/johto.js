@@ -476,6 +476,11 @@ export const johtoConfig = {
   pickCatchOffer,
   // Map-1 boss depends on the chosen starter (all → Falkner); fallback is Falkner.
   starterBoss: STARTER_BOSS,
+  // Gym leader guarding each map, by map index. Index 0 is null because the
+  // map-1 boss depends on the chosen starter (see starterBoss above). Exposed
+  // on the config so the admin dashboard can label each map's boss team; the
+  // generator still reads the module-local MAP_BOSSES directly.
+  mapBosses: MAP_BOSSES,
   // Species used when a map's catch/grass pool is empty (region-safe default).
   fallbackSpeciesId: 161,
   // Elite Four stage — a linear gauntlet after the 8th gym; beating the

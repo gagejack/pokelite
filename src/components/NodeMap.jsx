@@ -19,7 +19,7 @@ import { rivalTeamSpecs } from '../game/rivals.js'
 import { filterPoolByMap } from '../game/trainerPools.js'
 import { withRng, deriveSeed } from '../game/rng.js'
 import { pickThreeItems, itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
-import { megaRejectionReason, isHeldItemLocked, megaFormsFor } from '../game/megas.js'
+import { megaRejectionReason, isHeldItemLocked, resolveMegaTarget } from '../game/megas.js'
 import { getShopInventory } from '../game/shop.js'
 import { getRegionConfig } from '../game/regionRegistry.js'
 import { fetchPokemonBase, buildPokemonInstance, cachedType, cachedName, cachedSprite, rollStageForLevel, currentMoveType, swapIntoRoster, GEN_MAX_ID } from '../game/pokemon.js'
@@ -31,6 +31,7 @@ import { TYPE_COLORS, typeTextColor } from '../game/types.js'
 import { buildTrainerTeamSpec, pickTrainerCount, mapLevelRange, pickLevel } from '../game/battleTeams.js'
 import { BALANCE } from '../game/balance.js'
 import { getEffectiveBalance, getActiveExtras } from '../game/metaModifiers.js'
+import { applyBossLevels } from '../lib/bossLevelBalanceCache.js'
 import { swapInRoster } from '../game/roster.js'
 // The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
 // a filename can't be imported, since "?" is the query separator in a specifier.)
@@ -903,7 +904,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
 
     let specs
     if (isBoss) {
-      specs = config.bossTeams?.[node.trainer] ?? []
+      // Gym leader teams are AUTHORED, not generated — no band, no
+      // positionWeight, no rowOffset (that is why the dashboard's old
+      // "Row 9 (boss)" range was inert). applyBossLevels is the only knob
+      // that reaches them: it swaps in any admin-tuned per-slot level and
+      // returns the authored array untouched when nothing is tuned.
+      specs = applyBossLevels(config.name, node.trainer, config.bossTeams?.[node.trainer] ?? [])
     } else if (isMiniBoss) {
       // Mini boss: a fixed authored roster keyed by trainer name. No starter
       // counter — unlike the rival, a Rocket executive's team is the same
@@ -1350,7 +1356,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       return { title: node.trainer ?? 'Trainer', sub }
     }
     if (node.type === NODE_TYPES.BOSS) {
-      const team = config.bossTeams?.[node.trainer] ?? []
+      const team = applyBossLevels(config.name, node.trainer, config.bossTeams?.[node.trainer] ?? [])
       // Object lines carry the type so the tooltip can show a colored type chip
       // to the left of each Pokémon's name (type/name from the base cache).
       const sub = team.map(p => ({
@@ -1490,10 +1496,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
       const target = roster[pokeIndex]
       const reason = await megaRejectionReason(target)
       if (reason) { setNotice(reason); return }
-      const forms = await megaFormsFor(target.pokeId)
-      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, from }); return }
+      // evolveTo is the species the stone evolves through first (Kadabra ->
+      // Alakazam); null when the target already megas as itself.
+      const { forms, evolveTo } = await resolveMegaTarget(target)
+      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, evolveTo, from }); return }
       onMoveItem?.({ item, from, to: { kind: 'consumed' } })
-      onMegaEquip?.(pokeIndex, forms[0])
+      onMegaEquip?.(pokeIndex, forms[0], evolveTo)
       return
     }
     // Type Prism on a mega'd Pokémon: refused. It's a roster consumable, but
@@ -2133,7 +2141,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
           forms={bagMegaChoice.forms}
           onChoose={form => {
             onMoveItem?.({ item: MEGA_STONE_ITEM, from: bagMegaChoice.from, to: { kind: 'consumed' } })
-            onMegaEquip?.(bagMegaChoice.pokeIndex, form)
+            onMegaEquip?.(bagMegaChoice.pokeIndex, form, bagMegaChoice.evolveTo)
             setBagMegaChoice(null)
           }}
           // Cancelling leaves the stone exactly where it was — nothing was

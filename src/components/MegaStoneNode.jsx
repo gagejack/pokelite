@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted } from '../lib/colors'
-import { megaFormsFor, isFullyEvolved } from '../game/megas.js'
+import { resolveMegaTarget, isFullyEvolved } from '../game/megas.js'
 import MegaFormChoice from './MegaFormChoice'
 
 // "Mega Evolve" node popup. One row per roster Pokémon: ineligible species
@@ -12,13 +12,17 @@ import MegaFormChoice from './MegaFormChoice'
 // PowerUpgradeNode.jsx's roster-list structure.
 export default function MegaStoneNode({ roster, onEquip, onKeepInBag, onClose }) {
   const { dark } = useTheme()
-  const [rows, setRows] = useState(null) // [{ forms: [...], fullyEvolved: bool }] | null while loading
+  const [rows, setRows] = useState(null) // [{ forms, evolveTo, fullyEvolved }] | null while loading
   const [choosingIndex, setChoosingIndex] = useState(null) // roster index currently in the X/Y picker
 
   useEffect(() => {
     let cancelled = false
+    // resolveMegaTarget looks past a stone/trade evolution the Pokémon can't
+    // reach on its own, so a Kadabra row offers Mega Alakazam and equipping
+    // performs the Kadabra -> Alakazam step first. fullyEvolved is still
+    // resolved separately, only to word the ineligible rows' reason.
     Promise.all(roster.map(async p => ({
-      forms: await megaFormsFor(p.pokeId),
+      ...(await resolveMegaTarget(p) ?? { forms: [], evolveTo: null }),
       fullyEvolved: await isFullyEvolved(p),
     }))).then(results => { if (!cancelled) setRows(results) })
     return () => { cancelled = true }
@@ -37,7 +41,7 @@ export default function MegaStoneNode({ roster, onEquip, onKeepInBag, onClose })
       <MegaFormChoice
         pokemonName={pokemon.name}
         forms={rows[choosingIndex].forms}
-        onChoose={form => { onEquip(choosingIndex, form); setChoosingIndex(null) }}
+        onChoose={form => { onEquip(choosingIndex, form, rows[choosingIndex].evolveTo); setChoosingIndex(null) }}
         onCancel={() => setChoosingIndex(null)}
       />
     )
@@ -79,13 +83,13 @@ export default function MegaStoneNode({ roster, onEquip, onKeepInBag, onClose })
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {roster.map((pokemon, i) => {
             const row = rows?.[i]
-            const eligible = row && row.forms.length > 0 && row.fullyEvolved
+            const eligible = row && row.forms.length > 0
             const isMega = !!pokemon._megaBase
             // Evolution state is checked BEFORE mega forms, for the reason
             // megaRejectionReason spells out: forms are keyed by the CURRENT
             // species, so an unevolved Charmander reports zero of them and
             // would otherwise be told its line "has no Mega Evolution".
-            const reason = !row ? '' : !row.fullyEvolved ? 'Must be fully evolved' : row.forms.length === 0 ? 'No Mega Evolution' : ''
+            const reason = !row || row.forms.length > 0 ? '' : !row.fullyEvolved ? 'Must be fully evolved' : 'No Mega Evolution'
 
             return (
               <div key={i} style={{
@@ -118,7 +122,7 @@ export default function MegaStoneNode({ roster, onEquip, onKeepInBag, onClose })
                     onClick={() => {
                       if (!eligible) return
                       if (row.forms.length > 1) setChoosingIndex(i)
-                      else onEquip(i, row.forms[0])
+                      else onEquip(i, row.forms[0], row.evolveTo)
                     }}
                     aria-label={eligible ? `Mega Evolve ${pokemon.name}` : `${pokemon.name} cannot Mega Evolve: ${reason}`}
                     className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]"

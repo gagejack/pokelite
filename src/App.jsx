@@ -12,7 +12,7 @@ import DailyChallenge from './components/DailyChallenge'
 const NodeMap = lazy(() => import('./components/NodeMap'))
 const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
-import { applyMega, isHeldItemLocked } from './game/megas.js'
+import { megaEvolveWithStone, isHeldItemLocked } from './game/megas.js'
 import { toBagItem, ensureBagUids } from './game/bagItem.js'
 import { NODE_TYPES } from './game/nodeMap.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
@@ -27,6 +27,7 @@ import { setActiveRunModifiers, clearActiveRunModifiers, getActiveExtras } from 
 import { shouldCaptureSnapshot, isRunItBackAvailable, shouldRecordPayout } from './game/runItBack.js'
 import { loadRegionBalance } from './lib/regionBalance.js'
 import { loadMapLevelBalance } from './lib/mapLevelBalance.js'
+import { loadBossLevelBalance } from './lib/bossLevelBalance.js'
 import { loadShopPrices } from './lib/metaShopBalance.js'
 import { loadGameTuning, getGameTuning } from './lib/gameTuning.js'
 import { healOne, reviveOne, reviveAll } from './game/roster.js'
@@ -218,6 +219,7 @@ export default function App() {
   // posture as loadRegionBalance above — an empty cache falls back to each
   // region's shipped mapLevelRanges.
   useEffect(() => { loadMapLevelBalance() }, [])
+  useEffect(() => { loadBossLevelBalance() }, [])
 
   // Admin-tunable shop prices (Balance Dashboard "Shop" tab). Fetched once on
   // start, same non-fatal-failure posture as loadRegionBalance above — a
@@ -986,11 +988,18 @@ export default function App() {
   // moveItem's shape, see its comment above) — React may invoke updaters
   // more than once under StrictMode, and nesting setBag inside setRoster
   // caused a duplication bug there.
-  function handleMegaEquip(pokemonIndex, megaForm) {
+  //
+  // Async because the stone may have to evolve the Pokémon first: a Kadabra
+  // has no mega form of its own, so `evolveTo` (from resolveMegaTarget) names
+  // the Alakazam it becomes on the way. That step is a species fetch, so the
+  // roster write happens after the await. A failed evolution leaves the roster
+  // untouched rather than half-applying the stone.
+  async function handleMegaEquip(pokemonIndex, megaForm, evolveTo = null) {
     const before = roster[pokemonIndex]
     if (!before) return
     const displaced = before.heldItem ?? null
-    const mega = applyMega(before, megaForm)
+    const mega = await megaEvolveWithStone(before, megaForm, evolveTo)
+    if (!mega) return
     setRoster(prev => prev.map((p, i) => i === pokemonIndex ? mega : p))
     if (displaced) setBag(prev => [...prev, toBagItem(displaced)])
     setPendingMegaAnimation({ fromSprite: before.sprite, toSprite: mega.sprite, name: before.name })

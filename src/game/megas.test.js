@@ -18,7 +18,51 @@ const FAKE_MEGAS = {
         baseStats: { hp: 78, attack: 145, defense: 100, spAtk: 130, spDef: 90, speed: 100 },
         sprite: 'y-sprite', spriteBack: 'y-back', shinySprite: 'y-shiny', shinySpriteBack: 'y-shiny-back' },
     ],
+    // Scizor (212) — reached from Scyther through a BRANCHING trade evolution
+    // whose other side (Kleavor, 900) has no mega.
+    '212': [
+      { formId: 10046, formName: 'scizor-mega', label: 'Mega Scizor',
+        types: ['bug', 'steel'],
+        baseStats: { hp: 70, attack: 150, defense: 140, spAtk: 65, spDef: 100, speed: 75 },
+        sprite: 'sc-sprite', spriteBack: 'sc-back', shinySprite: 'sc-shiny', shinySpriteBack: 'sc-shiny-back' },
+    ],
+    // Alakazam (65) — the mega sits one TRADE evolution past Kadabra (64),
+    // which is the case the Mega Stone has to see through.
+    '65': [
+      { formId: 10037, formName: 'alakazam-mega', label: 'Mega Alakazam',
+        types: ['psychic'],
+        baseStats: { hp: 55, attack: 50, defense: 65, spAtk: 175, spDef: 105, speed: 150 },
+        sprite: 'zam-sprite', spriteBack: 'zam-back', shinySprite: 'zam-shiny', shinySpriteBack: 'zam-shiny-back' },
+    ],
   },
+}
+
+// Abra -> Kadabra (level 16) -> Alakazam (TRADE, levelUp: false). Kadabra is
+// the end of the line the player can reach by battling: nothing levels it into
+// an Alakazam. Abra sits one LEVEL-UP step behind it, so it must not benefit
+// from the stone's look-ahead.
+// Scyther -> Scizor (trade) OR Kleavor (trade). Only Scizor has a mega, so
+// the split still has one unambiguous answer and the stone may take it.
+const SCYTHER_LINE = {
+  id: 123,
+  minLevel: 1,
+  levelUp: true,
+  evolvesTo: [
+    { id: 212, minLevel: 1, levelUp: false, evolvesTo: [] },
+    { id: 900, minLevel: 1, levelUp: false, evolvesTo: [] },
+  ],
+}
+
+const ABRA_LINE = {
+  id: 63,
+  minLevel: 1,
+  levelUp: true,
+  evolvesTo: [{
+    id: 64,
+    minLevel: 16,
+    levelUp: true,
+    evolvesTo: [{ id: 65, minLevel: 1, levelUp: false, evolvesTo: [] }],
+  }],
 }
 
 // Real Charmander → Charmeleon → Charizard line, shape matching slimChain()'s
@@ -64,6 +108,23 @@ const FAKE_POKEDEX = {
       sprite: 'charmeleon.png', spriteBack: 'charmeleon-back.png',
       shinySprite: 'charmeleon-shiny.png', shinySpriteBack: 'charmeleon-shiny-back.png',
     },
+    // Abra -> Kadabra: checkEvolution resolves the evolved instance through
+    // fetchPokemonBase, so the level-up target needs an entry or the lookup
+    // throws and checkEvolution's catch reports "no evolution" (i.e. fully
+    // evolved), which would mask the very case the Abra test is checking.
+    64: {
+      pokeId: 64, apiName: 'kadabra', types: ['psychic'],
+      baseStats: { hp: 40, attack: 35, defense: 30, spAtk: 120, spDef: 70, speed: 105 },
+      sprite: 'kadabra.png', spriteBack: 'kadabra-back.png',
+      shinySprite: 'kadabra-shiny.png', shinySpriteBack: 'kadabra-shiny-back.png',
+    },
+    // Needed by megaEvolveWithStone's Kadabra -> Alakazam step.
+    65: {
+      pokeId: 65, apiName: 'alakazam', types: ['psychic'],
+      baseStats: { hp: 55, attack: 50, defense: 45, spAtk: 135, spDef: 95, speed: 120 },
+      sprite: 'alakazam.png', spriteBack: 'alakazam-back.png',
+      shinySprite: 'alakazam-shiny.png', shinySpriteBack: 'alakazam-shiny-back.png',
+    },
   },
 }
 
@@ -94,6 +155,12 @@ beforeEach(() => {
   _seedChainCacheForTest(5, CHARMANDER_LINE)
   _seedChainCacheForTest(6, CHARMANDER_LINE)
   _seedChainCacheForTest(999998, NO_MEGA_TERMINAL)
+  _seedChainCacheForTest(123, SCYTHER_LINE)
+  _seedChainCacheForTest(212, SCYTHER_LINE)
+  _seedChainCacheForTest(900, SCYTHER_LINE)
+  _seedChainCacheForTest(63, ABRA_LINE)
+  _seedChainCacheForTest(64, ABRA_LINE)
+  _seedChainCacheForTest(65, ABRA_LINE)
 })
 
 afterEach(() => {
@@ -449,4 +516,90 @@ test('swapping a NON-mega Pokémon out of the roster still transfers its held it
 
   expect(nextRoster[0].heldItem).toEqual({ id: 'leftovers', name: 'Leftovers' })
   expect(displaced).toBeNull()
+})
+
+// ── Mega Stone through an unreachable evolution ────────────────────────────
+// A Kadabra only becomes an Alakazam by trade, which this game never triggers
+// on its own (checkEvolution auto-evolves level-up branches only). Without the
+// look-ahead, Mega Alakazam is unobtainable for any player who never draws a
+// Moon Stone, so the Mega Stone performs that evolution itself.
+
+test('resolveMegaTarget looks through a trade evolution: Kadabra targets Mega Alakazam', async () => {
+  const { resolveMegaTarget } = await import('./megas.js')
+  const target = await resolveMegaTarget(makeInstance(64, 30))
+  expect(target.evolveTo).toBe(65)
+  expect(target.forms.map(f => f.formName)).toEqual(['alakazam-mega'])
+})
+
+test('resolveMegaTarget reports no intermediate evolution when the species megas as itself', async () => {
+  const { resolveMegaTarget } = await import('./megas.js')
+  const target = await resolveMegaTarget(makeInstance(6, 60))
+  expect(target.evolveTo).toBe(null)
+  expect(target.forms).toHaveLength(2)
+})
+
+test('isMegaEligible is true for a Kadabra, whose mega is one trade away', async () => {
+  const { isMegaEligible } = await import('./megas.js')
+  await expect(isMegaEligible(makeInstance(64, 30))).resolves.toBe(true)
+})
+
+// The look-ahead must NOT skip growth the Pokémon can still do on its own.
+test('the stone does not look through a LEVEL-UP evolution: Abra is still ineligible', async () => {
+  const { isMegaEligible, megaRejectionReason } = await import('./megas.js')
+  const abra = { ...makeInstance(63, 5), name: 'Abra' }
+  await expect(isMegaEligible(abra)).resolves.toBe(false)
+  await expect(megaRejectionReason(abra)).resolves.toBe('Abra must be fully evolved')
+})
+
+test('megaRejectionReason accepts a Kadabra rather than demanding full evolution', async () => {
+  const { megaRejectionReason } = await import('./megas.js')
+  const kadabra = { ...makeInstance(64, 30), name: 'Kadabra' }
+  await expect(megaRejectionReason(kadabra)).resolves.toBe(null)
+})
+
+test('megaEvolveWithStone evolves Kadabra into Alakazam, then applies the mega form', async () => {
+  const { megaEvolveWithStone, resolveMegaTarget } = await import('./megas.js')
+  const kadabra = { ...makeInstance(64, 40), name: 'Kadabra' }
+  const { forms, evolveTo } = await resolveMegaTarget(kadabra)
+  const mega = await megaEvolveWithStone(kadabra, forms[0], evolveTo)
+
+  // Landed on Alakazam, not Kadabra — the intermediate evolution really ran.
+  expect(mega.pokeId).toBe(65)
+  expect(mega._megaFormId).toBe(10037)
+  expect(mega.sprite).toBe('zam-sprite')
+  // Stats come from the MEGA base stats (spAtk 175), not Alakazam's own 135.
+  expect(mega._megaBaseStats.spAtk).toBe(175)
+  expect(mega.heldItem.id).toBe(MEGA_STONE_ITEM.id)
+  // The snapshot _megaBase is the ALAKAZAM it passed through, so a revert
+  // never lands the player back on a Kadabra it already spent the stone past.
+  expect(mega._megaBase.sprite).toBe('alakazam.png')
+})
+
+test('megaEvolveWithStone with no evolveTo applies the mega directly', async () => {
+  const { megaEvolveWithStone } = await import('./megas.js')
+  const mega = await megaEvolveWithStone(CHARIZARD_INSTANCE, MEGA_X_FORM, null)
+  expect(mega.pokeId).toBe(CHARIZARD_INSTANCE.pokeId)
+  expect(mega._megaFormId).toBe(10034)
+})
+
+test('a branching trade evolution resolves to the ONE side that megas (Scyther -> Scizor, not Kleavor)', async () => {
+  const { resolveMegaTarget } = await import('./megas.js')
+  const target = await resolveMegaTarget(makeInstance(123, 30))
+  expect(target.evolveTo).toBe(212)
+  expect(target.forms.map(f => f.formName)).toEqual(['scizor-mega'])
+})
+
+// Nothing in the real data is shaped this way, but if a split ever had a mega
+// on BOTH sides the stone must not choose for the player.
+test('a split with megas on both sides is refused rather than guessed', async () => {
+  const { resolveMegaTarget } = await import('./megas.js')
+  // Re-seed Scyther so its other branch is Charizard (6), which also megas.
+  _seedChainCacheForTest(123, {
+    id: 123, minLevel: 1, levelUp: true,
+    evolvesTo: [
+      { id: 212, minLevel: 1, levelUp: false, evolvesTo: [] },
+      { id: 6, minLevel: 1, levelUp: false, evolvesTo: [] },
+    ],
+  })
+  await expect(resolveMegaTarget(makeInstance(123, 30))).resolves.toBe(null)
 })

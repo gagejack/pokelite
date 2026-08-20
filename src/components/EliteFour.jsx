@@ -19,7 +19,7 @@ import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
 import { swapInRoster } from '../game/roster.js'
 import { itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
-import { megaRejectionReason, isHeldItemLocked, megaFormsFor } from '../game/megas.js'
+import { megaRejectionReason, isHeldItemLocked, resolveMegaTarget } from '../game/megas.js'
 import { TYPE_COLORS } from '../game/types.js'
 
 // Elite Four stage — a linear gauntlet after the 8th gym: four members then
@@ -228,10 +228,12 @@ export default function EliteFour({ region, character, starter, roster, setRoste
       const target = roster[pokeIndex]
       const reason = await megaRejectionReason(target)
       if (reason) { setNotice(reason); return }
-      const forms = await megaFormsFor(target.pokeId)
-      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, from }); return }
+      // evolveTo is the species the stone evolves through first (Kadabra ->
+      // Alakazam); null when the target already megas as itself.
+      const { forms, evolveTo } = await resolveMegaTarget(target)
+      if (forms.length > 1) { setBagMegaChoice({ pokeIndex, forms, evolveTo, from }); return }
       onMoveItem?.({ item, from, to: { kind: 'consumed' } })
-      onMegaEquip?.(pokeIndex, forms[0])
+      onMegaEquip?.(pokeIndex, forms[0], evolveTo)
       return
     }
     // Type Prism on a mega'd Pokémon: refused. It's a roster consumable, but
@@ -545,7 +547,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
           forms={bagMegaChoice.forms}
           onChoose={form => {
             onMoveItem?.({ item: MEGA_STONE_ITEM, from: bagMegaChoice.from, to: { kind: 'consumed' } })
-            onMegaEquip?.(bagMegaChoice.pokeIndex, form)
+            onMegaEquip?.(bagMegaChoice.pokeIndex, form, bagMegaChoice.evolveTo)
             setBagMegaChoice(null)
           }}
           // Cancelling leaves the stone exactly where it was — nothing was

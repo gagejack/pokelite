@@ -5,7 +5,7 @@
 // region's catch pool — mega eligibility only depends on the player already
 // having the species in their roster. See
 // docs/superpowers/specs/2026-08-13-mega-evolution-design.md.
-import { checkEvolution, calcHP, calcStat } from './pokemon.js'
+import { checkEvolution, calcHP, calcStat, forcedEvolutionPath, evolveInto } from './pokemon.js'
 import { attackTypeFor } from './attackTypes.js'
 import { getTypeMove, tierForLevel } from './typeMoves.js'
 import { MEGA_STONE_ITEM } from './items.js'
@@ -51,13 +51,59 @@ export async function isFullyEvolved(instance) {
   return result === null
 }
 
-// A roster Pokémon can be mega-evolved if its species has an official mega
-// form AND it's fully evolved (matches the real games: no mega-evolving a
-// Charmander, only a Charizard).
+// Where a Mega Stone applied to this instance would actually land: the mega
+// forms to offer, and the species the Pokémon must be evolved into first to
+// get them.
+//
+// The stone looks THROUGH evolutions the Pokémon cannot reach on its own.
+// checkEvolution only auto-evolves level-up branches (plus the Eevee
+// allowlist), so a Kadabra, Haunter or Scyther sits at the end of its
+// *reachable* line forever without a Moon Stone — yet Alakazam, Gengar and
+// Scizor all have mega forms. Refusing the stone there would make those megas
+// unobtainable for a player who never drew a Moon Stone. So the stone walks
+// the forced-evolution path (pokemon.js) and mega-evolves the first species
+// along it that has a mega form, performing the intermediate evolution itself.
+//
+// Level-up evolutions are NOT skipped this way: a Charmander still has to
+// grow into a Charizard. The walk stops at the first species with mega forms,
+// so nothing over-evolves past its mega.
+//
+// Returns { forms, evolveTo } — evolveTo is null when the instance's own
+// species already has the forms — or null if no species on the path megas.
+export async function resolveMegaTarget(instance) {
+  if (!instance) return null
+  const own = await megaFormsFor(instance.pokeId)
+  if (own.length > 0) return { forms: own, evolveTo: null }
+  // forcedEvolutionPath only walks branches the Pokémon will never trigger by
+  // leveling, so a Charmander (whose next step is a level-up) yields nothing
+  // here and still has to earn its Charizard the normal way.
+  //
+  // A split is resolved by which side actually megas, not by picking first:
+  // Scyther branches to Scizor AND Kleavor, and only Scizor has a mega form,
+  // so there is one unambiguous answer. Two mega-capable branches would be a
+  // genuine choice the player should make, so that case yields nothing rather
+  // than deciding for them — no species in the data is shaped that way today.
+  const candidates = []
+  for (const id of await forcedEvolutionPath(instance)) {
+    const forms = await megaFormsFor(id)
+    if (forms.length > 0) candidates.push({ forms, evolveTo: id })
+  }
+  return candidates.length === 1 ? candidates[0] : null
+}
+
+// A roster Pokémon can be mega-evolved if a Mega Stone applied to it resolves
+// to some mega form — its own, or one an unreachable evolution away.
 export async function isMegaEligible(instance) {
-  const forms = await megaFormsFor(instance.pokeId)
-  if (forms.length === 0) return false
-  return isFullyEvolved(instance)
+  return (await resolveMegaTarget(instance)) !== null
+}
+
+// Apply a Mega Stone end to end: perform the intermediate evolution the stone
+// looks through (if any), then apply the chosen mega form. Returns the final
+// instance, or null if the evolution step fails.
+export async function megaEvolveWithStone(instance, megaForm, evolveTo = null) {
+  const base = evolveTo === null ? instance : await evolveInto(instance, evolveTo)
+  if (!base) return null
+  return applyMega(base, megaForm)
 }
 
 // Equip a Mega Stone: rewrite types/stats/sprite/move onto the instance and
@@ -156,10 +202,13 @@ export function revertMega(instance) {
 // is the end of its line.
 export async function megaRejectionReason(instance) {
   if (!instance) return 'No Mega Evolution'
+  if (await resolveMegaTarget(instance)) return null
+  // Nothing on the path megas. Distinguish the two reasons it can fail: a
+  // Pokémon still owed a level-up evolution gets the actionable message
+  // ("keep leveling"), and only a species genuinely at the end of its line is
+  // told it has no Mega Evolution at all.
   if (!(await isFullyEvolved(instance))) return `${instance.name} must be fully evolved`
-  const forms = await megaFormsFor(instance.pokeId)
-  if (forms.length === 0) return `${instance.name} has no Mega Evolution`
-  return null
+  return `${instance.name} has no Mega Evolution`
 }
 
 // True if the instance's held item is locked in place and cannot be moved,
