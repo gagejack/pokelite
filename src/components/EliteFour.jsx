@@ -26,7 +26,7 @@ import { TYPE_COLORS } from '../game/types.js'
 // the Champion, fought in order. Beating the Champion wins the run.
 // TODO: no dedicated Pokémon League background asset exists yet — the stage
 // uses a plain themed panel until one is authored.
-export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, onMegaEquip, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMemberDefeated, onRunEnd, onSpeciesSeen, onSpeciesOwned, pokedexOpen, setPokedexOpen, seedCode }) {
+export default function EliteFour({ region, character, starter, roster, setRoster, bag = [], onMoveItem, onApplyConsumable, onMegaEquip, speedCash = 0, cashEarned = 0, metacashEarned = 0, keysEarned = 0, payoutSaved = true, onEarnCash, onBack, onRestart, runItBackAvailable = false, onRunItBack, onMemberDefeated, onRunEnd, onSpeciesSeen, onSpeciesOwned, onPrismRefund, pokedexOpen, setPokedexOpen, seedCode }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const config = getRegionConfig(region?.name)
@@ -34,7 +34,7 @@ export default function EliteFour({ region, character, starter, roster, setRoste
 
   const [defeated, setDefeated] = useState(0)
   const [pendingBattle, setPendingBattle] = useState(null)
-  const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned })
+  const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned, onPrismRefund })
   const [loadingIndex, setLoadingIndex] = useState(null)
   const [won, setWon] = useState(false)
 

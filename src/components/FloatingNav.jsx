@@ -4,6 +4,8 @@ import pokedexIcon from '../assets/Icons/pokedexIcon.png'
 import statsIcon from '../assets/Icons/statsIcon.png'
 import settingsIcon from '../assets/Icons/graySettingsIcon.png'
 import resetIcon from '../assets/Icons/reset.png'
+import collapseIcon from '../assets/Icons/collapseNavIcon.png'
+import expandIcon from '../assets/Icons/expandNavIcon.png'
 
 // Mobile-only floating nav — replaces the top nav bar so the map can use its
 // height. A translucent grey pill fixed to the top-left, above the map AND the
@@ -24,11 +26,30 @@ import resetIcon from '../assets/Icons/reset.png'
 // onSkipMap is shown only for admins, matching the desktop nav bar's gate.
 // onRestart is only passed on run screens, so Restart self-hides on the menus —
 // the same gate the desktop nav bar uses.
+//
+// The pill collapses to a single toggle icon so it can be pushed out of the way
+// on small screens, where six 44px targets run down a large share of the
+// viewport. Collapsed state persists across mounts (localStorage) so the choice
+// survives navigating between screens, but defaults to EXPANDED: TutorialOverlay
+// finds its targets by data-tutorial marker and skips any step whose target has
+// no layout box, so a collapsed-by-default pill would silently drop the whole
+// nav portion of a first-time player's tour.
+const COLLAPSED_KEY = 'speedmon.floatingNav.collapsed'
+
 export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, setStatsOpen, onRestart, onSkipMap, role }) {
   // Restart wipes the run with no undo, so it takes two taps: the first arms
   // it (the icon turns red and the label says so), the second fires. A single
   // mis-tap from a neighbouring button can now only arm it, never restart.
   const [armed, setArmed] = useState(false)
+  // Persisted so collapsing survives screen changes; defaults to expanded (see
+  // the note on the tutorial above). Wrapped because Safari private mode throws
+  // on localStorage access rather than returning null.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0') } catch { /* ignore */ }
+  }, [collapsed])
   // Disarm after 3s so a forgotten arm can't be triggered by a later stray tap.
   useEffect(() => {
     if (!armed) return
@@ -63,6 +84,23 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
       onClick: onSkipMap,
     })
   }
+  // Last in the list so it sits at the bottom of the pill, furthest from the
+  // navigation buttons a player reaches for most.
+  buttons.push({
+    key: 'collapse',
+    icon: collapsed ? expandIcon : collapseIcon,
+    alt: collapsed ? 'Expand navigation' : 'Collapse navigation',
+    title: collapsed ? 'Expand navigation' : 'Collapse navigation',
+    // Disarms Restart on the way in: collapsing hides that button, and an arm
+    // that outlived the collapse would reappear on expand as a live one-tap
+    // wipe, long after its 3s safety timer had run out.
+    onClick: () => { setArmed(false); setCollapsed(c => !c) },
+  })
+
+  // Collapsed shows the toggle alone; it keeps its key so React reuses the
+  // same button element rather than remounting it across the transition.
+  const visible = collapsed ? buttons.slice(-1) : buttons
+
   return (
     <div style={{
       position: 'fixed', top: '8px', left: '5px',
@@ -71,10 +109,14 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
       // to ~44% of an iPhone SE's height for a nav overlay.
       display: 'flex', flexDirection: 'column', gap: '2px',
       backgroundColor: 'rgba(46, 46, 46, 0.55)',
-      padding: '4px 2px',
+      padding: '3px 2px',
+      // The box is sized by the icons, not the touch targets: each button
+      // paints a 44px hit area but is pulled in with negative margins (see
+      // below), so the grey hugs the 22px icons while the finger target stays
+      // at the touch minimum.
       zIndex: 170,
     }}>
-      {buttons.map(b => (
+      {visible.map(b => (
         <div key={b.key} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
         {b.armed && (
           // Tells the player what the second tap does. Sits to the RIGHT of
@@ -106,6 +148,12 @@ export default function FloatingNav({ onHome, setSettingsOpen, setPokedexOpen, s
             minWidth: '44px', minHeight: '44px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 0, cursor: 'pointer',
+            // -7px on each side lets the 44px target overhang the 30px slot it
+            // occupies in the box. The hit area is unchanged — it just bleeds
+            // past the grey instead of inflating it. Vertical overhang is
+            // smaller (-5px) so stacked targets stay adjacent rather than
+            // overlapping, which would let a tap land on the wrong button.
+            margin: '-5px -7px',
             // Armed restart reads as dangerous rather than silently waiting
             // for a second tap.
             backgroundColor: b.armed ? 'rgba(220,38,38,0.85)' : 'transparent',

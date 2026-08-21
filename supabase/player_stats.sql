@@ -140,6 +140,16 @@ $$;
 -- It is labelled "reached", not "died on", because nothing records a quit: an
 -- abandoned run is indistinguishable from a lost one, so a true death curve is
 -- a claim this data cannot support.
+--
+-- Split by starter as well as depth: one row per (deepest_map, starter_id), so
+-- the panel can colour each depth bar by which starter the run began with and
+-- show how far players get per starter. Callers that only want the depth curve
+-- sum the starters within a bin — the bins themselves are unchanged.
+--
+-- starter_id is NOT coalesced to a sentinel. Runs recorded before the column
+-- existed leave it null, and folding those into a real starter would inflate
+-- that starter's depth curve with runs it never played. The panel renders them
+-- as their own unattributed segment instead.
 create or replace function public.admin_player_depth(
   p_region       text        default null,
   p_since        timestamptz default null,
@@ -147,6 +157,7 @@ create or replace function public.admin_player_depth(
 )
 returns table (
   deepest_map integer,
+  starter_id  integer,
   runs        bigint
 )
 language sql
@@ -156,6 +167,7 @@ stable
 as $$
   select
     (r.maps_cleared + case when r.result = 'win' then 0 else 1 end)::integer as deepest_map,
+    r.starter_id::integer                                                     as starter_id,
     count(*)::bigint                                                          as runs
   from public.runs r
   where exists (
@@ -167,8 +179,8 @@ as $$
       (p_unknown_only and r.region is null)
       or (not p_unknown_only and (p_region is null or r.region = p_region))
     )
-  group by 1
-  order by 1;
+  group by 1, 2
+  order by 1, 2;
 $$;
 
 -- Starter picks and their win rates.

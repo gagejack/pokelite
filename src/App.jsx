@@ -14,6 +14,7 @@ const EliteFour = lazy(() => import('./components/EliteFour'))
 import { fetchPokemonBase, buildPokemonInstance, prewarmCache, retypeMove, applyTypePrism } from './game/pokemon.js'
 import { megaEvolveWithStone, isHeldItemLocked } from './game/megas.js'
 import { toBagItem, ensureBagUids } from './game/bagItem.js'
+import { TYPE_PRISM_ITEM } from './game/items.js'
 import { NODE_TYPES } from './game/nodeMap.js'
 import { getRegionConfig, regionNames } from './game/regionRegistry.js'
 import { seedRng, clearRng, getRngState, setRngState } from './game/rng.js'
@@ -121,6 +122,25 @@ export default function App() {
   // State (not a ref) because the HUD and the shop's affordability re-render
   // on every change; the other stats above are only read at save time.
   const [speedCash, setSpeedCash] = useState(0)
+  // A mirror of the balance that spendCash can read SYNCHRONOUSLY.
+  //
+  // spendCash has to answer "did this purchase go through?" in its return
+  // value, because the shop hands over the item only if it did. It used to
+  // decide that inside the setSpeedCash updater and read the flag afterwards,
+  // on the assumption that React runs the updater synchronously. It does not:
+  // React only evaluates an updater eagerly when the queue is EMPTY. Once a
+  // re-render is already pending — which is the case on every purchase after
+  // the first, since the first one re-rendered the HUD — the updater is
+  // deferred, so spendCash returned its initial `false` while the debit still
+  // landed later. That is the "money gone, no item, shelf still full" bug:
+  // PokemartNode's buy() bails on a false return without decrementing stock.
+  //
+  // A ref is read and written synchronously, so the decision no longer depends
+  // on React's scheduling. It is kept in sync by the effect below rather than
+  // at each of the ~7 setSpeedCash call sites (run load, snapshot restore,
+  // interest, resets), so no future write path can forget to update it.
+  const speedCashRef = useRef(0)
+  useEffect(() => { speedCashRef.current = speedCash }, [speedCash])
   // Total ever earned this run — only goes up; purchases never touch it. Shown
   // on the run-end screen. Without it the Elite Four's payouts would be pure
   // waste: there is no mart there, so $200 × 4 + the last gym's $120 would
@@ -977,6 +997,18 @@ export default function App() {
     setBag(prev => [...prev, toBagItem(item)])
   }
 
+  // A prismed Pokémon just evolved, which discarded the typing the Type Prism
+  // bought (buildEvolvedInstance rebuilds from the evolved species' base data).
+  // Credit the prism back so the player keeps what they paid for and can spend
+  // it again — on the evolved form, or on someone else.
+  //
+  // Deliberately NOT once-per-prism: the flag rides through every evolution, so
+  // a line that evolves twice refunds twice. Each step is a separate loss of
+  // the same effect, and re-applying the refunded prism is what re-arms it.
+  function handlePrismRefund() {
+    setBag(prev => [...prev, toBagItem(TYPE_PRISM_ITEM)])
+  }
+
   // Mega Evolve: rewrite the roster slot's types/stats/sprite/move via
   // applyMega, same "bake it into the instance" convention evolution
   // already uses. Unlike handleItemAssign, there's no swapBackItem to
@@ -1099,6 +1131,11 @@ export default function App() {
   // cashEarned a true lifetime total.
   function earnCash(amount) {
     if (!amount) return
+    // Keep the ref in step immediately, for the same reason spendCash does:
+    // the syncing effect does not run until React commits, so a purchase made
+    // in the same tick as a payout would otherwise judge affordability against
+    // the pre-payout balance.
+    speedCashRef.current += amount
     setSpeedCash(prev => prev + amount)
     setCashEarned(prev => prev + amount)
   }
@@ -1107,23 +1144,27 @@ export default function App() {
   // couldn't afford it (and nothing changed) — the caller uses the boolean to
   // decide whether to hand over the item, so the two can never disagree.
   //
-  // The decision is made INSIDE the updater against `prev`, not against the
-  // `speedCash` closure value: two Buy taps in the same tick both close over
-  // the same stale balance, and checking outside would let a player at $150
-  // buy twice and go negative. `paid` is assigned during the updater and read
-  // after — safe because React runs the updater synchronously here.
+  // The decision is made against `speedCashRef`, NOT inside the setSpeedCash
+  // updater. An earlier version set a `paid` flag inside the updater and read
+  // it after the setState call, which silently failed for every purchase after
+  // the first: React defers an updater once a re-render is already pending, so
+  // the read happened before the flag was ever assigned. See speedCashRef's
+  // comment above for the full story.
   //
-  // StrictMode double-invokes updaters, so the updater must be idempotent for
-  // a given `prev`: it is, since it only ever returns `prev - amount` or
-  // `prev`, and `paid` is overwritten with the same value both times.
+  // The ref is decremented HERE rather than left to the effect, so that when
+  // two Buy taps land in the same tick the second one sees the first one's
+  // debit — the effect does not run until React commits, and checking a stale
+  // balance twice would let a player at $150 buy a $100 item twice and go
+  // negative.
+  //
+  // The setSpeedCash updater still recomputes from `prev` instead of writing
+  // the ref's value, so the state remains the single source of truth for the
+  // HUD and StrictMode's double invocation stays idempotent.
   function spendCash(amount) {
-    let paid = false
-    setSpeedCash(prev => {
-      if (prev < amount) { paid = false; return prev }
-      paid = true
-      return prev - amount
-    })
-    return paid
+    if (speedCashRef.current < amount) return false
+    speedCashRef.current -= amount
+    setSpeedCash(prev => Math.max(0, prev - amount))
+    return true
   }
 
   function restartRun() {
@@ -1467,6 +1508,7 @@ export default function App() {
           bag={bag}
           onItemAssign={handleItemAssign}
           onItemKeepInBag={handleItemKeepInBag}
+          onPrismRefund={handlePrismRefund}
           onMoveItem={moveItem}
           onMegaEquip={handleMegaEquip}
           megaStoneAvailable={!megaStoneSpawnedThisRun.current}
@@ -1548,6 +1590,7 @@ export default function App() {
           onRunEnd={recordRunEnd}
           onSpeciesSeen={recordSpeciesSeen}
           onSpeciesOwned={recordSpeciesOwned}
+          onPrismRefund={handlePrismRefund}
           pokedexOpen={pokedexOpen}
           setPokedexOpen={setPokedexOpen}
           seedCode={runSeed?.code}

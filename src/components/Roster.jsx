@@ -197,7 +197,7 @@ export function PokemonCardContent({ pokemon, dark, borderStyle, textColor, mute
   )
 }
 
-export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onStartHeldItemDrag }) {
+export default function Roster({ roster, horizontal = false, fullWidth = false, onSwap, itemTargeting = false, onPickTarget, onStartHeldItemDrag, mapHeight = 0 }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [selected, setSelected] = useState(null)
@@ -209,6 +209,51 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
 
   const openPopup = (pokemon, i) => { setSelected(pokemon); setSelectedIndex(i) }
   const closePopup = () => { setSelected(null); setSelectedIndex(null) }
+
+  // ── Desktop rail sizing ──────────────────────────────────────────────────
+  // The rail divides the MAP's height into one slot per party slot, so the
+  // stack always ends level with the map and always shows the full party —
+  // five dashed placeholders beside a single Pokémon, not a tall empty box.
+  //
+  // Slot height is derived, never authored, which is what makes this modular:
+  // the Extra Slot upgrade raises partySize to 7 and the same division simply
+  // yields seven shorter slots. Nothing here counts to six.
+  const partySize = Math.max(roster.length, getActiveExtras().partySize)
+  const railEnabled = isDesktop && !horizontal
+  // Measured by the owner of the map card and passed down: the rail renders
+  // before that card exists, so it cannot measure it itself.
+  const mapH = railEnabled ? mapHeight : 0
+
+  const RAIL_HEADER_H = 27   // ROSTER bar: 15px cap + 3px padding, both edges
+  const RAIL_GAP = 6         // between slots
+  const RAIL_PAD_BOTTOM = 8
+  const RAIL_BORDER = 4      // the rail's own 2px border, top and bottom
+  // Held back from the budget to absorb sub-pixel rounding in the header and
+  // borders, which otherwise leaves the rail a px past the map at some heights.
+  const RAIL_SLACK = 2
+  // Everything the slots do NOT get: header, the gaps between them, and the
+  // rail's own bottom padding. Subtracting first means the slots divide only
+  // the space genuinely left for them, so the total lands on the map's height
+  // instead of overshooting it by the chrome.
+  const railOverhead = RAIL_HEADER_H + RAIL_GAP + (partySize - 1) * RAIL_GAP
+    + RAIL_PAD_BOTTOM + RAIL_BORDER + RAIL_SLACK
+  // 92px is the authored fallback, used until the map reports a height (and
+  // wherever ResizeObserver is missing) so the rail still renders sanely.
+  // Capped at the authored 92px: on a tall monitor the slots should stay the
+  // size they were designed at rather than inflating into big empty boxes. The
+  // rail then ends ABOVE the map instead of level with it, which is the right
+  // trade — there is no way to fill that height without either stretched art
+  // or padding masquerading as content.
+  // floor(), not the raw quotient: each slot's fractional height gets rounded
+  // up somewhere in layout, and partySize of those add back into a rail a
+  // pixel or two longer than the map. Flooring spends at most one px per slot
+  // to guarantee the rail never crosses the map's bottom edge.
+  const slotH = mapH > 0
+    ? Math.min(92, Math.max(1, Math.floor((mapH - railOverhead) / partySize)))
+    : 92
+  // Slot internals scale against the authored 92px slot. Capped at 1 so a tall
+  // monitor leaves the authored design alone rather than inflating the art.
+  const slotK = Math.min(1, slotH / 92)
 
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
   const shadowStyle = dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e'
@@ -320,17 +365,27 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           textColor={textColor}
           mutedColor={mutedColor}
           horizontal={false}
+          slotH={railEnabled ? slotH : undefined}
+          k={railEnabled ? slotK : 1}
           onClick={() => itemTargeting ? onPickTarget?.(i) : (isDesktop ? undefined : openPopup(pokemon, i))}
           {...slotProps(i)}
         />
       ))}
-      {Array.from({ length: Math.max(0, getActiveExtras().partySize - roster.length) }).map((_, i) => (
+      {Array.from({ length: Math.max(0, partySize - roster.length) }).map((_, i) => (
         <div
           key={`empty-${i}`}
           style={{
             width: '100%',
-            height: '92px',
-            border: dark ? '2px dashed #333' : '2px dashed #bbb',
+            // Same derived height as a filled slot, so the party always reads
+            // as partySize equal rows regardless of how many are occupied.
+            height: railEnabled ? `${slotH}px` : '92px',
+            // #4a4a4a, not #333: the placeholders sit on the rail's own
+            // #2e2e2e card, and #333 against that is a ~1.05:1 contrast ratio —
+            // invisible in practice, which made a one-Pokémon party read as an
+            // empty box rather than as five open slots. The lighter dash is
+            // still quieter than a filled slot's #1a1a1a fill, so occupied and
+            // open slots stay easy to tell apart at a glance.
+            border: dark ? '2px dashed #4a4a4a' : '2px dashed #bbb',
             backgroundColor: 'transparent',
             flexShrink: 0,
             boxSizing: 'border-box',
@@ -381,9 +436,10 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '6px',
-          // Hug the slots. Stretching left six empty placeholders as a tall
-          // dead column beside the map.
+          gap: `${RAIL_GAP}px`,
+          // Hug the slots — they already sum to the map's height, so the rail
+          // lands level with the map without being stretched to it. Stretching
+          // instead would leave a short party as a tall empty box.
           flexShrink: 0, alignSelf: 'flex-start',
         }}>
           <div style={{
@@ -396,7 +452,7 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
           }}>
             <span style={{ fontFamily: 'Upheaval', fontSize: '15px', color: '#fff', letterSpacing: '0.5px' }}>ROSTER</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '0 6px 8px', width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: `${RAIL_GAP}px`, padding: `0 6px ${RAIL_PAD_BOTTOM}px`, width: '100%', boxSizing: 'border-box' }}>
             {desktopSlots}
           </div>
           {hoveredIndex != null && roster[hoveredIndex] && (
@@ -452,14 +508,23 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
   )
 }
 
-function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizontal, onClick,
+function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizontal, slotH, k = 1, onClick,
   isDragging, isDropTarget, draggable, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd,
   onTouchStart, onTouchMove, onTouchEnd, onTouchCancel, 'data-slot-index': slotIndex, onStartHeldItemDrag,
   onMouseEnter, onMouseLeave }) {
   const isFainted = pokemon.fainted
   // Desktop slots grew with the rail (90 → 132px) so the name and level can sit
   // at a size that actually resolves. Mobile is untouched.
-  const spriteSize = horizontal ? '34px' : '48px'
+  //
+  // `k` is the desktop rail's fit scale — the derived slot height over the
+  // authored 92px, capped at 1. The sprite and spacing take it directly; the
+  // two Pokemon Classic labels floor at 10px, where that bitmap face still
+  // resolves (docs/UI_TOUCHUPS.md). Type therefore stops shrinking before the
+  // art does, so a short slot reads as a smaller picture with the same legible
+  // name rather than a row of unreadable shapes.
+  const spriteSize = horizontal ? '34px' : `${Math.round(48 * k)}px`
+  const ks = px => `${Math.round(px * k)}px`
+  const kf = px => `${Math.max(10, Math.round(px * k))}px`
 
   return (
     <div
@@ -480,6 +545,10 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       style={{
         flex: horizontal ? 1 : undefined,
         width: horizontal ? undefined : '100%',
+        // Height is dictated by the rail's division of the map, not by the
+        // slot's contents — that is what keeps partySize slots summing to the
+        // map's height exactly.
+        height: slotH != null ? `${slotH}px` : undefined,
         flexShrink: 0,
         borderRight: horizontal ? (dark ? '1px solid #121212' : '1px solid #2e2e2e') : undefined,
         border: isDropTarget
@@ -493,8 +562,8 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         // No bottom padding on desktop: the HP bar is a foot rule flush to the
         // slot's bottom edge, so six stacked slots read as six parallel gauges
         // you can scan in one vertical pass.
-        padding: horizontal ? '4px 2px 3px' : '5px 4px 0',
-        gap: horizontal ? '2px' : '3px',
+        padding: horizontal ? '4px 2px 3px' : `${ks(5)} 4px 0`,
+        gap: horizontal ? '2px' : ks(3),
         boxSizing: 'border-box',
         opacity: isDragging ? 0.35 : isFainted ? 0.4 : 1,
         position: 'relative',
@@ -515,7 +584,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
           10px, not 11: measured against the loaded font, "Charmander" runs 110px
           at 11px in a 104px slot. A starter must not ellipse. */}
       <span style={{
-        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '7px' : '10px', color: textColor,
+        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '7px' : kf(10), color: textColor,
         textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.15,
         width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
         pointerEvents: 'none',
@@ -531,7 +600,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
           ever costing legibility. The FNT badge below keeps its 4-direction
           ring — that one sits over the sprite. */}
       <span style={{
-        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : '10px', color: accent(dark), pointerEvents: 'none',
+        fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : kf(10), color: accent(dark), pointerEvents: 'none',
       }}>
         LVL {pokemon.level}
       </span>
@@ -564,7 +633,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
             src={itemIconUrl(pokemon.heldItem)}
             alt={pokemon.heldItem.name}
             style={{
-              width: horizontal ? '14px' : '18px', height: horizontal ? '14px' : '18px',
+              width: horizontal ? '14px' : ks(18), height: horizontal ? '14px' : ks(18),
               imageRendering: 'pixelated', pointerEvents: 'none',
             }}
           />
@@ -585,8 +654,11 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
       {horizontal ? (
         <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width="50px" height="3px" />
       ) : (
-        <div style={{ width: '100%', marginTop: 'auto', paddingTop: '4px', pointerEvents: 'none' }}>
-          <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width="100%" height="5px" />
+        // The foot rule holds its weight (4px floor) while everything above it
+        // scales. Six stacked slots are read as six parallel gauges in one
+        // vertical pass, so the bar is the last thing that should thin out.
+        <div style={{ width: '100%', marginTop: 'auto', paddingTop: ks(4), pointerEvents: 'none' }}>
+          <AnimatedHpBar hp={pokemon.stats.hp} maxHp={pokemon.stats.maxHp} width="100%" height={`${Math.max(4, Math.round(5 * k))}px`} />
         </div>
       )}
     </div>

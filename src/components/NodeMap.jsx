@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTheme } from '../lib/theme'
 import { cash, muted, accent } from '../lib/colors'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { useMapHeight } from '../lib/useMapHeight.js'
 import { useBagTouchDrag } from '../lib/useBagTouchDrag.js'
 import Layout from './Layout'
 import Roster from './Roster'
@@ -783,6 +784,12 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
   const [mobileBarsHeight, setMobileBarsHeight] = useState(0)
   const mobileBarsRef = useRef(null)
   const mapContainerRef = useRef(null)
+  // The desktop map card's height. The roster rail divides it into party slots
+  // so the two columns end on the same line. Measured here rather than in the
+  // rail because the rail renders first — see useMapHeight on why this is a
+  // callback ref. Not the row the two share: the map is capped by its aspect
+  // ratio and stops short of the row's bottom.
+  const [mapCardHeight, attachMapCard] = useMapHeight(isDesktop)
   const holdTimerRef = useRef(null)
   const holdActivatedRef = useRef(false)
 
@@ -1661,6 +1668,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flexShrink: 0, alignSelf: 'flex-start' }}>
               <Roster
                 roster={roster}
+                mapHeight={mapCardHeight}
                 onSwap={swapRoster}
                 itemTargeting={isMovingItem}
                 onPickTarget={pokeIndex => resolveItemMove({ kind: 'pokemon', pokeIndex })}
@@ -1674,7 +1682,7 @@ export default function NodeMap({ region, starter, character, roster, setRoster,
                 background image's aspect ratio (so the whole image shows and
                 nodes sit on it), falling back to the node-layout ratio until the
                 image's size is known. The card + nodes scale with browser height. */}
-            <div style={{
+            <div ref={attachMapCard} style={{
               height: '100%',
               aspectRatio: bgRatio ? `${bgRatio}` : `${svgWidth} / ${svgHeight}`,
               alignSelf: 'stretch',

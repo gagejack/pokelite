@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   pct, toEngagement, toDifficulty, toDepth, toStarters, toEconomy, toRegionBreakdown,
-  RANGES, sinceFor,
+  RANGES, sinceFor, starterColor, UNATTRIBUTED_COLOR,
 } from './playerStats.js'
 
 // Every fixture uses STRINGS for bigint columns, because that is what
@@ -130,6 +130,91 @@ describe('toDepth', () => {
     expect(toDepth([])).toEqual([])
     expect(toDepth(null)).toEqual([])
     expect(toDepth(undefined)).toEqual([])
+  })
+
+  // The RPC now emits one row per (deepest_map, starter_id). The bins must
+  // still be one entry each, with the starters folded inside them — a caller
+  // that renders one bar per row would otherwise draw three "Map 1" bars.
+  it('folds the per-starter rows into one entry per bin', () => {
+    const d = toDepth([
+      { deepest_map: 1, starter_id: 1, runs: '10' },
+      { deepest_map: 1, starter_id: 4, runs: '20' },
+      { deepest_map: 1, starter_id: 7, runs: '10' },
+      { deepest_map: 2, starter_id: 4, runs: '60' },
+    ])
+    expect(d.map(x => x.deepestMap)).toEqual([1, 2])
+    expect(d.map(x => x.runs)).toEqual([40, 60])
+    expect(d.map(x => x.pct)).toEqual([40, 60])
+  })
+
+  it('keeps each bin starters as segments, largest first', () => {
+    const [bin] = toDepth([
+      { deepest_map: 1, starter_id: 1, runs: '10' },
+      { deepest_map: 1, starter_id: 4, runs: '25' },
+      { deepest_map: 1, starter_id: 7, runs: '15' },
+    ])
+    expect(bin.byStarter.map(s => s.starterId)).toEqual([4, 7, 1])
+    expect(bin.byStarter.map(s => s.runs)).toEqual([25, 15, 10])
+  })
+
+  // A segment's share is of the WHOLE dataset, not of its own bin: the bars
+  // are absolute, so the segments of one bar must add up to that bar's pct.
+  it('scales each segment against the overall total, not its own bin', () => {
+    const [bin] = toDepth([
+      { deepest_map: 1, starter_id: 1, runs: '10' },
+      { deepest_map: 1, starter_id: 4, runs: '10' },
+      { deepest_map: 2, starter_id: 4, runs: '80' },
+    ])
+    expect(bin.pct).toBe(20)
+    expect(bin.byStarter.map(s => s.pct)).toEqual([10, 10])
+  })
+
+  // Runs predating runs.starter_id arrive with starter_id null. They must
+  // still be counted in the bin total — dropping them would understate how
+  // many runs reached that depth — but kept as their own unattributed
+  // segment rather than folded into a real starter.
+  it('keeps runs with no recorded starter as a null segment', () => {
+    const [bin] = toDepth([
+      { deepest_map: 1, starter_id: null, runs: '30' },
+      { deepest_map: 1, starter_id: 4, runs: '70' },
+    ])
+    expect(bin.runs).toBe(100)
+    expect(bin.byStarter.find(s => s.starterId == null).runs).toBe(30)
+  })
+
+  // Rows from before the split (no starter_id key at all) must not silently
+  // produce a bogus starter 0 segment.
+  it('treats a row with no starter_id column as unattributed', () => {
+    const [bin] = toDepth([{ deepest_map: 1, runs: '5' }])
+    expect(bin.runs).toBe(5)
+    expect(bin.byStarter).toEqual([{ starterId: null, runs: 5, pct: 100, binPct: 100 }])
+  })
+
+  // binPct is a SECOND denominator, alongside pct: the share of THIS bin, not
+  // of all runs. It labels the segment in the bar ("of the runs that ended
+  // here, 60% were fire starters"), while pct sizes it. Conflating the two
+  // would either mislabel the split or resize the bars.
+  it('gives each segment its share of its own bin, summing to 100', () => {
+    const [bin] = toDepth([
+      { deepest_map: 1, starter_id: 1, runs: '10' },
+      { deepest_map: 1, starter_id: 4, runs: '20' },
+      { deepest_map: 1, starter_id: 7, runs: '10' },
+      { deepest_map: 2, starter_id: 4, runs: '60' },
+    ])
+    // Shares of the bin's own 40 runs, not of the 100 overall.
+    expect(bin.byStarter.map(s => s.binPct)).toEqual([50, 25, 25])
+    expect(bin.byStarter.reduce((t, s) => t + s.binPct, 0)).toBe(100)
+    // The overall-share figures are untouched by the addition.
+    expect(bin.byStarter.map(s => s.pct)).toEqual([20, 10, 10])
+  })
+
+  it('gives a single-starter bin a binPct of 100', () => {
+    const [bin] = toDepth([
+      { deepest_map: 1, starter_id: 4, runs: '30' },
+      { deepest_map: 2, starter_id: 4, runs: '70' },
+    ])
+    expect(bin.byStarter[0].binPct).toBe(100)
+    expect(bin.byStarter[0].pct).toBe(30)
   })
 })
 
@@ -294,5 +379,27 @@ describe('toRegionBreakdown', () => {
 
   it('returns an empty list for null', () => {
     expect(toRegionBreakdown(null)).toEqual([])
+  })
+})
+
+describe('starterColor', () => {
+  // Slot order in REGION_STARTERS is grass, fire, water for every region, so
+  // the same three colours mean the same three types in Kanto and in Unova.
+  it('colours each starter by its type, consistently across regions', () => {
+    expect(starterColor(1)).toBe(starterColor(152))   // Bulbasaur, Chikorita
+    expect(starterColor(4)).toBe(starterColor(155))   // Charmander, Cyndaquil
+    expect(starterColor(7)).toBe(starterColor(158))   // Squirtle, Totodile
+  })
+
+  it('gives the three slots three distinct colours', () => {
+    const colors = new Set([starterColor(1), starterColor(4), starterColor(7)])
+    expect(colors.size).toBe(3)
+  })
+
+  // Unattributed runs must not borrow a starter's colour — an admin reading
+  // grey as "Bulbasaur" would misattribute every legacy run in the chart.
+  it('returns a neutral colour for an unrecorded or unknown starter', () => {
+    expect(starterColor(null)).toBe(UNATTRIBUTED_COLOR)
+    expect(starterColor(99999)).toBe(UNATTRIBUTED_COLOR)
   })
 })

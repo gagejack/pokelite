@@ -14,12 +14,19 @@ import EvolutionChoice from '../components/EvolutionChoice'
 // continue. Multi-branch lines (Eevee, Tyrogue…) queue an EvolutionChoice
 // popup; the Pokémon stays un-evolved until the player picks.
 //
+// Type Prism refunds are raised here too, for the same reason the notices are:
+// this hook owns every path a Pokémon can evolve down, and each of them still
+// holds the PRE-evolution instance (the only place the `_prismed` flag can be
+// read before the rebuild discards the typing it stands for). `onPrismRefund`
+// is called once per evolved Pokémon that carried the flag; the caller owns the
+// bag and decides what to credit.
+//
 // Usage:
-//   const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned })
+//   const evo = useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned, onPrismRefund })
 //   const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained, fullHeal })
 //   ...
 //   {evo.render()}
-export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) {
+export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned, onPrismRefund }) {
   const [evolutionNotices, setEvolutionNotices] = useState([])
   // Pending multi-branch evolution picks (Eevee, Tyrogue…) — the popup shows
   // one at a time; the Pokémon stays un-evolved until the player chooses.
@@ -35,6 +42,23 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
   const noticeSeq = useRef(0)
   const tagNotices = list => list.map(n => ({ ...n, _seq: noticeSeq.current++ }))
 
+  // Credit a Type Prism back for every Pokémon that EVOLVED while carrying the
+  // prism flag. Compared slot-by-slot rather than driven off the notice list,
+  // because a notice carries species names, not the roster index needed to look
+  // up the pre-evolution instance — and two slots can evolve into the same
+  // species off one win, which names alone cannot tell apart.
+  //
+  // "Evolved" is `pokeId` changing: a slot that merely levelled up, or one that
+  // is waiting on a multi-branch choice popup, keeps its id and its prism.
+  function refundPrisms(before, after) {
+    if (!onPrismRefund) return
+    for (let i = 0; i < before.length; i++) {
+      if (before[i]?._prismed && after[i] && after[i].pokeId !== before[i].pokeId) {
+        onPrismRefund()
+      }
+    }
+  }
+
   // Apply a battle victory: level-ups, heal, auto-evolutions, and multi-branch
   // choice detection. Records auto-evolved species as owned, updates the roster,
   // and queues notices/choices. Returns the updated roster so the caller can
@@ -46,6 +70,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
       await applyBattleVictory(finalPlayerTeam, { levelsGained, fullHeal, maxSpeciesId, bonusLevelsForSurvivors })
     // Each evolved form is a new owned species for the Pokédex.
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
+    refundPrisms(finalPlayerTeam, updatedRoster)
     setRoster(updatedRoster)
     if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...tagNotices(notices)])
     if (choices.length > 0) setEvolutionChoices(choices)
@@ -69,6 +94,7 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
       await applyRareCandy(roster, pokeIndex, BALANCE.pokemon.rareCandyLevels, { maxSpeciesId })
     if (!used) return false
     notices.forEach(n => onSpeciesOwned?.(n.pokeId, !!n.shiny))
+    refundPrisms(roster, next)
     setRoster(next)
     if (notices.length > 0) setEvolutionNotices(prev => [...prev, ...tagNotices(notices)])
     if (choices.length > 0) setEvolutionChoices(prev => [...prev, ...choices])
@@ -90,6 +116,9 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (result?.evolved) {
       setRoster(prev => prev.map((p, i) => i === pokeIndex && p.pokeId === target.pokeId ? result.evolved : p))
       onSpeciesOwned?.(result.evolved.pokeId, !!result.evolved.shiny)
+      // The stone path evolves exactly one slot, so the flag is read straight
+      // off the target rather than by diffing rosters.
+      if (target._prismed) onPrismRefund?.()
       setEvolutionNotices(prev => [...prev, ...tagNotices([{
         from: target.name, to: result.evolved.name,
         fromSprite: target.sprite, toSprite: result.evolved.sprite,
@@ -111,6 +140,10 @@ export function useEvolutionFlow({ config, roster, setRoster, onSpeciesOwned }) 
     if (evolved) {
       setRoster(prev => prev.map((p, i) => i === choice.index && p.pokeId === choice.fromId ? evolved : p))
       onSpeciesOwned?.(evolved.pokeId, !!evolved.shiny)
+      // The choice popup defers the evolution, so the refund lands here rather
+      // than when the choice was queued — the Pokémon only loses its prismed
+      // typing now, at the moment it actually becomes the picked species.
+      if (current._prismed) onPrismRefund?.()
       setEvolutionNotices(prev => [...prev, ...tagNotices([{
         from: choice.fromName, to: evolved.name,
         // The choice popup already carries the pre-evolution sprite, so the

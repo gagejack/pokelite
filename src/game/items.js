@@ -162,6 +162,17 @@ export const MEGA_STONE_ITEM = {
   tier: 'legendary', icon: 'mega-ring',
 }
 
+// The Type Prism, by reference rather than by copy.
+//
+// Evolution refunds this item: a prismed Pokémon loses its bought typing the
+// moment it evolves (buildEvolvedInstance rebuilds from the evolved species'
+// base data), so useEvolutionFlow credits the prism back to the bag. That
+// caller needs the item object, and DERIVING it from ITEMS is what keeps its
+// name/description/icon from drifting away from the one the shop sells —
+// unlike MEGA_STONE_ITEM above, which is a genuine standalone (it is not in
+// ITEMS, since it only ever comes from its own node).
+export const TYPE_PRISM_ITEM = ITEMS.find(i => i.id === 'type_prism')
+
 // Consumables that route through App.applyConsumable — they share one contract
 // (`{ roster, used }`, kept when `used` is false) and every drop path treats
 // them identically. Listed here rather than inline at each of the three call

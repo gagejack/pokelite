@@ -6,7 +6,7 @@ import { allLegendaryIds } from '../../game/regionRegistry.js'
 import { fmtRunTime } from '../../lib/formatRunTime.js'
 import {
   RANGES, sinceFor, toEngagement, toDifficulty, toDepth, toStarters, toEconomy,
-  toRegionBreakdown,
+  toRegionBreakdown, starterColor, UNATTRIBUTED_COLOR,
 } from '../../lib/playerStats.js'
 
 // Aggregate player statistics across ALL users, for tuning feedback. The
@@ -97,9 +97,43 @@ function Section({ title, subtitle, loading, error, empty, theme, children }) {
   )
 }
 
+// The percentage that fills a Difficulty bar's whole track.
+//
+// The depth bars never approach 100% — runs spread across eight maps, so even
+// the fattest bin sits well under half — which left most of the track empty
+// and the bins hard to tell apart. Drawing against a 50% axis doubles every
+// bar without touching the numbers.
+//
+// It is ONLY the drawn width that scales. The labels stay true percentages of
+// all runs, so nothing here can make a bin look like a bigger share than it
+// is. A bin that did somehow exceed 50% still renders full-width rather than
+// overflowing (see the clamp in StatBar), which reads as "off the scale".
+const DEPTH_AXIS_PCT = 50
+
+// Segmented bars are taller than plain ones because they carry text inside.
+// 9px of Upheaval does not fit in the 9px track the unsegmented bars use, and
+// shrinking the type to fit would make the numbers unreadable at a glance.
+// Plain bars keep their original height so the Starters panel is unchanged.
+const SEGMENTED_BAR_HEIGHT = '14px'
+
 // A labelled percentage bar. Same shape as BalanceDashboard's Bar, kept local
 // so this panel does not reach into that file's internals.
-function StatBar({ label, pct, valueLabel, icon, theme }) {
+//
+// `segments` optionally splits the fill into coloured pieces —
+// [{ key, pct, color, title }] — for the depth bars, where each piece is one
+// starter. Their pcts are shares of the SAME denominator as `pct`, so they add
+// up to the bar's own length rather than stretching it; the bar is still
+// exactly as long as it would be unsegmented. Without `segments` the bar
+// renders as one solid accent fill, which is what the Starters panel wants.
+//
+// `fullScalePct` is the value that fills the track, defaulting to a plain
+// 0–100 axis. Opt-in rather than global: the Starters bars are shares of all
+// picks that genuinely do approach 100%, so rescaling them would misrepresent
+// a dominant starter as running off the end.
+function StatBar({ label, pct, valueLabel, icon, segments, fullScalePct = 100, theme }) {
+  // Clamp AFTER scaling, so an over-scale bar stops at the track edge instead
+  // of pushing its siblings out of the flex row.
+  const scale = width => `${Math.min(100, (width / fullScalePct) * 100)}%`
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       {icon && <img src={icon} alt="" style={{ width: '20px', height: '20px', imageRendering: 'pixelated', flexShrink: 0 }} />}
@@ -110,8 +144,33 @@ function StatBar({ label, pct, valueLabel, icon, theme }) {
       }}>
         {label}
       </span>
-      <div style={{ flex: 1, minWidth: 0, height: '9px', backgroundColor: theme.trackBg }}>
-        <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, backgroundColor: theme.accentColor }} />
+      <div style={{ flex: 1, minWidth: 0, height: segments?.length ? SEGMENTED_BAR_HEIGHT : '9px', backgroundColor: theme.trackBg, display: 'flex' }}>
+        {segments?.length ? segments.map(seg => (
+          <div
+            key={seg.key}
+            title={seg.title}
+            style={{
+              height: '100%', width: scale(seg.pct), backgroundColor: seg.color,
+              flexShrink: 0,
+              // The in-bar label is left-aligned and clipped to its own
+              // segment: a narrow slice shows as much of its number as fits
+              // and hides the rest, rather than spilling over the neighbouring
+              // starter's colour and appearing to belong to it.
+              display: 'flex', alignItems: 'center', overflow: 'hidden',
+            }}
+          >
+            {seg.label && (
+              <span style={{
+                fontFamily: 'Upheaval', fontSize: '9px', color: '#000',
+                paddingLeft: '3px', whiteSpace: 'nowrap',
+              }}>
+                {seg.label}
+              </span>
+            )}
+          </div>
+        )) : (
+          <div style={{ height: '100%', width: scale(pct), backgroundColor: theme.accentColor }} />
+        )}
       </div>
       <span style={{
         fontFamily: 'Upheaval', fontSize: '10px', color: theme.textColor,
@@ -119,6 +178,49 @@ function StatBar({ label, pct, valueLabel, icon, theme }) {
       }}>
         {valueLabel}
       </span>
+    </div>
+  )
+}
+
+// Turn one depth bin's starter breakdown into StatBar segments.
+//
+// Segments carry a `title` so hovering a slice names the starter and its run
+// count — the colour alone cannot say "Cyndaquil, 42 runs", and a legend keyed
+// by type can only say which of the three slots it was.
+function depthSegments(bin) {
+  return bin.byStarter.map(s => ({
+    key: s.starterId ?? 'unattributed',
+    pct: s.pct,
+    color: starterColor(s.starterId),
+    title: `${s.starterId == null ? 'No starter recorded' : STARTER_NAMES[s.starterId] ?? `#${s.starterId}`}: ${s.runs.toLocaleString()} runs`,
+  }))
+}
+
+// What the three colours mean, once per Difficulty section rather than per
+// bar. Labelled by TYPE, not by species: the colours are shared across all
+// five regions, so "Grass starter" is the only label that stays true in the
+// all-regions view.
+//
+// The unattributed swatch appears only when some run actually lacks a starter,
+// so a fully-attributed dataset does not show a legend entry for an empty
+// category.
+function StarterLegend({ showUnattributed, theme }) {
+  const entries = [
+    { label: 'Grass starter', color: starterColor(1) },
+    { label: 'Fire starter', color: starterColor(4) },
+    { label: 'Water starter', color: starterColor(7) },
+    ...(showUnattributed ? [{ label: 'No starter recorded', color: UNATTRIBUTED_COLOR }] : []),
+  ]
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+      {entries.map(e => (
+        <span key={e.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ width: '9px', height: '9px', backgroundColor: e.color, flexShrink: 0 }} />
+          <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: theme.mutedColor }}>
+            {e.label}
+          </span>
+        </span>
+      ))}
     </div>
   )
 }
@@ -270,6 +372,11 @@ export default function PlayerStatsPanel({ theme }) {
   // Only the "All regions" view splits by region. Picking one region already
   // scopes every panel, and Unknown has no region to split by.
   const showByRegion = region === '' && byRegion.length > 0
+  // Whether ANY visible bar carries a grey segment, so the legend explains that
+  // colour only when it is actually on screen. Checked across whichever set of
+  // bars is rendered — the combined curve or the per-region ones.
+  const hasUnattributedDepth = (showByRegion ? byRegion.flatMap(r => r.depth) : depth)
+    .some(d => d.byStarter.some(sg => sg.starterId == null))
 
   return (
     <div className="flex flex-col gap-4">
@@ -323,8 +430,8 @@ export default function PlayerStatsPanel({ theme }) {
         title="Difficulty"
         subtitle={
           showByRegion
-            ? 'Deepest map reached, broken out per region — nothing records a quit, so an abandoned run and a lost one look the same. Each region’s bars are a share of that region’s own runs.'
-            : 'Deepest map reached, not where runs died — nothing records a quit, so an abandoned run and a lost one look the same.'
+            ? 'Deepest map reached, broken out per region — nothing records a quit, so an abandoned run and a lost one look the same. Each region’s bars are a share of that region’s own runs, drawn against a 50% axis: a full-width bar is half the runs, not all of them.'
+            : 'Deepest map reached, not where runs died — nothing records a quit, so an abandoned run and a lost one look the same. Bars are drawn against a 50% axis: a full-width bar is half the runs, not all of them.'
         }
         loading={loading} error={errors.difficulty} empty={noRuns(difficulty)} theme={theme}
       >
@@ -336,6 +443,7 @@ export default function PlayerStatsPanel({ theme }) {
               <Figure label="Avg length" value={fmtRunTime(difficulty.avgElapsedMs) ?? '—'} theme={theme} />
               <Figure label="Wins" value={difficulty.wins.toLocaleString()} theme={theme} />
             </div>
+            <StarterLegend showUnattributed={hasUnattributedDepth} theme={theme} />
             {showByRegion ? (
               // The combined depth curve is deliberately NOT shown here as well:
               // two curves under one heading, one of them a blend of five
@@ -356,6 +464,8 @@ export default function PlayerStatsPanel({ theme }) {
                         key={d.deepestMap}
                         label={`Map ${d.deepestMap}`}
                         pct={d.pct}
+                        segments={depthSegments(d)}
+                        fullScalePct={DEPTH_AXIS_PCT}
                         valueLabel={`${d.pct}% · ${d.runs.toLocaleString()}`}
                         theme={theme}
                       />
@@ -370,6 +480,8 @@ export default function PlayerStatsPanel({ theme }) {
                     key={d.deepestMap}
                     label={`Map ${d.deepestMap}`}
                     pct={d.pct}
+                    segments={depthSegments(d)}
+                    fullScalePct={DEPTH_AXIS_PCT}
                     valueLabel={`${d.pct}%`}
                     theme={theme}
                   />

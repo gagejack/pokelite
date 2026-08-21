@@ -276,3 +276,165 @@ test('Unknown does not fan out per region', async () => {
   await waitFor(() => expect(rpc).toHaveBeenCalled())
   expect(rpc.mock.calls.filter(c => c[1]?.p_region).length).toBe(0)
 })
+
+// --- Per-starter depth colouring ------------------------------------------
+
+// The depth RPC returns one row per (deepest_map, starter_id). The bar for a
+// map must be ONE bar split into coloured pieces, not three bars — and the
+// pieces must be sized against the whole dataset so the bar keeps its length.
+test('a depth bar is one bar split into a segment per starter', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({
+        data: [
+          { deepest_map: 1, starter_id: 1, runs: '10' },
+          { deepest_map: 1, starter_id: 4, runs: '20' },
+          { deepest_map: 1, starter_id: 7, runs: '30' },
+          { deepest_map: 2, starter_id: 4, runs: '40' },
+        ],
+        error: null,
+      })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  // Kanto scopes the panel to a single region so only the combined curve runs.
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+  // One bar per depth, not one per (depth, starter).
+  expect(screen.queryAllByText('Map 1').length).toBe(1)
+
+  // Three segments under Map 1, each titled with its starter and run count,
+  // and each sized against the 100-run total rather than the bin's own 60.
+  //
+  // Widths are DOUBLE the share, because the depth bars are drawn against a
+  // 50% axis — 30 runs of 100 is a 30% share and a 60%-wide bar. The label
+  // still reads the true share; only the drawn width is scaled.
+  const seg = name => document.querySelector(`[title^="${name}:"]`)
+  expect(seg('Squirtle').style.width).toBe('60%')
+  expect(seg('Charmander')).toBeTruthy()
+  expect(seg('Bulbasaur').style.width).toBe('20%')
+  // Three distinct colours, one per starter type.
+  const colors = new Set(['Bulbasaur', 'Charmander', 'Squirtle'].map(n => seg(n).style.backgroundColor))
+  expect(colors.size).toBe(3)
+})
+
+// Runs predating runs.starter_id must be visible as their own segment with a
+// legend entry — silently folding them into a starter would misattribute them.
+test('runs with no recorded starter get their own segment and legend entry', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({
+        data: [
+          { deepest_map: 1, starter_id: null, runs: '25' },
+          { deepest_map: 1, starter_id: 4, runs: '75' },
+        ],
+        error: null,
+      })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+  // 25 of 100 runs — a 25% share, drawn at 50% against the 50% axis.
+  expect(document.querySelector('[title^="No starter recorded:"]').style.width).toBe('50%')
+  expect(screen.getByText('No starter recorded')).toBeTruthy()
+})
+
+// The grey swatch is explained only when a grey segment is actually drawn.
+test('the legend omits the unattributed swatch when every run has a starter', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({ data: [{ deepest_map: 1, starter_id: 4, runs: '100' }], error: null })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+  expect(screen.getByText('Grass starter')).toBeTruthy()
+  expect(screen.queryByText('No starter recorded')).toBeNull()
+})
+
+// The 50% axis is a DRAWING choice, not a data one: the numeric labels must
+// keep reporting true shares of all runs, or an admin reads every bin as
+// twice as common as it is.
+test('the 50% axis scales the drawn bar but never the reported percentage', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({
+        data: [
+          { deepest_map: 1, starter_id: 4, runs: '20' },
+          { deepest_map: 2, starter_id: 4, runs: '80' },
+        ],
+        error: null,
+      })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+
+  // 20% of runs, drawn at 40%; the label still says 20%.
+  expect(document.querySelector('[title^="Charmander: 20 runs"]').style.width).toBe('40%')
+  expect(screen.getByText('20%')).toBeTruthy()
+
+  // 80% is past the axis: it clamps to a full track rather than overflowing,
+  // and the label still tells the truth about the share.
+  expect(document.querySelector('[title^="Charmander: 80 runs"]').style.width).toBe('100%')
+  expect(screen.getByText('80%')).toBeTruthy()
+})
+
+// The Starters bars are shares of all picks and really can approach 100%, so
+// they must keep the plain 0-100 axis the depth bars opted out of.
+test('the starters bars keep a full 0-100 axis', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_starters') {
+      return Promise.resolve({ data: [{ starter_id: 4, picks: '60', wins: '6' }, { starter_id: 1, picks: '40', wins: '4' }], error: null })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_depth') return Promise.resolve({ data: DEPTH, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+  await waitFor(() => expect(screen.getByText('Charmander')).toBeTruthy())
+
+  // 60% of picks is a 60%-wide bar here — NOT doubled to 120/100.
+  const row = screen.getByText('Charmander').closest('div')
+  const track = [...row.querySelectorAll('div')].find(d => d.style.height === '9px')
+  expect(track.firstElementChild.style.width).toBe('60%')
+})

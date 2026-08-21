@@ -597,6 +597,12 @@ export function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     // Carry the held item through evolution (buildPokemonInstance omits it).
     heldItem: instance.heldItem ?? null,
     fainted: instance.fainted,
+    // Carry the Type Prism marker. The evolved form has just LOST the prism's
+    // retyping (its `types` come from the evolved species' base data above),
+    // which is exactly the event the refund pays out on — so the flag has to
+    // survive the rebuild for the caller to see it. Spread conditionally so an
+    // un-prismed Pokémon keeps the key absent rather than gaining `false`.
+    ...(instance._prismed ? { _prismed: true } : {}),
     // Preserve the ORIGINAL starter species id (for future evolutions/level-
     // ups downstream of this one) and the multipliers computed under it,
     // overwriting whatever buildPokemonInstance above set under evolvedBase's
@@ -1009,6 +1015,15 @@ export function applyTypePrism(roster, index) {
     roster: roster.map((p, i) => i === index ? {
       ...p,
       types: [alt],
+      // Records that this Pokémon's typing was bought with a Type Prism.
+      //
+      // Evolution rebuilds the instance from the evolved species' own base
+      // data, which discards `types` above — the prism's whole effect. Rather
+      // than fight that (the evolved form's natural typing is the correct
+      // starting point), the flag rides along so the evolution can credit the
+      // prism back to the bag. It deliberately does NOT clear on refund: a
+      // prismed Gastly pays out again at Gengar, one refund per stage lost.
+      _prismed: true,
       // Preserve the move's TIER (set by TM nodes, not by level) while retyping
       // it — the same rule evolution follows.
       move: getTypeMove(alt, p.move?.tier ?? tierForLevel(p.level)),
