@@ -182,17 +182,30 @@ function StatBar({ label, pct, valueLabel, icon, segments, fullScalePct = 100, t
   )
 }
 
+// Below this share of its own bar, a segment is too narrow to show even a
+// two-digit number, so it carries no label and relies on its hover title
+// instead. Printing one anyway would clip to a stray digit — "1" from a
+// hidden "12%" — which reads as a wrong number rather than as a truncation.
+const MIN_LABELLED_BIN_PCT = 12
+
 // Turn one depth bin's starter breakdown into StatBar segments.
 //
 // Segments carry a `title` so hovering a slice names the starter and its run
 // count — the colour alone cannot say "Cyndaquil, 42 runs", and a legend keyed
 // by type can only say which of the three slots it was.
+//
+// `pct` sizes the segment (share of all runs) while `label` reports binPct
+// (share of this bar), so the labels within one bar add to 100 even though
+// the bar itself is only a fraction of the total. Deliberately two different
+// numbers: sizing by binPct would make every bar full-width, and labelling
+// with pct would leave each bar's numbers summing to something arbitrary.
 function depthSegments(bin) {
   return bin.byStarter.map(s => ({
     key: s.starterId ?? 'unattributed',
     pct: s.pct,
     color: starterColor(s.starterId),
-    title: `${s.starterId == null ? 'No starter recorded' : STARTER_NAMES[s.starterId] ?? `#${s.starterId}`}: ${s.runs.toLocaleString()} runs`,
+    label: s.binPct >= MIN_LABELLED_BIN_PCT ? `${s.binPct}%` : null,
+    title: `${s.starterId == null ? 'No starter recorded' : STARTER_NAMES[s.starterId] ?? `#${s.starterId}`}: ${s.runs.toLocaleString()} runs (${s.binPct}% of this map)`,
   }))
 }
 
