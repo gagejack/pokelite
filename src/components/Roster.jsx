@@ -522,9 +522,41 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   // resolves (docs/UI_TOUCHUPS.md). Type therefore stops shrinking before the
   // art does, so a short slot reads as a smaller picture with the same legible
   // name rather than a row of unreadable shapes.
-  const spriteSize = horizontal ? '34px' : `${Math.round(48 * k)}px`
   const ks = px => `${Math.round(px * k)}px`
   const kf = px => `${Math.max(10, Math.round(px * k))}px`
+
+  // The sprite takes whatever the text does not.
+  //
+  // Everything else in the slot has a hard floor — two 10px Pokemon Classic
+  // labels (~12px line box each) and a 4px HP bar — so below a certain slot
+  // height those floors add up to more than the box, and flexbox resolves the
+  // difference by crushing whichever child can shrink. Scaling the sprite by
+  // `k` alone left a deficit of 5-10px at EVERY height (5.5px even at the
+  // authored 92px), which is why the name was rendering at 0px.
+  //
+  // Sizing the sprite from the remainder inverts that: the labels keep their
+  // floors, and the sprite — the one element that stays recognisable at any
+  // size — gives up the pixels instead. Floors at 20px, below which a 96x96
+  // sprite is no longer readable as a species; past that the slot would need
+  // to drop a label, which is a different decision than this scale.
+  // Measured, not estimated. Pokemon Classic renders taller than its nominal
+  // size: at the 10px floor the name's line box is 11.5px and the LVL line is
+  // 15px — an arithmetic guess of 12px for both under-reserved by 3px and put
+  // the deficit straight back onto the sprite.
+  const NAME_LINE = 12    // 11.5px measured, rounded up
+  const LVL_LINE = 15     // measured
+  const HP_H = Math.max(4, Math.round(5 * k))
+  const slotPadY = Math.round(5 * k)
+  const slotGap = Math.round(3 * k)
+  // Three gaps between the four children. Dropping the one above the HP
+  // wrapper looks reclaimable (it is pushed down by marginTop:auto and has its
+  // own paddingTop) but measures as a real -2.5px deficit, which is exactly the
+  // condition that crushes the name. The sprite gives up ~3px instead.
+  const textBlock = NAME_LINE + LVL_LINE + HP_H + Math.round(4 * k) + slotPadY + slotGap * 3
+  const spritePx = slotH != null
+    ? Math.max(20, Math.min(Math.round(48 * k), Math.floor(slotH - textBlock)))
+    : Math.round(48 * k)
+  const spriteSize = horizontal ? '34px' : `${spritePx}px`
 
   return (
     <div
@@ -588,6 +620,15 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
         textTransform: 'capitalize', textAlign: 'center', lineHeight: 1.15,
         width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
         pointerEvents: 'none',
+        // flexShrink: 0 is what keeps the name on screen. The slot is a fixed
+        // height flex column, and flexbox resolves any deficit by shrinking
+        // whichever children CAN shrink — the sprite and HP bar are already
+        // protected, so this span was absorbing the whole overflow and
+        // collapsing to 0px. The font floor protects the type SIZE; it cannot
+        // protect a box that flex has crushed, so a 10px name was rendering as
+        // nothing at all. The name is the one label identifying the slot, so it
+        // is the last thing that should yield.
+        flexShrink: 0,
       }}>
         {pokemon.name}
       </span>
@@ -601,6 +642,7 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
           ring — that one sits over the sprite. */}
       <span style={{
         fontFamily: 'Pokemon Classic', fontSize: horizontal ? '6px' : kf(10), color: accent(dark), pointerEvents: 'none',
+        flexShrink: 0,
       }}>
         LVL {pokemon.level}
       </span>
