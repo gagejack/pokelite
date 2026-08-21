@@ -443,8 +443,8 @@ export default function PlayerStatsPanel({ theme }) {
         title="Difficulty"
         subtitle={
           showByRegion
-            ? 'Deepest map reached, broken out per region — nothing records a quit, so an abandoned run and a lost one look the same. Each region’s bars are a share of that region’s own runs, drawn against a 50% axis: a full-width bar is half the runs, not all of them.'
-            : 'Deepest map reached, not where runs died — nothing records a quit, so an abandoned run and a lost one look the same. Bars are drawn against a 50% axis: a full-width bar is half the runs, not all of them.'
+            ? 'Deepest map reached, broken out per region — nothing records a quit, so an abandoned run and a lost one look the same. Each region’s bars are a share of that region’s own runs, drawn against a 50% axis: a full-width bar is half the runs, not all of them. The number inside each colour is that starter’s share of THAT bar, so a bar’s labels add to 100.'
+            : 'Deepest map reached, not where runs died — nothing records a quit, so an abandoned run and a lost one look the same. Bars are drawn against a 50% axis: a full-width bar is half the runs, not all of them. The number inside each colour is that starter’s share of THAT bar, so a bar’s labels add to 100.'
         }
         loading={loading} error={errors.difficulty} empty={noRuns(difficulty)} theme={theme}
       >

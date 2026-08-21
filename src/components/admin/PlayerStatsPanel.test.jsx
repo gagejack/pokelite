@@ -438,3 +438,77 @@ test('the starters bars keep a full 0-100 axis', async () => {
   const track = [...row.querySelectorAll('div')].find(d => d.style.height === '9px')
   expect(track.firstElementChild.style.width).toBe('60%')
 })
+
+// The in-bar labels report each starter's share of ITS OWN bar, so they add to
+// 100 within a bar — a different denominator from the widths, which are shares
+// of all runs. Getting these two confused is the whole risk of this chart.
+test('in-bar labels show each starter share of its own bar and sum to 100', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({
+        data: [
+          // Bin 1 is 40 of 100 runs overall, split 50/25/25 within itself.
+          { deepest_map: 1, starter_id: 1, runs: '20' },
+          { deepest_map: 1, starter_id: 4, runs: '10' },
+          { deepest_map: 1, starter_id: 7, runs: '10' },
+          { deepest_map: 2, starter_id: 4, runs: '60' },
+        ],
+        error: null,
+      })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+
+  const seg = name => document.querySelector(`[title^="${name}:"]`)
+  // Bulbasaur is 20 of the bin's 40 runs: labelled 50%, but only 20 of the
+  // overall 100, so drawn at 40% (20% share on the 50% axis).
+  expect(seg('Bulbasaur').textContent).toBe('50%')
+  expect(seg('Bulbasaur').style.width).toBe('40%')
+  // The bin's three labels add to 100 even though the bar is 40% of all runs.
+  const labels = ['Bulbasaur', 'Charmander', 'Squirtle']
+    .map(n => Number(seg(n).textContent.replace('%', '')))
+  expect(labels.reduce((a, b) => a + b, 0)).toBe(100)
+
+  // Label text is black for legibility on the type colours.
+  expect(seg('Bulbasaur').querySelector('span').style.color).toBe('rgb(0, 0, 0)')
+})
+
+// A sliver too narrow for a number shows none rather than a clipped digit,
+// which would read as a wrong figure instead of a truncated one.
+test('a segment too narrow to read carries no label, only a hover title', async () => {
+  rpc.mockImplementation(name => {
+    if (name === 'admin_player_depth') {
+      return Promise.resolve({
+        data: [
+          { deepest_map: 1, starter_id: 1, runs: '2' },    // 2% of the bin
+          { deepest_map: 1, starter_id: 4, runs: '98' },
+        ],
+        error: null,
+      })
+    }
+    if (name === 'admin_player_engagement') return Promise.resolve({ data: [ENGAGEMENT], error: null })
+    if (name === 'admin_player_difficulty') return Promise.resolve({ data: [DIFFICULTY], error: null })
+    if (name === 'admin_player_starters') return Promise.resolve({ data: STARTERS, error: null })
+    if (name === 'admin_player_economy') return Promise.resolve({ data: [ECONOMY], error: null })
+    return Promise.resolve({ data: null, error: new Error('unexpected rpc') })
+  })
+  renderPanel()
+
+  await waitFor(() => expect(screen.getByText('1,284')).toBeTruthy())
+  fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'Kanto' } })
+  await waitFor(() => expect(screen.getByText('Map 1')).toBeTruthy())
+
+  const sliver = document.querySelector('[title^="Bulbasaur:"]')
+  expect(sliver.textContent).toBe('')
+  // The number is still reachable on hover.
+  expect(sliver.getAttribute('title')).toContain('2% of this map')
+})
