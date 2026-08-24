@@ -17,6 +17,7 @@ import { fetchPokemonBase, buildPokemonInstance, cachedName } from '../game/poke
 import { BALANCE } from '../game/balance.js'
 import { useEvolutionFlow } from '../lib/useEvolutionFlow.jsx'
 import { getRegionBalance } from '../lib/regionBalance'
+import { applyBossLevels } from '../lib/bossLevelBalanceCache.js'
 import { swapInRoster } from '../game/roster.js'
 import { itemIconUrl, isRosterConsumable, MEGA_STONE_ITEM } from '../game/items.js'
 import { megaRejectionReason, isHeldItemLocked, resolveMegaTarget } from '../game/megas.js'
@@ -48,14 +49,29 @@ export default function EliteFour({ region, character, starter, roster, setRoste
   // fully-evolved starter that counters the player's pick, falling back to the
   // config's first entry if the starter is unknown. Shared by the preview row
   // (MemberRow) and the actual battle (startBattle) so they never disagree.
+  // Admin level overrides apply here, the single place both the preview row
+  // and the battle read, so a tuned Elite Four can never disagree with the
+  // levels the player was shown. Gym leaders go through the same
+  // applyBossLevels in NodeMap; the Elite Four were the one boss-tier fight
+  // reading authored levels raw, which left them untunable while every gym
+  // was tunable.
+  //
+  // The champion's appended starter-counter ace is included BEFORE the
+  // override, so its slot index matches what the dashboard renders and the
+  // ace is tunable like any other slot. That ace is starter-dependent, so
+  // slot N holds a different species per run — an override there tunes the
+  // SLOT (the champion's ace), not one species.
   function teamSpecs(member) {
     const specs = config?.eliteFourTeams?.[member.name] ?? []
     const counter = config?.blueStarterCounter
-    if (member.champion && counter) {
-      const ace = counter[starter?.id] ?? Object.values(counter)[0]
-      if (ace) return [...specs, ace]
-    }
-    return specs
+    const full = (() => {
+      if (member.champion && counter) {
+        const ace = counter[starter?.id] ?? Object.values(counter)[0]
+        if (ace) return [...specs, ace]
+      }
+      return specs
+    })()
+    return applyBossLevels(config?.name, member.name, full)
   }
 
   async function startBattle(index) {

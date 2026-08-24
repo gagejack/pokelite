@@ -7,6 +7,7 @@ import { useSettings } from '../lib/settings'
 import { AnimatedHpBar, hpColor } from '../lib/AnimatedHpBar'
 import { simulateBattle } from '../game/battle.js'
 import { NODE_TYPES } from '../game/nodeMap.js'
+import { opensOnPrepScreen } from '../game/battlePhase.js'
 import { BALANCE } from '../game/balance.js'
 import { getEffectiveBalance } from '../game/metaModifiers.js'
 import { itemIconUrl } from '../game/items.js'
@@ -100,7 +101,6 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const { battleSpeed, autoClose } = useSettings()
-  const isBoss = node.type === NODE_TYPES.BOSS
   const isMasterBall = node.type === NODE_TYPES.MASTER_BALL
   const levelsGained = node.type === NODE_TYPES.GRASS ? BALANCE.progression.levelsGained.grass : BALANCE.progression.levelsGained.default
 
@@ -120,7 +120,7 @@ export default function BattleCard({ node, enemyTeam, trainerSprite, playerRoste
     ? `A wild ${legendaryName} appeared!`
     : `${node.trainer} wants to battle!`
 
-  const [phase, setPhase] = useState(isBoss || isMasterBall ? 'prep' : 'battle')
+  const [phase, setPhase] = useState(opensOnPrepScreen(node) ? 'prep' : 'battle')
   // Local copy of the roster so the prep screen can drag-reorder it before
   // Fight. Regular battles skip prep, so there it stays identical to the prop.
   const [battleRoster, setBattleRoster] = useState(playerRoster)

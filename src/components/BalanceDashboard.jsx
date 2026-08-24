@@ -379,6 +379,80 @@ function TrainerLevelsPanel({ theme, regions }) {
   const statusColor = s =>
     s === 'error' ? '#ef4444' : s === 'saved' ? '#22c55e' : 'transparent'
 
+  // One boss-tier team's level inputs — shared by the per-map gym leaders and
+  // the Elite Four section below, because both write the SAME override table
+  // (boss_level_balance, keyed region/boss/slot). Extracted when the Elite
+  // Four gained inputs: duplicating this markup would have been the second
+  // place a slot index is derived, and a drift between them would silently
+  // write overrides to the wrong slot.
+  //
+  // Team sizes differ per leader (Brock fields 2, the champion 5), so this
+  // maps the authored array rather than assuming a fixed count.
+  function renderBossTeam(region, name, team) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        // Wider than the 5px binding each mon's own parts together, so a team
+        // reads as N groups rather than one long strip.
+        gap: '14px',
+        // No left inset: the leader-name column matches the band label's
+        // width, so both rows share one left edge.
+      }}>
+        <span style={{
+          fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor,
+          width: theme.labelWidth, flexShrink: 0,
+        }}>
+          {name}
+        </span>
+        {team.map((spec, slot) => {
+          const bKey = `${region}:${name}:${slot}`
+          const value = bossLevelFor(region, name, slot, spec.level)
+          const tuned = Number(value) !== spec.level
+          return (
+            <span key={bKey} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <img
+                src={SPRITE(spec.id)}
+                alt=""
+                style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }}
+              />
+              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor }}>
+                {cachedName(spec.id) ?? `#${spec.id}`}
+              </span>
+              <input
+                type="number" min={BOSS_LEVEL_MIN} max={BOSS_LEVEL_MAX} step={1}
+                value={value}
+                onChange={e => setBossDrafts(prev => ({ ...prev, [bKey]: e.target.value }))}
+                onBlur={() => commitBossLevel(region, name, slot, value)}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                style={{ ...numberInput, width: '46px' }}
+              />
+              {/* The authored level, shown only when overridden, so there is
+                  always a way back to shipped behaviour. Both this and the
+                  status below RENDER ONLY when they have something to say —
+                  reserving width for them left ~54px of dead space beside
+                  every untuned Pokémon, which is what pushed the teams apart. */}
+              {tuned && (
+                <span style={{
+                  fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor,
+                }}>
+                  was {spec.level}
+                </span>
+              )}
+              {status[bKey] && status[bKey] !== 'idle' && (
+                <span style={{
+                  fontFamily: 'Orange Kid', fontSize: '10px',
+                  color: statusColor(status[bKey]),
+                }}>
+                  {status[bKey] === 'saving' ? '…' : status[bKey] === 'saved' ? 'OK' : 'Err'}
+                </span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+    )
+  }
+
   // Only the rows this panel can actually tune are listed.
   //
   // rowPositionWeights() returns a weight for EVERY row buildRows produces —
@@ -485,71 +559,52 @@ function TrainerLevelsPanel({ theme, regions }) {
               {(() => {
                 const boss = bossFor(region)
                 if (!boss || boss.team.length === 0) return null
+                return renderBossTeam(region, boss.name, boss.team)
+              })()}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Elite Four + Champion — level inputs per member, same override table
+          as the gym leaders above (boss_level_balance, keyed by member name).
+          They sit OUTSIDE the per-map loop because the Elite Four is not a
+          map: it is one gauntlet fought after map 8, so rendering it per map
+          would repeat the same eight inputs on every map tab and imply a
+          per-map override that does not exist.
+
+          The champion's starter-counter ace (Kanto's Blue) is NOT listed: it
+          is chosen from the player's starter at battle time, so there is no
+          single species to show here. EliteFour.jsx appends it before
+          applying overrides, so it occupies the slot after the authored team
+          and stays untuned unless a row is written for that slot directly. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+        {regions.map((region, idx) => {
+          const config = getRegionConfig(region)
+          const members = config?.eliteFour ?? []
+          if (members.length === 0) return null
+          return (
+            <div
+              key={region}
+              style={{
+                display: 'flex', flexDirection: 'column', gap: '8px',
+                ...(idx > 0 ? { borderTop: panelBorder, paddingTop: '12px' } : null),
+              }}
+            >
+              <span style={{
+                fontFamily: 'Orange Kid', fontSize: '14px', color: textColor,
+              }}>
+                {region} Elite Four
+              </span>
+              {members.map(member => {
+                const team = config?.eliteFourTeams?.[member.name] ?? []
+                if (team.length === 0) return null
                 return (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', flexWrap: 'wrap',
-                    // Wider than the 5px binding each mon's own parts together,
-                    // so a team reads as N groups rather than one long strip.
-                    gap: '14px',
-                    // No left inset: the leader-name column below matches the
-                    // band label's width, so both rows share one left edge.
-                  }}>
-                    <span style={{
-                      fontFamily: 'Orange Kid', fontSize: '12px', color: mutedColor,
-                      width: theme.labelWidth, flexShrink: 0,
-                    }}>
-                      {boss.name}
-                    </span>
-                    {boss.team.map((spec, slot) => {
-                      const bKey = `${region}:${boss.name}:${slot}`
-                      const value = bossLevelFor(region, boss.name, slot, spec.level)
-                      const tuned = Number(value) !== spec.level
-                      return (
-                        <span key={bKey} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <img
-                            src={SPRITE(spec.id)}
-                            alt=""
-                            style={{ width: '22px', height: '22px', imageRendering: 'pixelated' }}
-                          />
-                          <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor }}>
-                            {cachedName(spec.id) ?? `#${spec.id}`}
-                          </span>
-                          <input
-                            type="number" min={BOSS_LEVEL_MIN} max={BOSS_LEVEL_MAX} step={1}
-                            value={value}
-                            onChange={e => setBossDrafts(prev => ({ ...prev, [bKey]: e.target.value }))}
-                            onBlur={() => commitBossLevel(region, boss.name, slot, value)}
-                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                            style={{ ...numberInput, width: '46px' }}
-                          />
-                          {/* The authored level, shown only when overridden, so
-                              there is always a way back to shipped behaviour.
-                              Both this and the status below RENDER ONLY when
-                              they have something to say — reserving width for
-                              them left ~54px of dead space beside every
-                              untuned Pokémon, which is what pushed the teams
-                              apart. */}
-                          {tuned && (
-                            <span style={{
-                              fontFamily: 'Orange Kid', fontSize: '10px', color: mutedColor,
-                            }}>
-                              was {spec.level}
-                            </span>
-                          )}
-                          {status[bKey] && status[bKey] !== 'idle' && (
-                            <span style={{
-                              fontFamily: 'Orange Kid', fontSize: '10px',
-                              color: statusColor(status[bKey]),
-                            }}>
-                              {status[bKey] === 'saving' ? '…' : status[bKey] === 'saved' ? 'OK' : 'Err'}
-                            </span>
-                          )}
-                        </span>
-                      )
-                    })}
+                  <div key={member.name}>
+                    {renderBossTeam(region, member.name, team)}
                   </div>
                 )
-              })()}
+              })}
             </div>
           )
         })}

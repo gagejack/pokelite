@@ -63,3 +63,32 @@ describe('boss level overrides', () => {
     expect(clampBossLevel('42')).toBe(42)
   })
 })
+
+// ── Elite Four coverage ───────────────────────────────────────────────────
+// The Elite Four read their levels through this same table, keyed by member
+// name. They were originally wired to read config.eliteFourTeams RAW, which
+// made every gym leader tunable while the four hardest fights in a run were
+// not — these lock in that they go through applyBossLevels like any boss.
+describe('elite four level overrides', () => {
+  const ALDER = [
+    { id: 617, level: 77 }, { id: 626, level: 77 }, { id: 621, level: 78 },
+    { id: 584, level: 78 }, { id: 637, level: 80 },
+  ]
+
+  test('an override applies to an elite four member', () => {
+    __setBossCacheForTests({ 'Unova:Alder:4': 62 })
+    expect(applyBossLevels('Unova', 'Alder', ALDER).map(m => m.level))
+      .toEqual([77, 77, 78, 78, 62])
+  })
+
+  test('members are keyed independently of a gym leader of the same region', () => {
+    __setBossCacheForTests({ 'Unova:Drayden:0': 59 })
+    // Tuning the 8th gym must not leak into the champion's slot 0.
+    expect(applyBossLevels('Unova', 'Alder', ALDER)[0].level).toBe(77)
+  })
+
+  test('an untuned member returns the authored team unchanged', () => {
+    __setBossCacheForTests({ 'Unova:Shauntal:0': 60 })
+    expect(applyBossLevels('Unova', 'Alder', ALDER)).toBe(ALDER)
+  })
+})
