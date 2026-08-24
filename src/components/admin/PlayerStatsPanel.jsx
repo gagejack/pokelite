@@ -340,36 +340,47 @@ export default function PlayerStatsPanel({ theme }) {
         p_unknown_only: unknownOnly,
       }
 
-      // All five together — they are independent, and serialising them would
-      // multiply time-to-paint by five.
-      const [engagement, difficulty, depth, starters, economy, byRegion] = await Promise.all([
-        supabase.rpc('admin_player_engagement', base),
-        supabase.rpc('admin_player_difficulty', base),
-        supabase.rpc('admin_player_depth', base),
-        supabase.rpc('admin_player_starters', { ...base, p_starter_ids: STARTER_IDS }),
-        supabase.rpc('admin_player_economy', { ...base, p_legendary_ids: LEGENDARY_IDS }),
-        // Only in the "All regions" view. Picking a single region already
-        // scopes every panel above, so a breakdown there would just restate
-        // the same numbers under a second heading.
-        allRegions ? fetchByRegion(regions, base) : Promise.resolve([]),
-      ])
-      if (cancelled) return
+      try {
+        // All five together — they are independent, and serialising them would
+        // multiply time-to-paint by five.
+        const [engagement, difficulty, depth, starters, economy, byRegion] = await Promise.all([
+          supabase.rpc('admin_player_engagement', base),
+          supabase.rpc('admin_player_difficulty', base),
+          supabase.rpc('admin_player_depth', base),
+          supabase.rpc('admin_player_starters', { ...base, p_starter_ids: STARTER_IDS }),
+          supabase.rpc('admin_player_economy', { ...base, p_legendary_ids: LEGENDARY_IDS }),
+          // Only in the "All regions" view. Picking a single region already
+          // scopes every panel above, so a breakdown there would just restate
+          // the same numbers under a second heading.
+          allRegions ? fetchByRegion(regions, base) : Promise.resolve([]),
+        ])
+        if (cancelled) return
 
-      setErrors({
-        engagement: !!engagement.error,
-        difficulty: !!difficulty.error || !!depth.error,
-        starters: !!starters.error,
-        economy: !!economy.error,
-      })
-      setData({
-        engagement: toEngagement(engagement.data?.[0] ?? null),
-        difficulty: toDifficulty(difficulty.data?.[0] ?? null),
-        depth: toDepth(depth.data),
-        starters: toStarters(starters.data),
-        economy: toEconomy(economy.data?.[0] ?? null),
-        byRegion: toRegionBreakdown(byRegion),
-      })
-      setLoading(false)
+        setErrors({
+          engagement: !!engagement.error,
+          difficulty: !!difficulty.error || !!depth.error,
+          starters: !!starters.error,
+          economy: !!economy.error,
+        })
+        setData({
+          engagement: toEngagement(engagement.data?.[0] ?? null),
+          difficulty: toDifficulty(difficulty.data?.[0] ?? null),
+          depth: toDepth(depth.data),
+          starters: toStarters(starters.data),
+          economy: toEconomy(economy.data?.[0] ?? null),
+          byRegion: toRegionBreakdown(byRegion),
+        })
+      } catch (err) {
+        if (cancelled) return
+        // A thrown rejection (network failure, bad params) previously left every
+        // section stuck on "Loading..." forever, since setLoading(false) below
+        // never ran. Mark every section failed instead — same as if each RPC had
+        // resolved with .error, so the panel always leaves the loading state.
+        console.error('PlayerStatsPanel: stats fetch failed', err)
+        setErrors({ engagement: true, difficulty: true, starters: true, economy: true })
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     })()
     return () => { cancelled = true }
   }, [region, rangeKey, regions])

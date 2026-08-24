@@ -85,6 +85,7 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
     let cancelled = false
     setLoading(true)
     ;(async () => {
+     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (cancelled) return
       if (!user) { setLoggedIn(false); setLoading(false); return }
@@ -202,7 +203,16 @@ export default function Stats({ onClose, role = null, initialStatsTab = 'profile
         })
 
       setStats({ totalRuns, wins, losses, winRate, totalBadges, totalCatches, totalCashEarned, levelInfo, legendaries, shinies, winRosters, bestRun, topCaught, allCaught, favouriteStarter })
-      setLoading(false)
+     } catch (err) {
+      if (cancelled) return
+      // A thrown rejection (network failure, bad query) previously left this
+      // tab stuck on "Loading..." forever, since setLoading(false) below never
+      // ran. Fall back to logged-out-shaped empty state instead of hanging.
+      console.error('Stats: profile load failed', err)
+      setLoggedIn(false)
+     } finally {
+      if (!cancelled) setLoading(false)
+     }
     })()
     return () => { cancelled = true }
   }, [reloadKey])
