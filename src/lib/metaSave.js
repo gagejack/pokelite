@@ -158,6 +158,9 @@ export async function migrateMetaProfile(signedInUser) {
  *    same fact observed twice. safariUnlockedRegions is Safari Mode's own
  *    list, unioned the same way and independently of unlockedRegions — the
  *    two modes' unlocks never leak into each other, merge included.
+ *  - disabledUpgrades: INTERSECTION, not union — see migrateGuestProfile's
+ *    inline comment above its computation for why a toggle-off is treated as
+ *    a preference rather than progress.
  *  - safariFirstRegionClaimed: OR, not "prefer account". Safari grants its
  *    first region free exactly once per profile; if EITHER side already
  *    claimed it, the merged profile must stay claimed, or the merge itself
@@ -201,6 +204,14 @@ export function migrateGuestProfile(localProfile, accountProfile) {
   const unlockedRegions = union(accountProfile.unlockedRegions, localProfile.unlockedRegions)
   const safariUnlockedRegions = union(accountProfile.safariUnlockedRegions, localProfile.safariUnlockedRegions)
   const ownedUpgrades = union(accountProfile.ownedUpgrades, localProfile.ownedUpgrades)
+  // Intersection, not union: a toggle is a player PREFERENCE, not progress.
+  // Unioning would let an upgrade disabled on one device silently mute itself
+  // everywhere after merge; intersecting means it only stays off if the
+  // player turned it off on BOTH sides, which is the one case that's clearly
+  // intentional rather than a device-specific accident.
+  const disabledUpgrades = (accountProfile.disabledUpgrades ?? []).filter(id =>
+    (localProfile.disabledUpgrades ?? []).includes(id)
+  )
   const ownedSprites = union(accountProfile.ownedSprites, localProfile.ownedSprites)
   const usedStarters = union(accountProfile.usedStarters, localProfile.usedStarters)
 
@@ -216,6 +227,7 @@ export function migrateGuestProfile(localProfile, accountProfile) {
       accountProfile.safariFirstRegionClaimed || localProfile.safariFirstRegionClaimed
     ),
     ownedUpgrades,
+    disabledUpgrades,
     vitamins: mergeVitamins(accountProfile.vitamins, localProfile.vitamins),
     ownedSprites,
     equippedSprite: accountProfile.equippedSprite ?? localProfile.equippedSprite ?? null,

@@ -14,7 +14,7 @@ import { VERSION } from '../game/version'
 import { UPDATE_HISTORY } from '../game/updates'
 import { REGIONS } from '../game/regions/regionList'
 import { regionNames } from '../game/regionRegistry'
-import speedmonLogo from '../assets/SpeedmonLogoGradientBevel.png'
+import speedmonLogo from '../assets/images/SpeedmonLogoGradientBevel.png'
 import { supabase } from '../lib/supabase'
 import { getShopOverrides } from '../lib/metaShopBalance.js'
 // The shop pulls in the full trainer-sprite glob (import.meta.glob across all

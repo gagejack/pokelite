@@ -9,15 +9,13 @@ import bgNacrene from '../../assets/regions/Unova/MapAssets/Nacrene.png'
 import bgCastelia from '../../assets/regions/Unova/MapAssets/Castelia.png'
 import bgNimbasa from '../../assets/regions/Unova/MapAssets/Nimbasa.png'
 import bgDriftveil from '../../assets/regions/Unova/MapAssets/Driftveil.png'
-// Maps 6–8 have no authored Unova art yet, so they borrow Kanto's type-themed
-// backgrounds, matched to each map's gym-leader type by mood:
-//   Mistralton / Skyla  (flying) → Psychic — open, airy meadow
-//   Icirrus    / Brycen (ice)    → Water   — icy blue border
-//   Opelucid   / Drayden (dragon)→ Fire    — dramatic red volcanic finale
-// Swap these for Unova-native art when it exists.
-import bgFlying from '../../assets/regions/Kanto/Maps/Psychic.png'
-import bgIce from '../../assets/regions/Kanto/Maps/Water.png'
-import bgDragon from '../../assets/regions/Kanto/Maps/Fire.png'
+// Maps 6–8 have no authored Unova art yet, so they borrow Johto's type-themed
+// backgrounds — same gym-leader type as the Unova map they stand in for
+// (Mistralton/Skyla → flying, Icirrus/Brycen → ice, Opelucid/Drayden →
+// dragon). Swap these for Unova-native art when it exists.
+import bgFlying from '../../assets/regions/Unova/MapAssets/Flying.png'
+import bgIce from '../../assets/regions/Unova/MapAssets/Ice.png'
+import bgDragon from '../../assets/regions/Unova/MapAssets/Dragon.png'
 import grassIcon from '../../assets/regions/Unova/MapAssets/BW_Dark_Grass_Sp.png'
 
 // Gym badges — one per map (index 0–7), earned by beating that map's gym leader.

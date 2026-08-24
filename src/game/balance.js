@@ -109,7 +109,7 @@ export const BALANCE = deepFreeze({
 
   // ── XP / level rewards (component victory handlers) ──────────────────────
   progression: {
-    levelsGained: { grass: 1, default: 2, rival: 4, eliteFour: 2 },
+    levelsGained: { grass: 1, default: 2, rival: 4 },
   },
 
   // ── Speed Cash economy (NodeMap / EliteFour victory handlers, shop.js) ────

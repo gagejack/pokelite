@@ -3,27 +3,27 @@
 
 @font-face {
   font-family: 'Pixeled';
-  src: url('./assets/Pixeled.ttf') format('truetype');
+  src: url('./assets/fonts/Pixeled.ttf') format('truetype');
 }
 
 @font-face {
   font-family: 'Pokemon Classic';
-  src: url('./assets/Pokemon Classic.ttf') format('truetype');
+  src: url('./assets/fonts/Pokemon Classic.ttf') format('truetype');
 }
 
 @font-face {
   font-family: 'Orange Kid';
-  src: url('./assets/Orange Kid.otf') format('opentype');
+  src: url('./assets/fonts/Orange Kid.otf') format('opentype');
 }
 
 @font-face {
   font-family: 'Upheaval';
-  src: url('./assets/upheavtt.ttf') format('truetype');
+  src: url('./assets/fonts/upheavtt.ttf') format('truetype');
 }
 
 @font-face {
   font-family: 'Nebal';
-  src: url('./assets/Nebal.ttf') format('truetype');
+  src: url('./assets/fonts/Nebal.ttf') format('truetype');
 }
 
 /* Type/move chips. The one non-pixel face in the app: the chip labels are read
@@ -76,7 +76,7 @@
    caps bring grows the chip rather than clipping the word. */
 @font-face {
   font-family: 'Mona Sans';
-  src: url('./assets/MonaSans-VariableFont_wdth,wght.ttf') format('truetype-variations');
+  src: url('./assets/fonts/MonaSans-VariableFont_wdth,wght.ttf') format('truetype-variations');
   font-weight: 200 900;
   font-stretch: 75% 125%;
   font-style: normal;

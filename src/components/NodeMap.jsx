@@ -37,8 +37,8 @@ import { swapInRoster } from '../game/roster.js'
 // The mystery-node icon. (Renamed from the original "?.png" — a literal "?" in
 // a filename can't be imported, since "?" is the query separator in a specifier.)
 import mysteryIcon from '../assets/Icons/mysteryIcon2.png'
-import pokecenterIcon from '../assets/pokecenter.png'
-import pokemartIcon from '../assets/pokemart.png'
+import pokecenterIcon from '../assets/images/pokecenter.png'
+import pokemartIcon from '../assets/images/pokemart.png'
 import megaEvoIcon from '../assets/Icons/megaEvo2.png'
 
 let isTouchDevice = false

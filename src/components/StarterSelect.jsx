@@ -16,7 +16,7 @@ export default function StarterSelect({ region, onBack, onSelectStarter, caughtS
 
   useEffect(() => {
     const LEVEL = 5
-    const ownsDejaVu = !!profile?.ownedUpgrades?.includes('deja_vu')
+    const ownsDejaVu = !!profile?.ownedUpgrades?.includes('deja_vu') && !profile?.disabledUpgrades?.includes('deja_vu')
     const { regionIds, dejaVuIds } = dejaVuOfferedIds(
       REGION_STARTERS[region.name], profile?.usedStarters, ownsDejaVu
     )

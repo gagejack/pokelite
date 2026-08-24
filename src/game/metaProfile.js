@@ -17,6 +17,7 @@
 // @property {string[]} safariUnlockedRegions - Safari Mode's own unlock list, separate from unlockedRegions
 // @property {boolean} safariFirstRegionClaimed - has the one free Safari region been claimed?
 // @property {string[]} ownedUpgrades       - catalog item ids owned
+// @property {string[]} disabledUpgrades    - owned catalog item ids the player has toggled off
 // @property {Object<string, Object<string, number>>} vitamins - speciesId -> stat -> count
 // @property {string[]} ownedSprites
 // @property {string|null} equippedSprite
@@ -58,6 +59,7 @@ export function createProfile() {
     safariUnlockedRegions: [],
     safariFirstRegionClaimed: false,
     ownedUpgrades: [],
+    disabledUpgrades: [],
     vitamins: {},
     ownedSprites: [],
     equippedSprite: null,
@@ -72,6 +74,15 @@ export function createProfile() {
 // Set does not without extra (de)serialization code in metaSave.js).
 function owns(profile, itemId) {
   return profile.ownedUpgrades.includes(itemId)
+}
+
+// Owned AND not toggled off. Purchase-time checks (already-owned rejection,
+// prerequisites like Starting Funds II requiring I) use `owns` above — a
+// toggled-off item is still owned, just inert — while every EFFECT
+// application (payouts, pricing) must use this instead so a disabled upgrade
+// stops doing anything without losing its "owned" status.
+function isActive(profile, itemId) {
+  return owns(profile, itemId) && !(profile.disabledUpgrades ?? []).includes(itemId)
 }
 
 // Rounding rule for every percentage-derived money amount in this module
@@ -144,13 +155,13 @@ export function runEndPayout(result, mapsCleared, profile, dexCount, eliteFourDe
   let metacash = BASE_WIN_PAYOUT
 
   // Percentage first, against the base alone.
-  if (owns(profile, 'dex_dividends')) {
+  if (isActive(profile, 'dex_dividends')) {
     const tiers = Math.floor(dexCount / DEX_DIVIDEND_SPECIES_STEP)
     metacash += metacash * (tiers * DEX_DIVIDEND_RATE)
   }
 
   // Flat bonus last, so the dividend never scales it.
-  if (owns(profile, 'win_streak') && newWinStreak > STREAK_THRESHOLD) {
+  if (isActive(profile, 'win_streak') && newWinStreak > STREAK_THRESHOLD) {
     const extraWins = newWinStreak - STREAK_THRESHOLD
     metacash += extraWins * STREAK_BONUS
   }
@@ -181,7 +192,7 @@ export function runEndPayout(result, mapsCleared, profile, dexCount, eliteFourDe
  */
 export function effectivePrice(item, profile, overrides = {}) {
   const basePrice = overrides[item.id] ?? item.cost
-  if (item.currency === 'metacash' && owns(profile, 'bargain_hunter')) {
+  if (item.currency === 'metacash' && isActive(profile, 'bargain_hunter')) {
     return roundMoney(basePrice * 0.85)
   }
   return basePrice
@@ -274,6 +285,28 @@ export function applyPurchase(profile, item, choice, overrides = {}) {
   }
 
   return { ok: true, profile: next }
+}
+
+/**
+ * Flip an owned upgrade's disabled state, returning a NEW profile — same
+ * mutate-nothing contract as applyPurchase. Only meaningful for owned,
+ * non-vitamin upgrades (vitamins and sprites have no shop toggle); calling
+ * this on an item that isn't owned is a no-op-with-reason rather than a
+ * silent state change, matching applyPurchase's rejection style.
+ *
+ * @param {MetaProfile} profile
+ * @param {string} itemId
+ * @returns {{ ok: boolean, profile: MetaProfile, reason?: string }}
+ */
+export function toggleUpgrade(profile, itemId) {
+  if (!owns(profile, itemId)) {
+    return { ok: false, profile, reason: 'Not owned' }
+  }
+  const disabled = profile.disabledUpgrades ?? []
+  const next = disabled.includes(itemId)
+    ? disabled.filter(id => id !== itemId)
+    : [...disabled, itemId]
+  return { ok: true, profile: { ...profile, disabledUpgrades: next } }
 }
 
 // Sum of vitamin purchases (any stat) for one starter, used by both the cap

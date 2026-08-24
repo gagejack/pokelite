@@ -103,8 +103,8 @@ export default function EliteFour({ region, character, starter, roster, setRoste
     if (!pendingBattle) return
     const { index } = pendingBattle
     if (battleWon) {
-      // Levels gained per battle; reorder happens on the next member's prep screen.
-      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: BALANCE.progression.levelsGained.eliteFour, fullHeal: false })
+      // No level gains vs Elite Four; reorder happens on the next member's prep screen.
+      const updatedRoster = await evo.applyVictory(finalPlayerTeam, { levelsGained: 0, fullHeal: false })
       onEarnCash?.(BALANCE.economy.payouts.eliteFour)
       setPendingBattle(null)
         onMemberDefeated?.()

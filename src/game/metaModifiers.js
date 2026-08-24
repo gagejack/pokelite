@@ -37,8 +37,13 @@ import { META_CATALOG_BY_ID } from './metaCatalog.js'
 
 // ── modifiersFor: pure profile → overlay ────────────────────────────────────
 
+// Owned AND not toggled off in the shop. Every check below gates a gameplay
+// EFFECT (not a purchase-time ownership fact — see metaProfile.js's own
+// isActive for that distinction), so a disabled upgrade must read as
+// unowned here even though profile.ownedUpgrades still contains its id.
 function owns(profile, itemId) {
-  return !!profile?.ownedUpgrades?.includes(itemId)
+  if (!profile?.ownedUpgrades?.includes(itemId)) return false
+  return !(profile.disabledUpgrades ?? []).includes(itemId)
 }
 
 // Deep-merge `overrides` onto `base`, returning a NEW object at every level

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
 import { METACASH_ITEMS, KEY_ITEMS, metaIconUrl } from '../game/metaCatalog.js'
-import { applyPurchase, effectivePrice } from '../game/metaProfile.js'
+import { applyPurchase, effectivePrice, toggleUpgrade } from '../game/metaProfile.js'
 import { rowState, rowPrice, starterPickerRows } from '../game/metaShopUi.js'
 import { spritesForRegion, SPRITE_REGIONS } from '../game/spriteIndex.js'
 import { dailyOffers } from '../game/spriteRotation.js'
@@ -35,9 +35,10 @@ function formatCountdown(ms) {
 
 // One row in the Upgrades list. Shared styling for both metacash and key
 // items — the only difference is what `onBuy` does with the choice.
-function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
+function UpgradeRow({ item, profile, overrides, dark, onBuy, onToggle }) {
   const state = rowState(profile, item, overrides)
   const price = rowPrice(profile, item, overrides)
+  const disabled = (profile?.disabledUpgrades ?? []).includes(item.id)
   const textColor = dark ? '#DBDBDB' : '#333333'
   const mutedColor = muted(dark)
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -95,7 +96,26 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy }) {
           </span>
         )}
         {state === 'owned' ? (
-          <span style={{ fontFamily: 'Upheaval', fontSize: '13px', color: mutedColor }}>OWNED</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!disabled}
+            aria-label={`${item.name} ${disabled ? 'disabled' : 'enabled'}`}
+            onClick={() => onToggle(item)}
+            className="hover:opacity-80 transition-opacity"
+            style={{
+              width: '40px', height: '22px', borderRadius: '11px',
+              border: borderStyle, padding: '2px',
+              backgroundColor: disabled ? (dark ? '#444' : '#999') : '#7c3aed',
+              cursor: 'pointer', flexShrink: 0,
+              display: 'flex', justifyContent: disabled ? 'flex-start' : 'flex-end',
+            }}
+          >
+            <span style={{
+              width: '16px', height: '16px', borderRadius: '50%',
+              backgroundColor: '#fff', display: 'block',
+            }} />
+          </button>
         ) : (
           <button
             type="button"
@@ -209,7 +229,7 @@ function StarterPicker({ item, profile, dark, error, onConfirm, onCancel }) {
   )
 }
 
-function UpgradesTab({ profile, overrides, dark, onBuy }) {
+function UpgradesTab({ profile, overrides, dark, onBuy, onToggle }) {
   const mutedColor = muted(dark)
   const sorted = items => [...items].sort((a, b) => a.cost - b.cost)
   const metacashItems = sorted(METACASH_ITEMS)
@@ -218,7 +238,7 @@ function UpgradesTab({ profile, overrides, dark, onBuy }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {metacashItems.map(item => (
-        <UpgradeRow key={item.id} item={item} profile={profile} overrides={overrides} dark={dark} onBuy={onBuy} />
+        <UpgradeRow key={item.id} item={item} profile={profile} overrides={overrides} dark={dark} onBuy={onBuy} onToggle={onToggle} />
       ))}
       <div style={{
         padding: '10px 12px', textAlign: 'center',
@@ -228,7 +248,7 @@ function UpgradesTab({ profile, overrides, dark, onBuy }) {
         KEY ITEMS
       </div>
       {keyItems.map(item => (
-        <UpgradeRow key={item.id} item={item} profile={profile} overrides={overrides} dark={dark} onBuy={onBuy} />
+        <UpgradeRow key={item.id} item={item} profile={profile} overrides={overrides} dark={dark} onBuy={onBuy} onToggle={onToggle} />
       ))}
     </div>
   )
@@ -526,6 +546,18 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
     runPurchase(result.profile)
   }
 
+  // Owned-upgrade toggle (where Buy used to sit once owned). Same runPurchase
+  // pipe as a purchase — it's just another profile write — so save/notice
+  // handling doesn't need a second copy.
+  function handleToggleUpgrade(item) {
+    const result = toggleUpgrade(profile, item.id)
+    if (!result.ok) {
+      setNotice(result.reason)
+      return
+    }
+    runPurchase(result.profile)
+  }
+
   // Only closes the picker on success. On failure the picker stays open and
   // shows the reason inline (vitaminError, not the shop-wide `notice` banner
   // — that banner renders behind the modal we just opened, so a player would
@@ -650,7 +682,7 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {tab === 'upgrades' ? (
-            <UpgradesTab profile={profile} overrides={overrides} dark={dark} onBuy={handleBuyUpgrade} />
+            <UpgradesTab profile={profile} overrides={overrides} dark={dark} onBuy={handleBuyUpgrade} onToggle={handleToggleUpgrade} />
           ) : (
             <CosmeticsTab profile={profile} dark={dark} overrides={overrides} onBuy={handleBuySprite} onEquip={handleEquipSprite} />
           )}

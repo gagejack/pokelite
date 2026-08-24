@@ -62,11 +62,24 @@ test('an unaffordable item renders a disabled Buy button and does not call onPur
   expect(called).toBe(false)
 })
 
-test('an owned item shows OWNED instead of a Buy button', () => {
+test('an owned item shows an enabled toggle switch instead of a Buy button', () => {
   const profile = { ...createProfile(), metacash: 1000, ownedUpgrades: ['side_hustle'] }
   show({ profile })
   const row = screen.getByText('Side Hustle').closest('div').parentElement
-  expect(row.textContent).toContain('OWNED')
+  const toggle = row.querySelector('button[role="switch"]')
+  expect(toggle).toBeTruthy()
+  expect(toggle.getAttribute('aria-checked')).toBe('true')
+  expect(row.textContent).not.toContain('Buy')
+})
+
+test('clicking an owned item\'s toggle disables it and calls onPurchase with disabledUpgrades set', () => {
+  const profile = { ...createProfile(), metacash: 1000, ownedUpgrades: ['side_hustle'] }
+  let captured = null
+  show({ profile, onPurchase: p => { captured = p } })
+  const row = screen.getByText('Side Hustle').closest('div').parentElement
+  const toggle = row.querySelector('button[role="switch"]')
+  fireEvent.click(toggle)
+  expect(captured.disabledUpgrades).toContain('side_hustle')
 })
 
 test('Starting Funds II shows the locked-by-prerequisite copy instead of a price', () => {

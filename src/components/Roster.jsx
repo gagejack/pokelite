@@ -248,8 +248,23 @@ export default function Roster({ roster, horizontal = false, fullWidth = false, 
   // up somewhere in layout, and partySize of those add back into a rail a
   // pixel or two longer than the map. Flooring spends at most one px per slot
   // to guarantee the rail never crosses the map's bottom edge.
+  //
+  // MIN_SLOT_H is the floor, and it is not arbitrary: a slot's name (12px line
+  // box), LVL line (15px), HP rule (4px + 2px lead), its own 3px top padding
+  // and the gaps between its children are all incompressible, and a held item
+  // adds a badge that cannot usefully go below ~10px. Below their sum the slot
+  // is being asked to render more than it has room for, and since it clips with
+  // overflow:hidden the surplus silently disappeared off the bottom edge —
+  // which is exactly the cut-off the rail was showing on short windows.
+  //
+  // Honouring the floor means a very short window gets a rail that runs PAST
+  // the map's bottom rather than one full of clipped slots. That is the right
+  // trade: the rail is the party, and a party you cannot read is worse than a
+  // rail that outruns its neighbour. The rail already declines to stretch
+  // upward on tall monitors (the 92px cap above) for the same reason.
+  const MIN_SLOT_H = 64
   const slotH = mapH > 0
-    ? Math.min(92, Math.max(1, Math.floor((mapH - railOverhead) / partySize)))
+    ? Math.min(92, Math.max(MIN_SLOT_H, Math.floor((mapH - railOverhead) / partySize)))
     : 92
   // Slot internals scale against the authored 92px slot. Capped at 1 so a tall
   // monitor leaves the authored design alone rather than inflating the art.
@@ -548,14 +563,34 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
   const HP_H = Math.max(4, Math.round(5 * k))
   const slotPadY = Math.round(5 * k)
   const slotGap = Math.round(3 * k)
-  // Three gaps between the four children. Dropping the one above the HP
-  // wrapper looks reclaimable (it is pushed down by marginTop:auto and has its
-  // own paddingTop) but measures as a real -2.5px deficit, which is exactly the
-  // condition that crushes the name. The sprite gives up ~3px instead.
+  // Everything in the column that is NOT the sprite or the held-item badge.
+  // Three gaps between the four always-present children. Dropping the one above
+  // the HP wrapper looks reclaimable (it is pushed down by marginTop:auto and
+  // has its own paddingTop) but measures as a real -2.5px deficit, which is
+  // exactly the condition that crushes the name. The sprite gives up ~3px.
   const textBlock = NAME_LINE + LVL_LINE + HP_H + Math.round(4 * k) + slotPadY + slotGap * 3
-  const spritePx = slotH != null
-    ? Math.max(20, Math.min(Math.round(48 * k), Math.floor(slotH - textBlock)))
-    : Math.round(48 * k)
+  // A held item used to render a FIFTH child in this column — a badge below LVL
+  // — that the height budget never reserved. Since the slot is overflow:hidden
+  // at a fixed height and every element above the badge is flexShrink:0, the
+  // surplus was clipped straight off the bottom: the badge and the HP rule
+  // under it simply were not drawn.
+  //
+  // Reserving the badge as a row fixes the clipping but spends the wrong
+  // resource. The column's whole budget is ~39px at the authored slot height,
+  // and a stacked badge takes 24 of it, leaving the Pokémon a 15px smudge —
+  // the item ends up louder than the creature holding it. So the badge does not
+  // sit in the column at all: it pins to the sprite's corner, the way the FNT
+  // flag already does, and costs the stack no height. It stays visible, stays
+  // draggable, and annotates the sprite instead of displacing it.
+  const BADGE_PX = 10
+  const spriteMax = Math.round(48 * k)
+  // The sprite is the only flexible child, so it takes the entire remainder.
+  const flexBudget = slotH != null ? Math.max(0, Math.floor(slotH - textBlock)) : spriteMax
+  // Never above the authored size, and no floor of its own: the rail's
+  // MIN_SLOT_H already guarantees a workable budget here, and a floor applied
+  // past that point would push the column back over its fixed height and
+  // re-introduce the clipping this all exists to prevent.
+  const spritePx = Math.max(0, Math.min(spriteMax, flexBudget))
   const spriteSize = horizontal ? '34px' : `${spritePx}px`
 
   return (
@@ -669,13 +704,24 @@ function PokemonSlot({ pokemon, dark, borderStyle, textColor, mutedColor, horizo
             cursor: isHeldItemLocked(pokemon) ? 'default' : 'grab',
             display: 'flex',
             flexShrink: 0,
+            // Desktop pins the badge to the slot's bottom-left, clear of the HP
+            // rule, rather than stacking it in the column — see the budget note
+            // above. It carries the slot's own background so it stays legible
+            // over the sprite without the FNT flag's text ring.
+            ...(horizontal ? null : {
+              position: 'absolute',
+              left: '2px',
+              bottom: `${Math.round(4 * k) + HP_H + 2}px`,
+              backgroundColor: dark ? '#1a1a1a' : '#c8c8c8',
+              zIndex: 1,
+            }),
           }}
         >
           <img
             src={itemIconUrl(pokemon.heldItem)}
             alt={pokemon.heldItem.name}
             style={{
-              width: horizontal ? '14px' : ks(18), height: horizontal ? '14px' : ks(18),
+              width: horizontal ? '14px' : `${BADGE_PX}px`, height: horizontal ? '14px' : `${BADGE_PX}px`,
               imageRendering: 'pixelated', pointerEvents: 'none',
             }}
           />

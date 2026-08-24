@@ -20,8 +20,8 @@ import { defeatVerdict } from '../game/runVerdict.js'
 import { getBattleSkin } from './battleSkins/index.js'
 import { playSound, playSoundUrl, stopMoveSfx } from '../lib/sound.js'
 import { getMoveSound } from '../game/moveSounds.js'
-import battleGrass from '../assets/battleGrass.png'
-import DayBattleBackground from '../assets/DayBattleBackground.png'
+import battleGrass from '../assets/images/battleGrass.png'
+import DayBattleBackground from '../assets/images/DayBattleBackground.png'
 import { TYPE_COLORS } from '../game/types.js'
 
 const PROJECTILE_MS = 400
