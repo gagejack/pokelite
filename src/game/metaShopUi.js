@@ -1,47 +1,33 @@
 // Pure view-model helpers for MetaShop.jsx (Task 9, spec §6c) — extracted so
-// the four-state row logic and the vitamin starter-picker's eligibility rules
-// are unit-testable without mounting the component.
+// the four-state row logic and the vitamin picker's eligibility rules are
+// unit-testable without mounting the component.
 //
-// Imports metaCatalog.js/metaProfile.js/starters.js (all closed, data-only or
+// Imports metaCatalog.js/metaProfile.js (both closed, data-only or
 // pure-function modules) but no React and no DOM, so this stays testable in
 // a plain `vitest run` process the same way metaProfile.js is.
 
 import { canAfford, effectivePrice, totalVitamins } from './metaProfile.js'
-import { VITAMIN_CAP_PER_STARTER } from './metaCatalog.js'
-import { REGION_STARTERS } from './starters.js'
+import { VITAMIN_CAP_PER_SPECIES } from './metaCatalog.js'
 
-// Which starters is `profile` allowed to spend a vitamin on? Spec: "a grid of
-// the player's UNLOCKED starters" — derived from unlockedRegions the same way
-// Déjà Vu (Task 7) derives its offer list from usedStarters, i.e. by reading
-// REGION_STARTERS keyed off which regions the profile has bought into, NOT
-// off usedStarters (a player can unlock a region and never have run it yet,
-// and should still be able to pre-invest a vitamin the moment they can afford
-// one — nothing here requires a starter to have been played).
-//
-// @param {MetaProfile} profile
-// @returns {number[]} species ids, in REGION_STARTERS' own per-region order,
-//   regions in SPRITE_REGIONS-independent REGION_STARTERS key order.
-export function unlockedStarterIds(profile) {
-  const unlocked = profile?.unlockedRegions ?? []
-  const ids = []
-  for (const region of Object.keys(REGION_STARTERS)) {
-    if (!unlocked.includes(region)) continue
-    ids.push(...REGION_STARTERS[region])
-  }
-  return ids
-}
-
-// One row of the vitamin starter picker: species id, current vitamin total
+// One row of the vitamin species picker: species id, current vitamin total
 // (any stat mix, spec §3), and whether it's still purchasable (under the
-// 3-per-starter cap). The picker grid renders directly off this array rather
+// 3-per-species cap). The picker grid renders directly off this array rather
 // than re-deriving cap math itself.
 //
+// Vitamins target any caught/seen species, not just a starter (spec change:
+// the picker used to be scoped to unlockedStarterIds, derived internally from
+// profile.unlockedRegions). That scoping now lives in MetaShop.jsx, which
+// already fetches the account's caught/seen sets for the Pokédex-style picker
+// — this module stays a pure leaf (no Supabase) and just takes the resulting
+// species id list as `speciesIds`, same as any other caller-supplied data.
+//
 // @param {MetaProfile} profile
+// @param {number[]} speciesIds - species the player may target (caught/seen)
 // @returns {{ speciesId: number, count: number, atCap: boolean }[]}
-export function starterPickerRows(profile) {
-  return unlockedStarterIds(profile).map(speciesId => {
+export function vitaminPickerRows(profile, speciesIds) {
+  return speciesIds.map(speciesId => {
     const count = totalVitamins(profile, speciesId)
-    return { speciesId, count, atCap: count >= VITAMIN_CAP_PER_STARTER }
+    return { speciesId, count, atCap: count >= VITAMIN_CAP_PER_SPECIES }
   })
 }
 

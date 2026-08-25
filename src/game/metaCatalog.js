@@ -38,11 +38,11 @@ export const VITAMIN_STAT = {
   carbos: 'speed',
 }
 
-// Cap on vitamin purchases per starter, summed across all six stats (spec §3).
-// Forces a build identity (fast OR bulky, not both) rather than gating each
-// stat separately, which would just let every starter max every stat given
-// enough runs.
-export const VITAMIN_CAP_PER_STARTER = 3
+// Cap on vitamin purchases per species, summed across all six stats (spec
+// §3). Forces a build identity (fast OR bulky, not both) rather than gating
+// each stat separately, which would just let every species max every stat
+// given enough runs.
+export const VITAMIN_CAP_PER_SPECIES = 3
 
 // ── The 20 metacash upgrades (spec §2) ──────────────────────────────────────
 // Order matches the spec table; the shop UI sorts cheapest-first itself, so
@@ -72,7 +72,7 @@ export const METACASH_ITEMS = [
     name: 'HP Up',
     cost: 500,
     currency: 'metacash',
-    description: '+5% HP for one chosen starter',
+    description: '+5% HP for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.hp_up, amount: 0.05 },
   },
   {
@@ -81,7 +81,7 @@ export const METACASH_ITEMS = [
     name: 'Protein',
     cost: 500,
     currency: 'metacash',
-    description: '+5% Attack for one chosen starter',
+    description: '+5% Attack for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.protein, amount: 0.05 },
   },
   {
@@ -90,7 +90,7 @@ export const METACASH_ITEMS = [
     name: 'Iron',
     cost: 500,
     currency: 'metacash',
-    description: '+5% Defense for one chosen starter',
+    description: '+5% Defense for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.iron, amount: 0.05 },
   },
   {
@@ -99,7 +99,7 @@ export const METACASH_ITEMS = [
     name: 'Calcium',
     cost: 500,
     currency: 'metacash',
-    description: '+5% SpAtk for one chosen starter',
+    description: '+5% SpAtk for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.calcium, amount: 0.05 },
   },
   {
@@ -108,7 +108,7 @@ export const METACASH_ITEMS = [
     name: 'Zinc',
     cost: 500,
     currency: 'metacash',
-    description: '+5% SpDef for one chosen starter',
+    description: '+5% SpDef for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.zinc, amount: 0.05 },
   },
   {
@@ -117,7 +117,7 @@ export const METACASH_ITEMS = [
     name: 'Carbos',
     cost: 500,
     currency: 'metacash',
-    description: '+5% Speed for one chosen starter',
+    description: '+5% Speed for one chosen Pokémon',
     effect: { type: 'vitamin', stat: VITAMIN_STAT.carbos, amount: 0.05 },
   },
   {

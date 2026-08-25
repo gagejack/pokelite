@@ -27,6 +27,7 @@ export default function Pokedex({ onClose }) {
   const { dark } = useTheme()
   const isDesktop = useIsDesktop()
   const [selectedGen, setSelectedGen] = useState('Gen 1')
+  const [search, setSearch] = useState('')
   const [pokemon, setPokemon] = useState([])
   const [loadingPokemon, setLoadingPokemon] = useState(false)
   const [caughtSet, setCaughtSet] = useState(() => new Set())
@@ -146,6 +147,18 @@ export default function Pokedex({ onClose }) {
   const genPct = Math.round((genCaught / genRange.limit) * 100)
   const allPct = Math.round((activeCaught.size / GEN_RANGES['All'].limit) * 100)
 
+  // Name search only matches SEEN species — an unseen entry renders as "???"
+  // and a name match would leak its identity through search. A numeric query
+  // still finds an unseen dex number, since the number is already on screen.
+  const query = search.trim().toLowerCase()
+  const visiblePokemon = query
+    ? pokemon.filter(p => {
+        const idMatch = String(p.id).padStart(3, '0').includes(query.replace(/^#/, ''))
+        const nameMatch = activeSeen.has(p.id) && p.name.toLowerCase().includes(query)
+        return idMatch || nameMatch
+      })
+    : pokemon
+
   return (
     <div
       className="fixed inset-0 z-60 flex items-center justify-center"
@@ -215,6 +228,24 @@ export default function Pokedex({ onClose }) {
             >
               Shiny
             </button>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search name or #"
+              className="py-1 px-3"
+              style={{
+                fontFamily: 'Upheaval',
+                fontSize: '12px',
+                color: dark ? '#DBDBDB' : '#333333',
+                backgroundColor: dark ? '#2e2e2e' : '#DBDBDB',
+                border: dark ? '2px solid #121212' : '2px solid #2e2e2e',
+                boxShadow: dark ? '-2.5px 4.3px 0 0 #121212' : '-2.5px 4.3px 0 0 #2e2e2e',
+                outline: 'none',
+                minWidth: '140px',
+                flex: isDesktop ? '0 1 180px' : '1 1 100%',
+              }}
+            />
           </div>
 
           <div className="flex flex-col gap-3">
@@ -248,9 +279,13 @@ export default function Pokedex({ onClose }) {
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: dark ? '#DBDBDB' : '#333333' }}>Loading...</span>
             </div>
+          ) : visiblePokemon.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <span style={{ fontFamily: 'Upheaval', fontSize: '14px', color: muted(dark) }}>No Pokémon match "{search.trim()}"</span>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(6, 1fr)' : 'repeat(3, 1fr)', gap: isDesktop ? '10px' : '6px' }}>
-              {pokemon.map(p => {
+              {visiblePokemon.map(p => {
                 const caught = activeCaught.has(p.id)
                 const seen = activeSeen.has(p.id)
                 const champion = championSet.has(p.id)

@@ -81,13 +81,28 @@ test('a run with a profile owning zero vitamins reproduces the exact no-run-acti
   expect(withEmptyProfile.stats).toEqual(unboosted.stats)
 })
 
-test('non-starter instances are unaffected by an active run with vitamins for that same species', () => {
-  setActiveRunModifiers(profileWithVitamins(4, { attack: 3, speed: 3 }))
+test('a non-starter with no vitamins for its species is unaffected (flat 1x floor, not starterBoost)', () => {
+  setActiveRunModifiers(createProfile())
   const wild = buildPokemonInstance(CHARMANDER, 5, false)
   expect(wild.stats.attack).toBe(calcStat(CHARMANDER.baseStats.attack, 5))
   expect(wild.stats.speed).toBe(calcStat(CHARMANDER.baseStats.speed, 5))
   expect(wild._starterSpeciesId).toBeUndefined()
-  expect(wild._multipliers).toBeUndefined()
+})
+
+// ── Vitamins target any caught species, not just the run's starter ─────
+
+test('a wild catch DOES pick up vitamins bought for its species — a flat 1x floor, not the starter boost', () => {
+  setActiveRunModifiers(profileWithVitamins(4, { attack: 3, speed: 3 }))
+  const wild = buildPokemonInstance(CHARMANDER, 5, false)
+  expect(wild.stats.attack).toBe(Math.floor(calcStat(CHARMANDER.baseStats.attack, 5) * 1.15))
+  expect(wild.stats.speed).toBe(Math.floor(calcStat(CHARMANDER.baseStats.speed, 5) * 1.15))
+  // Untouched stat stays exactly flat — the floor is 1, not starterBoost.
+  expect(wild.stats.defense).toBe(calcStat(CHARMANDER.baseStats.defense, 5))
+  // Not a starter: no starterBoost floor, but it still carries a vitamin
+  // lookup key and resolved multipliers so levelUp/evolution keep them.
+  expect(wild._starterSpeciesId).toBeUndefined()
+  expect(wild._vitaminSpeciesId).toBe(4)
+  expect(wild._multipliers).toBeDefined()
 })
 
 // ── One vitamin raises exactly one stat ─────────────────────────────────
@@ -174,10 +189,23 @@ test('the evolved instance keeps looking itself up under the ORIGINAL species id
   expect(evolved.pokeId).toBe(5) // the instance IS Charmeleon now
 })
 
-test('evolving a non-starter (wild catch) is unaffected: no _multipliers, no _starterSpeciesId, flat stats', () => {
+test('evolving a non-starter with no vitamins for its species keeps flat stats: no starterBoost, no _starterSpeciesId', () => {
+  setActiveRunModifiers(createProfile())
   const wildCharmander = buildPokemonInstance(CHARMANDER, 16, false)
   const evolved = buildEvolvedInstance(wildCharmander, CHARMELEON, 16)
   expect(evolved.stats.attack).toBe(calcStat(CHARMELEON.baseStats.attack, 16))
+  expect(evolved._starterSpeciesId).toBeUndefined()
+})
+
+test('a vitamin bought for a wild catch survives its evolution — looked up under the ORIGINAL species id', () => {
+  // Same fix as the starter case above, generalized: a Rattata-shaped vitamin
+  // purchase must not evaporate the moment that specific Rattata becomes a
+  // Raticate, even though it was never the run's starter.
+  setActiveRunModifiers(profileWithVitamins(4, { attack: 3 }))
+  const wildCharmander = buildPokemonInstance(CHARMANDER, 16, false)
+  const evolved = buildEvolvedInstance(wildCharmander, CHARMELEON, 16)
+  expect(evolved.stats.attack).toBe(Math.floor(calcStat(CHARMELEON.baseStats.attack, 16) * 1.15))
+  expect(evolved._vitaminSpeciesId).toBe(4)
   expect(evolved._starterSpeciesId).toBeUndefined()
 })
 

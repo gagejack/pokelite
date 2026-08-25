@@ -1,45 +1,43 @@
 import { test, expect } from 'vitest'
-import { unlockedStarterIds, starterPickerRows, rowState, rowPrice } from './metaShopUi.js'
+import { vitaminPickerRows, rowState, rowPrice } from './metaShopUi.js'
 import { createProfile } from './metaProfile.js'
 import { META_CATALOG_BY_ID } from './metaCatalog.js'
 
-// ── unlockedStarterIds ──────────────────────────────────────────────────────
+// ── vitaminPickerRows ────────────────────────────────────────────────────────
+// Species scoping (which ids the picker offers) is MetaShop.jsx's job now —
+// it fetches the account's caught/seen ids and passes them straight through
+// as `speciesIds`. This module only owns the per-row cap math, so these tests
+// pass an explicit id list rather than deriving one from unlockedRegions.
 
-test('a fresh profile (Kanto only) offers exactly Kanto\'s three starters', () => {
+test('a species with no vitamins yet shows 0 and is not at cap', () => {
   const profile = createProfile()
-  expect(unlockedStarterIds(profile)).toEqual([1, 4, 7])
-})
-
-test('unlocking a second region adds its starters without dropping the first', () => {
-  const profile = { ...createProfile(), unlockedRegions: ['Kanto', 'Hoenn'] }
-  expect(unlockedStarterIds(profile)).toEqual([1, 4, 7, 252, 255, 258])
-})
-
-test('a null profile offers no starters rather than crashing', () => {
-  expect(unlockedStarterIds(null)).toEqual([])
-})
-
-// ── starterPickerRows ────────────────────────────────────────────────────────
-
-test('a starter with no vitamins yet shows 0 and is not at cap', () => {
-  const profile = createProfile()
-  const rows = starterPickerRows(profile)
+  const rows = vitaminPickerRows(profile, [1, 4, 7])
   const bulbasaur = rows.find(r => r.speciesId === 1)
   expect(bulbasaur).toEqual({ speciesId: 1, count: 0, atCap: false })
 })
 
-test('a starter with 3 vitamins (any stat mix) is at cap', () => {
+test('a species with 3 vitamins (any stat mix) is at cap', () => {
   const profile = { ...createProfile(), vitamins: { 1: { attack: 2, speed: 1 } } }
-  const rows = starterPickerRows(profile)
+  const rows = vitaminPickerRows(profile, [1, 4, 7])
   const bulbasaur = rows.find(r => r.speciesId === 1)
   expect(bulbasaur).toEqual({ speciesId: 1, count: 3, atCap: true })
 })
 
-test('a starter with 2 vitamins is pickable but not yet at cap', () => {
+test('a species with 2 vitamins is pickable but not yet at cap', () => {
   const profile = { ...createProfile(), vitamins: { 4: { hp: 2 } } }
-  const rows = starterPickerRows(profile)
+  const rows = vitaminPickerRows(profile, [1, 4, 7])
   const charmander = rows.find(r => r.speciesId === 4)
   expect(charmander).toEqual({ speciesId: 4, count: 2, atCap: false })
+})
+
+test('an empty species list produces an empty picker rather than crashing', () => {
+  expect(vitaminPickerRows(createProfile(), [])).toEqual([])
+})
+
+test('rows follow the order of the given speciesIds, not sorted or deduped', () => {
+  const profile = createProfile()
+  const rows = vitaminPickerRows(profile, [7, 1, 4])
+  expect(rows.map(r => r.speciesId)).toEqual([7, 1, 4])
 })
 
 // ── rowState ─────────────────────────────────────────────────────────────────

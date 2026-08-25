@@ -412,17 +412,23 @@ export function getActiveExtras() {
   return active?.extras ?? NEUTRAL_EXTRAS
 }
 
-// A starter species' per-stat multiplier for the active run: the effective
-// starterBoost on every stat, plus +0.05 per vitamin the active run's profile
-// holds for `speciesId` in that stat. With no run active (or a profile with
-// no vitamins for this species), every stat is just the stock starterBoost —
-// identical to today's plain scalar boost. pokemon.js calls this at instance-
-// build time instead of reading profile.vitamins itself, so it stays free of
-// any import on metaProfile.js/metaSave.js (the established seam: only this
-// module translates "what the player owns" into something gameplay reads).
+// A species' per-stat multiplier for the active run: `baseBoost` on every
+// stat, plus +0.05 per vitamin the active run's profile holds for `speciesId`
+// in that stat. Vitamins target any caught species now, not just the run's
+// starter (spec: "usable on any mon") — `baseBoost` is what tells them apart:
+// pokemon.js passes the effective starterBoost for the starter (so an
+// unvitamined starter reproduces the old plain scalar boost exactly) and 1
+// for everything else (so an unvitamined wild catch is untouched, and a
+// vitamined one gets +0.05 per vitamin on an otherwise-flat stat line). With
+// no run active (or a profile with no vitamins for this species), every stat
+// is just `baseBoost`. pokemon.js calls this at instance-build time instead
+// of reading profile.vitamins itself, so it stays free of any import on
+// metaProfile.js/metaSave.js (the established seam: only this module
+// translates "what the player owns" into something gameplay reads).
 //
 // @param {number} speciesId
+// @param {number} baseBoost - starterBoost for the run's starter, 1 otherwise
 // @returns {{ hp: number, attack: number, defense: number, spAtk: number, spDef: number, speed: number }}
-export function getVitaminMultipliers(speciesId) {
-  return vitaminMultipliers(active?.profile, speciesId, getEffectiveBalance().pokemon.starterBoost)
+export function getVitaminMultipliers(speciesId, baseBoost = 1) {
+  return vitaminMultipliers(active?.profile, speciesId, baseBoost)
 }

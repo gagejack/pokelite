@@ -1,28 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTheme } from '../lib/theme'
 import { muted, cash } from '../lib/colors'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { METACASH_ITEMS, KEY_ITEMS, metaIconUrl } from '../game/metaCatalog.js'
 import { applyPurchase, effectivePrice, toggleUpgrade } from '../game/metaProfile.js'
-import { rowState, rowPrice, starterPickerRows } from '../game/metaShopUi.js'
+import { rowState, rowPrice, vitaminPickerRows } from '../game/metaShopUi.js'
 import { spritesForRegion, SPRITE_REGIONS } from '../game/spriteIndex.js'
 import { dailyOffers } from '../game/spriteRotation.js'
 import { priceForDisplayName } from '../game/spriteTiers.js'
 import { SPRITE_TIER_PRICES } from '../game/metaCatalog.js'
 import { msUntilNextUtcDay } from '../game/dailyDerive.js'
 import { todayUtc } from '../lib/daily.js'
-import { SPRITE as STARTER_SPRITE } from '../game/regions/regionList'
-
-// Species -> display name for the vitamin picker's grid. A literal table
-// (same approach Stats.jsx already uses for STARTER_NAMES) rather than an
-// async PokeAPI fetch — this is a small fixed set of 12 ids and the picker
-// must never show a blank name while a request is in flight.
-const STARTER_NAMES = {
-  1: 'Bulbasaur', 4: 'Charmander', 7: 'Squirtle',
-  152: 'Chikorita', 155: 'Cyndaquil', 158: 'Totodile',
-  252: 'Treecko', 255: 'Torchic', 258: 'Mudkip',
-  387: 'Turtwig', 390: 'Chimchar', 393: 'Piplup',
-  495: 'Snivy', 498: 'Tepig', 501: 'Oshawott',
-}
+import { fetchPokemonBase } from '../game/pokemon.js'
+import { supabase } from '../lib/supabase'
 
 // Countdown formatted the same way the daily challenge already does: hours +
 // minutes, no seconds (spec §6c: "New stock in 4h 12m").
@@ -137,19 +127,42 @@ function UpgradeRow({ item, profile, overrides, dark, onBuy, onToggle }) {
   )
 }
 
-// The starter picker modal, opened when Buy is clicked on a vitamin row.
-// Grid of the player's unlocked starters; starters at the 3-vitamin cap are
-// dimmed and unselectable (spec §6c). Confirming applies the purchase and
-// closes the picker on success — the only two-step purchase in the shop. On
-// failure (an applyPurchase rejection reached from this flow — at-cap
-// starters are already disabled, so this is defence-in-depth, not the normal
-// path) the picker stays open and shows `error` instead of silently closing.
-function StarterPicker({ item, profile, dark, error, onConfirm, onCancel }) {
-  const rows = starterPickerRows(profile)
+// The vitamin picker modal, opened when Buy is clicked on a vitamin row.
+// Confirming applies the purchase and closes the picker on success — the
+// only two-step purchase in the shop. On failure (an applyPurchase rejection
+// reached from this flow — at-cap species are already disabled, so this is
+// defence-in-depth, not the normal path) the picker stays open and shows
+// `error` instead of silently closing.
+//
+// Sprite URL for any species id — same raw-PokeAPI convention Pokedex.jsx
+// draws its grid from. Synchronous (no fetch needed to know the URL), so the
+// picker's grid never waits on a request before it can paint an image.
+const dexSpriteUrl = speciesId => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${speciesId}.png`
+
+// Vitamins target any species the player has caught or seen (not just a
+// starter, spec change) — a grid that can run to dozens of entries instead of
+// a fixed 12, so this borrows the Pokédex's own shape (search bar, scrolling
+// grid, responsive sizing) rather than the old fixed-size 3-column popup.
+// `speciesIds` is the caught/seen id list MetaShop already fetched;
+// `namesById` fills in as fetchPokemonBase resolves each one (see MetaShop's
+// effect below) — a still-loading name falls back to the dex number so the
+// grid never waits on a request before it can paint.
+function VitaminPicker({ item, profile, speciesIds, namesById, dark, isDesktop, error, onConfirm, onCancel }) {
+  const [search, setSearch] = useState('')
+  const rows = vitaminPickerRows(profile, speciesIds)
   const textColor = dark ? '#DBDBDB' : '#333333'
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const cellBg = dark ? '#1a1a1a' : '#c8c8c8'
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
+
+  const query = search.trim().toLowerCase()
+  const visibleRows = query
+    ? rows.filter(({ speciesId }) => {
+        const name = namesById[speciesId]
+        return String(speciesId).padStart(3, '0').includes(query.replace(/^#/, ''))
+          || (name && name.toLowerCase().includes(query))
+      })
+    : rows
 
   return (
     <div
@@ -166,52 +179,74 @@ function StarterPicker({ item, profile, dark, error, onConfirm, onCancel }) {
         style={{
           backgroundColor: cardBg, border: borderStyle,
           boxShadow: dark ? '-4px 6px 0 0 #121212' : '-4px 6px 0 0 #2e2e2e',
-          padding: '16px', width: '100%', maxWidth: '420px',
+          padding: '16px', width: '100%', maxWidth: isDesktop ? '560px' : '420px',
+          maxHeight: '80vh',
           display: 'flex', flexDirection: 'column', gap: '12px',
         }}
       >
         <span style={{ fontFamily: 'Upheaval', fontSize: '16px', color: textColor }}>
-          Choose a starter for {item.name}
+          Choose a Pokémon for {item.name}
         </span>
         {rows.length === 0 && (
           <span style={{ fontFamily: 'Orange Kid', fontSize: '14px', color: muted(dark) }}>
-            No starters unlocked yet.
+            Catch or encounter a Pokémon in a run before spending a vitamin on it.
           </span>
+        )}
+        {rows.length > 0 && (
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name or #"
+            style={{
+              fontFamily: 'Upheaval', fontSize: '12px', color: textColor,
+              backgroundColor: cellBg, border: borderStyle,
+              padding: '8px 10px', outline: 'none',
+            }}
+          />
         )}
         {error && (
           <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: '#f87171' }}>
             {error}
           </span>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-          {rows.map(({ speciesId, count, atCap }) => (
-            <button
-              key={speciesId}
-              type="button"
-              disabled={atCap}
-              onClick={() => onConfirm(speciesId)}
-              className="disabled:cursor-not-allowed hover:opacity-80 transition-opacity disabled:hover:opacity-100"
-              style={{
-                backgroundColor: cellBg, border: borderStyle,
-                padding: '8px 4px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '4px',
-                opacity: atCap ? 0.5 : 1,
-                cursor: atCap ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <img
-                src={STARTER_SPRITE(speciesId)}
-                alt={STARTER_NAMES[speciesId] ?? String(speciesId)}
-                style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }}
-              />
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textAlign: 'center' }}>
-                {STARTER_NAMES[speciesId] ?? speciesId}
-              </span>
-              <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: muted(dark) }}>
-                {count}/3
-              </span>
-            </button>
-          ))}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {rows.length > 0 && visibleRows.length === 0 ? (
+            <span style={{ fontFamily: 'Orange Kid', fontSize: '13px', color: muted(dark) }}>
+              No Pokémon match "{search.trim()}"
+            </span>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: '8px' }}>
+              {visibleRows.map(({ speciesId, count, atCap }) => (
+                <button
+                  key={speciesId}
+                  type="button"
+                  disabled={atCap}
+                  onClick={() => onConfirm(speciesId)}
+                  className="disabled:cursor-not-allowed hover:opacity-80 transition-opacity disabled:hover:opacity-100"
+                  style={{
+                    backgroundColor: cellBg, border: borderStyle,
+                    padding: '8px 4px', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: '4px',
+                    opacity: atCap ? 0.5 : 1,
+                    cursor: atCap ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <img
+                    src={dexSpriteUrl(speciesId)}
+                    alt={namesById[speciesId] ?? `#${speciesId}`}
+                    style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }}
+                  />
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: textColor, textAlign: 'center' }}>
+                    {namesById[speciesId] ?? `#${String(speciesId).padStart(3, '0')}`}
+                  </span>
+                  <span style={{ fontFamily: 'Orange Kid', fontSize: '12px', color: muted(dark) }}>
+                    {count}/3
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -483,10 +518,70 @@ function CosmeticsTab({ profile, dark, overrides, onBuy, onEquip }) {
 // in later is a no-op integration (constraint from the task brief).
 export default function MetaShop({ profile, onClose, onPurchase, overrides = {} }) {
   const { dark } = useTheme()
+  const isDesktop = useIsDesktop()
   const [tab, setTab] = useState('upgrades')
-  const [pendingVitamin, setPendingVitamin] = useState(null) // item awaiting a starter choice
+  const [pendingVitamin, setPendingVitamin] = useState(null) // item awaiting a Pokémon choice
   const [vitaminError, setVitaminError] = useState(null) // inline error inside the open picker
   const [notice, setNotice] = useState(null)
+  // Species the account has caught or seen across every saved run — the
+  // vitamin picker's pool (spec: "any mon", scoped to species the player has
+  // actually encountered rather than the full ~649-species dex). Same query
+  // shape Pokedex.jsx already runs; fetched here too rather than threaded
+  // down as a prop, since MetaShop is its own self-contained overlay the same
+  // way the Pokédex/Stats sheets are.
+  const [caughtSpeciesIds, setCaughtSpeciesIds] = useState([])
+  // speciesId -> display name, filled in as fetchPokemonBase resolves each id
+  // the vitamin picker needs. Starts empty; the picker falls back to the dex
+  // number for any id not yet resolved rather than blocking on a fetch.
+  const [vitaminNamesById, setVitaminNamesById] = useState({})
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from('runs')
+        .select('pokemon_caught_ids, pokemon_seen_ids')
+        .eq('user_id', user.id)
+      if (cancelled || error || !data) return
+      const ids = new Set()
+      data.forEach(row => {
+        (row.pokemon_caught_ids ?? []).forEach(id => ids.add(id))
+        ;(row.pokemon_seen_ids ?? []).forEach(id => ids.add(id))
+      })
+      setCaughtSpeciesIds([...ids].sort((a, b) => a - b))
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Resolve display names for the picker's species only when a vitamin item
+  // is actually being bought — not on mount, since most shop visits never
+  // open the picker and a name isn't needed until then. Skips ids already
+  // resolved from a previous open in this session.
+  useEffect(() => {
+    if (!pendingVitamin) return
+    let cancelled = false
+    const unresolved = caughtSpeciesIds.filter(id => !(id in vitaminNamesById))
+    if (unresolved.length === 0) return
+    ;(async () => {
+      const entries = await Promise.all(unresolved.map(async id => {
+        try {
+          const base = await fetchPokemonBase(id)
+          return [id, base.name]
+        } catch {
+          return [id, null]
+        }
+      }))
+      if (cancelled) return
+      setVitaminNamesById(prev => {
+        const next = { ...prev }
+        entries.forEach(([id, name]) => { if (name) next[id] = name })
+        return next
+      })
+    })()
+    return () => { cancelled = true }
+  }, [pendingVitamin, caughtSpeciesIds])
 
   const cardBg = dark ? '#2e2e2e' : '#DBDBDB'
   const borderStyle = dark ? '2px solid #121212' : '2px solid #2e2e2e'
@@ -561,7 +656,7 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
   // Only closes the picker on success. On failure the picker stays open and
   // shows the reason inline (vitaminError, not the shop-wide `notice` banner
   // — that banner renders behind the modal we just opened, so a player would
-  // see the picker vanish with no explanation). At-cap starters are already
+  // see the picker vanish with no explanation). At-cap species are already
   // `disabled` in the grid, so reaching the failure branch here means either
   // a stale `profile` prop or a race with another purchase — rare, but the
   // picker must not silently disappear either way.
@@ -690,10 +785,13 @@ export default function MetaShop({ profile, onClose, onPurchase, overrides = {} 
       </div>
 
       {pendingVitamin && (
-        <StarterPicker
+        <VitaminPicker
           item={pendingVitamin}
           profile={profile}
+          speciesIds={caughtSpeciesIds}
+          namesById={vitaminNamesById}
           dark={dark}
+          isDesktop={isDesktop}
           error={vitaminError}
           onConfirm={handleConfirmVitamin}
           onCancel={() => { setVitaminError(null); setPendingVitamin(null) }}

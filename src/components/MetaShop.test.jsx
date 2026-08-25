@@ -1,8 +1,26 @@
-import { test, expect, beforeAll } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { test, expect, beforeAll, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ThemeProvider } from '../lib/theme'
-import MetaShop from './MetaShop.jsx'
 import { createProfile } from '../game/metaProfile.js'
+
+// The vitamin picker now targets any caught/seen species (spec change), fetched
+// from the account's `runs` rows the same way Pokedex.jsx already does — see
+// metaSave.test.js/metaShopBalance.test.js for this mock's established shape.
+// A signed-in user with two runs recording Bulbasaur (1) and Charmander (4) as
+// caught, matching the profile fixtures below (fresh Kanto-only profile — these
+// two happen to also be Kanto starters, but the picker no longer cares).
+const eq = vi.fn().mockResolvedValue({
+  data: [{ pokemon_caught_ids: [1], pokemon_seen_ids: [] }, { pokemon_caught_ids: [4], pokemon_seen_ids: [7] }],
+  error: null,
+})
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'player-1' } } }) },
+    from: vi.fn(() => ({ select: vi.fn(() => ({ eq })) })),
+  },
+}))
+
+const { default: MetaShop } = await import('./MetaShop.jsx')
 
 // Same jsdom localStorage stub RunEndScreen.test.jsx/StarterSelect.test.jsx
 // need — ThemeProvider reads/writes it on mount.
@@ -88,27 +106,45 @@ test('Starting Funds II shows the locked-by-prerequisite copy instead of a price
   expect(screen.getByText('Requires Starting Funds I')).toBeTruthy()
 })
 
-test('buying a vitamin opens the starter picker instead of purchasing immediately', () => {
+test('buying a vitamin opens the species picker instead of purchasing immediately', async () => {
   const profile = { ...createProfile(), metacash: 1000 }
   show({ profile })
   const row = screen.getByText('HP Up').closest('div').parentElement
   const buyButton = row.querySelector('button')
   fireEvent.click(buyButton)
-  expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
-  // Kanto's three starters should be offered (fresh profile = Kanto only).
-  expect(screen.getByText('Bulbasaur')).toBeTruthy()
+  expect(screen.getByText('Choose a Pokémon for HP Up')).toBeTruthy()
+  // The mocked account has caught/seen species 1, 4, 7 (see the supabase
+  // mock above) — the picker's grid should offer all three, by dex number
+  // since name resolution needs a real PokeAPI fetch this test env has none
+  // of (fetchPokemonBase's local-data fetch fails offline and the picker
+  // falls back to the number rather than blocking on it).
+  await waitFor(() => expect(screen.getByText('#001')).toBeTruthy())
+  expect(screen.getByText('#004')).toBeTruthy()
+  expect(screen.getByText('#007')).toBeTruthy()
 })
 
-test('confirming a starter in the picker applies the vitamin purchase and closes it', () => {
+test('confirming a species in the picker applies the vitamin purchase and closes it', async () => {
   let captured = null
   const profile = { ...createProfile(), metacash: 1000 }
   show({ profile, onPurchase: p => { captured = p } })
   fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
-  fireEvent.click(screen.getByText('Bulbasaur'))
+  await waitFor(() => expect(screen.getByText('#001')).toBeTruthy())
+  fireEvent.click(screen.getByText('#001'))
 
   expect(captured).not.toBeNull()
   expect(captured.vitamins[1]).toEqual({ hp: 1 })
-  expect(screen.queryByText('Choose a starter for HP Up')).toBeNull()
+  expect(screen.queryByText('Choose a Pokémon for HP Up')).toBeNull()
+})
+
+test('searching the picker filters the grid by dex number', async () => {
+  const profile = { ...createProfile(), metacash: 1000 }
+  show({ profile })
+  fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
+  await waitFor(() => expect(screen.getByText('#001')).toBeTruthy())
+
+  fireEvent.change(screen.getByPlaceholderText('Search name or #'), { target: { value: '004' } })
+  expect(screen.queryByText('#001')).toBeNull()
+  expect(screen.getByText('#004')).toBeTruthy()
 })
 
 test('switching to Cosmetics shows region sub-tabs, and a locked region reads "Unlock <Region>"', () => {
@@ -137,12 +173,13 @@ test('a locked-region sprite card is inert: clicking it never calls onPurchase',
   expect(called).toBe(false)
 })
 
-test('a starter at the 3-vitamin cap renders a disabled button in the picker', () => {
+test('a species at the 3-vitamin cap renders a disabled button in the picker', async () => {
   const profile = { ...createProfile(), metacash: 1000, vitamins: { 1: { hp: 3 } } }
   show({ profile })
   fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
 
-  const bulbasaurCell = screen.getByText('Bulbasaur').closest('button')
+  await waitFor(() => expect(screen.getByText('#001')).toBeTruthy())
+  const bulbasaurCell = screen.getByText('#001').closest('button')
   expect(bulbasaurCell.disabled).toBe(true)
 })
 
@@ -191,11 +228,11 @@ test('a rejected onPurchase (e.g. a save failure) surfaces a notice instead of a
   expect(await screen.findByText('Could not save — try again')).toBeTruthy()
 })
 
-test('a funds race during confirm keeps the picker open and shows the reason inline, instead of closing silently', () => {
+test('a funds race during confirm keeps the picker open and shows the reason inline, instead of closing silently', async () => {
   // Exactly enough for one HP Up and nothing else, so the row that opens the
-  // picker reads 'affordable'. starterPickerRows' atCap check (the only thing
+  // picker reads 'affordable'. vitaminPickerRows' atCap check (the only thing
   // that disables a button in the picker grid) never looks at metacash, so
-  // Bulbasaur stays clickable even after the rerender below drains the
+  // the #001 cell stays clickable even after the rerender below drains the
   // balance to 0 — a realistic race with another purchase landing while the
   // picker is open. applyPurchase re-checks affordability at confirm time
   // regardless of what the (now stale) picker grid shows.
@@ -206,7 +243,8 @@ test('a funds race during confirm keeps the picker open and shows the reason inl
     </ThemeProvider>,
   )
   fireEvent.click(screen.getByText('HP Up').closest('div').parentElement.querySelector('button'))
-  expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
+  expect(screen.getByText('Choose a Pokémon for HP Up')).toBeTruthy()
+  await waitFor(() => expect(screen.getByText('#001')).toBeTruthy())
 
   const racedProfile = { ...profile, metacash: 0 }
   rerender(
@@ -215,13 +253,13 @@ test('a funds race during confirm keeps the picker open and shows the reason inl
     </ThemeProvider>,
   )
 
-  const bulbasaurButton = screen.getByText('Bulbasaur').closest('button')
+  const bulbasaurButton = screen.getByText('#001').closest('button')
   expect(bulbasaurButton.disabled).toBe(false)
   fireEvent.click(bulbasaurButton)
 
   // Picker stays open (title still present) and shows the rejection reason,
   // rather than vanishing with no explanation.
-  expect(screen.getByText('Choose a starter for HP Up')).toBeTruthy()
+  expect(screen.getByText('Choose a Pokémon for HP Up')).toBeTruthy()
   expect(screen.getByText('Not enough metacash')).toBeTruthy()
 })
 

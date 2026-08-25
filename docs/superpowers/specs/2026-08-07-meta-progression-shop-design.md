@@ -110,12 +110,12 @@ rotation would be actively hostile here.
 |---|---|---|---|
 | 1 | Side Hustle | $300 | +$10 per non-combat node |
 | 2 | Starting Funds I | $400 | +$50 speed cash at run start |
-| 3 | HP Up | $500 | +5% HP for one chosen starter (permanent) |
-| 4 | Protein | $500 | +5% Attack for one chosen starter |
-| 5 | Iron | $500 | +5% Defense for one chosen starter |
-| 6 | Calcium | $500 | +5% SpAtk for one chosen starter |
-| 7 | Zinc | $500 | +5% SpDef for one chosen starter |
-| 8 | Carbos | $500 | +5% Speed for one chosen starter |
+| 3 | HP Up | $500 | +5% HP for one chosen Pokémon (permanent) |
+| 4 | Protein | $500 | +5% Attack for one chosen Pokémon |
+| 5 | Iron | $500 | +5% Defense for one chosen Pokémon |
+| 6 | Calcium | $500 | +5% SpAtk for one chosen Pokémon |
+| 7 | Zinc | $500 | +5% SpDef for one chosen Pokémon |
+| 8 | Carbos | $500 | +5% Speed for one chosen Pokémon |
 | 9 | Bargain Hunter | $500 | 15% off all shop prices (meta + Pokémart) |
 | 10 | Bonded | $700 | Pokémon surviving a **gym leader** fight gain +1 level (that run) |
 | 11 | Type Synergy | $800 | ≥3 party mons share a type → +10% damage for those types |
@@ -162,23 +162,29 @@ party-composition condition is the interesting part and stands alone.
 
 ### 3. Vitamins (items 3–8)
 
-The collectible mechanic: buy a vitamin, **choose one unlocked starter**, that
-starter gains +5% in the vitamin's stat **permanently, across all future
-runs**.
+The collectible mechanic: buy a vitamin, **choose any Pokémon species you've
+caught or seen**, that species gains +5% in the vitamin's stat **permanently,
+across all future runs** — any instance of that species, starter or wild
+catch, carries the boost from then on.
 
 - Vitamin → stat: HP Up → hp, Protein → attack, Iron → defense,
   Calcium → spAtk, Zinc → spDef, Carbos → speed.
-- **Cap: 3 vitamins total per starter** (any stat mix). Forces a build
+- **Cap: 3 vitamins total per species** (any stat mix). Forces a build
   identity — a fast Blaziken or a bulky Blaziken, not both — and keeps
-  max-per-starter at 3 purchases rather than 18.
-- 12 playable starters (4 regions × 3; Johto has no config yet).
+  max-per-species at 3 purchases rather than 18.
+- Originally starters-only (12 species: 4 regions × 3); opened to any
+  caught/seen species so the mechanic isn't bottlenecked on which starter you
+  picked at run start.
 
-**Implementation change.** `makePokemon` currently applies a scalar
-`boost = isStarter ? BALANCE.pokemon.starterBoost : 1` uniformly to all six
-stats (`pokemon.js:243-264`). Vitamins require this to become a **per-stat
-multiplier keyed by species id** — same idea, more granular. Contained change,
-one function; the overlay computes each starter's six multipliers from the
-profile's `vitamins` map.
+**Implementation.** `buildPokemonInstance` applies a per-stat multiplier keyed
+by species id: `starterBoost` as the floor for the run's starter, a flat `1`
+floor for everything else, plus the profile's per-species `vitamins` map
+layered on top of either floor. The floor is what keeps starterBoost
+starter-exclusive while vitamins reach any species — a vitamined wild catch
+gets `1 + 0.05n`, a vitamined starter gets `starterBoost + 0.05n`.
+`buildEvolvedInstance` carries the ORIGINAL pre-evolution species id forward
+(`_vitaminSpeciesId`) so a vitamin bought under a Rattata's id still applies
+once it's a Raticate.
 
 ### 4. Key items
 
@@ -422,12 +428,13 @@ right-aligned (`Orange Kid` 18px), and a Buy button. Four states:
 | Owned | Buy replaced by "OWNED" in muted `Upheaval`, row at 60% opacity |
 | Locked by prerequisite | Buy disabled, price replaced by "Requires Starting Funds I" |
 
-Vitamins (items 3–8) open a **starter picker** on Buy rather than purchasing
-immediately: a grid of the player's unlocked starters, each showing its sprite
-and current vitamin count (`2/3`). Starters at the 3-vitamin cap are darkened
-and unselectable. Confirming applies the vitamin and closes the picker. This is
-the only two-step purchase in the shop, because it's the only one that needs a
-target.
+Vitamins (items 3–8) open a **species picker** on Buy rather than purchasing
+immediately: a searchable dex grid of every species the player has caught or
+seen, each showing its sprite and current vitamin count (`2/3`). Species at
+the 3-vitamin cap are darkened and unselectable; unseen species don't appear
+(searching can't be used to discover a species early). Confirming applies the
+vitamin and closes the picker. This is the only two-step purchase in the shop,
+because it's the only one that needs a target.
 
 **Cosmetics tab.** Five region sub-tabs (Kanto, Johto, Hoenn, Sinnoh, Unova),
 each showing that region's 2 daily offers as sprite cards.

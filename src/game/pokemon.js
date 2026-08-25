@@ -255,12 +255,12 @@ export function shinyOdds() {
 // arrive shiny. Passing the preview's flag through makes the sprite on the
 // select screen a promise. Everything else passes nothing and rolls once.
 //
-// `starterSpeciesId` carries the vitamin lookup key through evolution and
+// `_vitaminSpeciesId` carries the vitamin lookup key through evolution and
 // level-ups (see buildEvolvedInstance/levelUp below). buildPokemonInstance's
-// own callers never pass it explicitly — for a freshly-picked starter it is
+// own callers never pass it explicitly — for a freshly-built instance it is
 // just `base.pokeId`, the species being built right now — but
 // buildEvolvedInstance overrides it afterward on the returned instance so an
-// evolved starter keeps looking itself up under its ORIGINAL species id (a
+// evolved Pokémon keeps looking itself up under its ORIGINAL species id (a
 // Charmander's Protein purchases are stored under Charmander's id, not
 // Charmeleon's, even after it evolves).
 export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShiny = null) {
@@ -269,14 +269,15 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
   // game above MAX_LEVEL regardless of what a caller passes.
   const level = Math.min(MAX_LEVEL, Math.max(1, rawLevel))
   // Per-stat multiplier, keyed by species id (spec §3: vitamins are a
-  // per-stat, not uniform, boost). getVitaminMultipliers reads the active
-  // run's effective starterBoost as its base, so a profile with zero
-  // vitamins for this species reproduces the old uniform scalar exactly —
-  // every stat gets the same number, just computed per-stat instead of once.
-  // Non-starters get a flat 1 on every stat, same as the old `boost = 1`.
-  const multipliers = isStarter
-    ? getVitaminMultipliers(base.pokeId)
-    : { hp: 1, attack: 1, defense: 1, spAtk: 1, spDef: 1, speed: 1 }
+  // per-stat, not uniform, boost, usable on any caught species — not just the
+  // run's starter). `isStarter` only decides the FLOOR: the run's starter
+  // gets starterBoost as its floor (so an unvitamined starter reproduces the
+  // old uniform scalar exactly), everything else floors at a flat 1 (so an
+  // unvitamined wild catch is untouched, same as before this species-wide
+  // lookup existed). Every instance gets a real per-species lookup now, since
+  // any species can hold vitamins.
+  const baseBoost = isStarter ? getEffectiveBalance().pokemon.starterBoost : 1
+  const multipliers = getVitaminMultipliers(base.pokeId, baseBoost)
   const hp = Math.floor(calcHP(base.baseStats.hp, level) * multipliers.hp)
   const move = getTypeMove(attackTypeFor(base.pokeId, base.types), tierForLevel(level))
   // Null (not false) means "no opinion, roll it" — so an explicit false can
@@ -302,12 +303,15 @@ export function buildPokemonInstance(base, rawLevel, isStarter = false, forceShi
     move,
     fainted: false,
     _base: base,
-    // Present only on starters (and their evolutions/level-ups downstream —
-    // see buildEvolvedInstance and levelUp). Doubles as both "is this a
-    // starter" and "which species id to look vitamins up under": absence
-    // means "not a starter," never a starter with zero vitamins (that case
-    // is still present, just with a flat-starterBoost `_multipliers`).
-    ...(isStarter ? { _starterSpeciesId: base.pokeId, _multipliers: multipliers } : {}),
+    // Present on every instance now — any species can hold vitamins, so any
+    // instance needs its lookup key and its resolved multipliers carried
+    // forward across evolution/level-ups (see buildEvolvedInstance and
+    // levelUp below). `isStarter` still marks which instance gets
+    // starterBoost as its multiplier floor; it does not gate whether vitamin
+    // lookup happens at all.
+    _vitaminSpeciesId: base.pokeId,
+    _multipliers: multipliers,
+    ...(isStarter ? { _starterSpeciesId: base.pokeId } : {}),
   }
 }
 
@@ -535,41 +539,38 @@ export function _clearChainCacheForTest() {
 //
 // PRE-EXISTING BUG, fixed as part of Task 6 (vitamins): this used to call
 // buildPokemonInstance(evolvedBase, newLevel) with NO isStarter argument, so
-// a starter's boost (and now, vitamins) evaporated the instant it evolved —
-// the evolved form was built as if it were any wild spawn. Vitamins would
-// have inherited the exact same bug: buy Protein for Charmander, evolve to
-// Charmeleon, silently lose the boost AND the vitamin, which would make the
-// feature visibly fail for most players (most starters get evolved). Fixed
-// here rather than left, since it's the same instance-tagging mechanism this
-// task already had to build for the per-species vitamin lookup: `instance`
-// carries `_starterSpeciesId` (set in buildPokemonInstance, present only on
-// starters) forward across the evolution, and it is THAT id — the run's
-// original starter species, not evolvedBase's — that both the boost-eligible
-// check and the vitamin lookup use, since profile.vitamins is keyed by the
-// starter's original species id (spec §3: "choose one unlocked starter"),
-// which does not change just because the instance representing it does.
+// a starter's boost evaporated the instant it evolved — the evolved form was
+// built as if it were any wild spawn. Vitamins inherit the exact same shape
+// of bug for ANY species now that they target any caught mon (not just
+// starters): buy Protein for a wild Rattata, evolve it to Raticate, and a
+// naive rebuild would silently lose the vitamin, since the fresh instance
+// would look itself up under Raticate's id instead of Rattata's — the id the
+// purchase is actually stored under. `instance` carries `_vitaminSpeciesId`
+// (set on every instance by buildPokemonInstance) forward across the
+// evolution so the lookup always uses the ORIGINAL pre-evolution species id,
+// same as profile.vitamins is keyed. `_starterSpeciesId`, checked separately,
+// only decides which multiplier FLOOR applies (starterBoost vs. flat 1).
 export function buildEvolvedInstance(instance, evolvedBase, newLevel) {
   const hpRatio = instance.stats.hp / instance.stats.maxHp
-  // A starter is anything carrying the tag buildPokemonInstance sets — absent
-  // on every non-starter, so this is a no-op for the vast majority of
-  // evolutions exactly as before.
   const isStarter = instance._starterSpeciesId != null
+  const vitaminSpeciesId = instance._vitaminSpeciesId ?? instance.pokeId
   const evolved = buildPokemonInstance(evolvedBase, newLevel, isStarter)
   // buildPokemonInstance above looked vitamins up under evolvedBase.pokeId
-  // (the species it was JUST asked to build) — wrong for a starter, since
-  // profile.vitamins is keyed by the run's ORIGINAL starter species
-  // (instance._starterSpeciesId), which does not change across evolution.
-  // Recompute the multipliers and every multiplier-scaled stat under the
-  // correct key rather than trust evolved.stats, which used evolvedBase's id.
-  const multipliers = isStarter ? getVitaminMultipliers(instance._starterSpeciesId) : evolved._multipliers
-  const stats = isStarter ? {
+  // (the species it was JUST asked to build) — wrong here, since
+  // profile.vitamins is keyed by the ORIGINAL pre-evolution species id
+  // (vitaminSpeciesId), which does not change across evolution. Recompute the
+  // multipliers and every multiplier-scaled stat under the correct key rather
+  // than trust evolved.stats, which used evolvedBase's id.
+  const baseBoost = isStarter ? getEffectiveBalance().pokemon.starterBoost : 1
+  const multipliers = getVitaminMultipliers(vitaminSpeciesId, baseBoost)
+  const stats = {
     maxHp:   Math.floor(calcHP(evolvedBase.baseStats.hp, newLevel) * multipliers.hp),
     attack:  Math.floor(calcStat(evolvedBase.baseStats.attack,  newLevel) * multipliers.attack),
     defense: Math.floor(calcStat(evolvedBase.baseStats.defense, newLevel) * multipliers.defense),
     spAtk:   Math.floor(calcStat(evolvedBase.baseStats.spAtk,   newLevel) * multipliers.spAtk),
     spDef:   Math.floor(calcStat(evolvedBase.baseStats.spDef,   newLevel) * multipliers.spDef),
     speed:   Math.floor(calcStat(evolvedBase.baseStats.speed,   newLevel) * multipliers.speed),
-  } : evolved.stats
+  }
   // Preserve HP ratio
   const evolvedHp = Math.max(1, Math.floor(stats.maxHp * hpRatio))
   // Preserve the Pokémon's current move tier across evolution (set via TM nodes,
@@ -603,14 +604,15 @@ export function buildEvolvedInstance(instance, evolvedBase, newLevel) {
     // survive the rebuild for the caller to see it. Spread conditionally so an
     // un-prismed Pokémon keeps the key absent rather than gaining `false`.
     ...(instance._prismed ? { _prismed: true } : {}),
-    // Preserve the ORIGINAL starter species id (for future evolutions/level-
-    // ups downstream of this one) and the multipliers computed under it,
+    // Preserve the ORIGINAL species id (for future evolutions/level-ups
+    // downstream of this one) and the multipliers computed under it,
     // overwriting whatever buildPokemonInstance above set under evolvedBase's
-    // (wrong, for this purpose) id.
-    ...(isStarter ? {
-      _starterSpeciesId: instance._starterSpeciesId,
-      _multipliers: multipliers,
-    } : {}),
+    // (wrong, for this purpose) id. _starterSpeciesId only carries forward
+    // when this line IS the run's starter — it marks the boost floor, not the
+    // vitamin lookup key.
+    _vitaminSpeciesId: vitaminSpeciesId,
+    _multipliers: multipliers,
+    ...(isStarter ? { _starterSpeciesId: instance._starterSpeciesId } : {}),
   }
 }
 

@@ -24,7 +24,7 @@
 // @property {number[]} usedStarters        - species ids, feeds Déjà Vu
 // @property {number} winStreak             - consecutive wins, resets on loss
 
-import { META_CATALOG_BY_ID, VITAMIN_CAP_PER_STARTER } from './metaCatalog.js'
+import { META_CATALOG_BY_ID, VITAMIN_CAP_PER_SPECIES } from './metaCatalog.js'
 
 // Kanto is where a new player starts, and the only region unlocked for free.
 // Something has to be: keys come only from WINNING a run, so a profile with
@@ -225,13 +225,13 @@ export function canAfford(profile, item, overrides = {}) {
  * unchanged, on failure": a caller that destructures only `.profile` and
  * ignores `.ok` still gets a value, but every failure path also sets
  * `reason` to a stable string the UI can show ("Requires Starting Funds I",
- * "already at 3/3 vitamins for this starter", "not enough keys") instead of
+ * "already at 3/3 vitamins for this Pokémon", "not enough keys") instead of
  * a purchase silently doing nothing with no way for the caller to tell it
  * failed short of deep-equal-comparing profiles.
  *
  * @param {MetaProfile} profile
  * @param {{id: string, currency: 'metacash'|'keys', cost: number}} item
- * @param {number} [choice] - starter species id, required for vitamin items
+ * @param {number} [choice] - target species id, required for vitamin items (any caught/seen species, not just a starter)
  * @param {Object<string, number>} [overrides]
  * @returns {{ ok: boolean, profile: MetaProfile, reason?: string }}
  */
@@ -244,7 +244,7 @@ export function applyPurchase(profile, item, choice, overrides = {}) {
   }
 
   // Non-vitamin metacash/key upgrades are one-time purchases. Vitamins are
-  // the one repeatable item (spec §3: up to 3 per starter), so ownership
+  // the one repeatable item (spec §3: up to 3 per species), so ownership
   // alone can't gate them — the cap does that instead, below.
   if (!isVitamin && owns(profile, catalogItem.id)) {
     return { ok: false, profile, reason: 'Already owned' }
@@ -252,11 +252,11 @@ export function applyPurchase(profile, item, choice, overrides = {}) {
 
   if (isVitamin) {
     if (choice == null) {
-      return { ok: false, profile, reason: 'Choose a starter' }
+      return { ok: false, profile, reason: 'Choose a Pokémon' }
     }
     const currentTotal = totalVitamins(profile, choice)
-    if (currentTotal >= VITAMIN_CAP_PER_STARTER) {
-      return { ok: false, profile, reason: `Already at ${VITAMIN_CAP_PER_STARTER}/${VITAMIN_CAP_PER_STARTER} vitamins for this starter` }
+    if (currentTotal >= VITAMIN_CAP_PER_SPECIES) {
+      return { ok: false, profile, reason: `Already at ${VITAMIN_CAP_PER_SPECIES}/${VITAMIN_CAP_PER_SPECIES} vitamins for this Pokémon` }
     }
   }
 
@@ -309,7 +309,7 @@ export function toggleUpgrade(profile, itemId) {
   return { ok: true, profile: { ...profile, disabledUpgrades: next } }
 }
 
-// Sum of vitamin purchases (any stat) for one starter, used by both the cap
+// Sum of vitamin purchases (any stat) for one species, used by both the cap
 // check above and available to callers (the shop UI's "2/3" picker badge)
 // without re-deriving it from raw profile.vitamins shape themselves.
 export function totalVitamins(profile, speciesId) {

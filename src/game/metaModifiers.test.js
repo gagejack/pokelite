@@ -289,23 +289,35 @@ test('a mixed stat spread applies independently per stat, none dropped or leaked
 })
 
 // ── getVitaminMultipliers: runtime getter reads the active run's profile ──
+//
+// `baseBoost` is caller-supplied now (defaults to 1, a species with no
+// starter status), since vitamins target any caught species and only the
+// run's actual starter should float on starterBoost — pokemon.js is the
+// caller that decides which floor applies per instance. These tests pass
+// the stock starterBoost explicitly wherever they're exercising that
+// starter-composition behavior specifically.
 
-test('with no active run, getVitaminMultipliers returns the stock starterBoost on every stat', () => {
+test('with no active run, getVitaminMultipliers returns whatever baseBoost it is given, unmodified', () => {
   clearActiveRunModifiers()
-  const m = getVitaminMultipliers(4)
+  const m = getVitaminMultipliers(4, 1.3)
   expect(m).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
+})
+
+test('with no baseBoost argument, getVitaminMultipliers floors at a flat 1 (non-starter default)', () => {
+  clearActiveRunModifiers()
+  expect(getVitaminMultipliers(4)).toEqual({ hp: 1, attack: 1, defense: 1, spAtk: 1, spDef: 1, speed: 1 })
 })
 
 test('setActiveRunModifiers makes getVitaminMultipliers reflect the active profile\'s vitamins', () => {
   setActiveRunModifiers({ ...createProfile(), vitamins: { 4: { attack: 2 } } })
-  expect(getVitaminMultipliers(4).attack).toBeCloseTo(1.4)
-  expect(getVitaminMultipliers(4).defense).toBe(1.3)
+  expect(getVitaminMultipliers(4, 1.3).attack).toBeCloseTo(1.4)
+  expect(getVitaminMultipliers(4, 1.3).defense).toBe(1.3)
   clearActiveRunModifiers()
 })
 
 test('getVitaminMultipliers keys strictly by species id — a different id sees no bonus', () => {
   setActiveRunModifiers({ ...createProfile(), vitamins: { 4: { attack: 3 } } })
-  expect(getVitaminMultipliers(7)).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
+  expect(getVitaminMultipliers(7, 1.3)).toEqual({ hp: 1.3, attack: 1.3, defense: 1.3, spAtk: 1.3, spDef: 1.3, speed: 1.3 })
   clearActiveRunModifiers()
 })
 
@@ -407,16 +419,20 @@ test('setActiveRunModifiers with no tunedStarterBoost argument (existing call si
 test('a vitamin-boosted starter composes on top of the TUNED base, not the stock 1.3 — the bug this feature exists to avoid reintroducing', () => {
   const profile = { ...createProfile(), vitamins: { 4: { attack: 2 } } }
   setActiveRunModifiers(profile, 1.6)
-  // Base is the tuned 1.6, not stock 1.3, plus +0.05 per vitamin (2 here).
-  expect(getVitaminMultipliers(4).attack).toBeCloseTo(1.6 + 0.05 * 2)
+  // pokemon.js passes getEffectiveBalance().pokemon.starterBoost as baseBoost
+  // for the run's starter — the tuned 1.6, not stock 1.3 — plus +0.05 per
+  // vitamin (2 here).
+  const tunedBoost = getEffectiveBalance().pokemon.starterBoost
+  expect(getVitaminMultipliers(4, tunedBoost).attack).toBeCloseTo(1.6 + 0.05 * 2)
   // Untouched stats sit at the tuned base with zero vitamins added.
-  expect(getVitaminMultipliers(4).defense).toBeCloseTo(1.6)
+  expect(getVitaminMultipliers(4, tunedBoost).defense).toBeCloseTo(1.6)
   clearActiveRunModifiers()
 })
 
-test('with no admin tune (default argument), vitamins still compose on the stock 1.3 exactly as before', () => {
+test('with no admin tune, vitamins still compose on the stock 1.3 exactly as before, for the caller that passes it', () => {
   const profile = { ...createProfile(), vitamins: { 4: { speed: 1 } } }
   setActiveRunModifiers(profile)
-  expect(getVitaminMultipliers(4).speed).toBeCloseTo(1.3 + 0.05)
+  const stockBoost = getEffectiveBalance().pokemon.starterBoost
+  expect(getVitaminMultipliers(4, stockBoost).speed).toBeCloseTo(1.3 + 0.05)
   clearActiveRunModifiers()
 })

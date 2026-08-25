@@ -1,7 +1,7 @@
 import { test, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { migrateGuestProfile } from './metaSave.js'
 import { createProfile } from '../game/metaProfile.js'
-import { VITAMIN_CAP_PER_STARTER } from '../game/metaCatalog.js'
+import { VITAMIN_CAP_PER_SPECIES } from '../game/metaCatalog.js'
 
 // migrateGuestProfile is pure, so every case here is exercised with plain
 // profile objects — no Supabase/localStorage mocking needed.
@@ -108,9 +108,9 @@ test('equippedSprite is null when neither side has one', () => {
   expect(migrateGuestProfile(guest, account).equippedSprite).toBe(null)
 })
 
-// ── vitamins: union per starter/stat, capped at VITAMIN_CAP_PER_STARTER ──
+// ── vitamins: union per species/stat, capped at VITAMIN_CAP_PER_SPECIES ──
 
-test('vitamins union per starter/stat by taking the higher count, not summing', () => {
+test('vitamins union per species/stat by taking the higher count, not summing', () => {
   // Same purchase history recorded on both sides (e.g. an old sync) must not
   // double the count.
   const guest = { ...createProfile(), vitamins: { 4: { attack: 2 } } }
@@ -143,7 +143,7 @@ test('vitamins merge clamps to the per-starter cap when independent per-stat max
   const account = { ...createProfile(), vitamins: { 4: { defense: 2 } } }
   const result = migrateGuestProfile(guest, account)
   const total = Object.values(result.vitamins[4]).reduce((sum, n) => sum + n, 0)
-  expect(total).toBeLessThanOrEqual(VITAMIN_CAP_PER_STARTER)
+  expect(total).toBeLessThanOrEqual(VITAMIN_CAP_PER_SPECIES)
 })
 
 test('vitamins merge clamp trims the smaller stat first, deterministically', () => {
@@ -155,7 +155,7 @@ test('vitamins merge clamp trims the smaller stat first, deterministically', () 
   const result = migrateGuestProfile(guest, account)
   const merged = result.vitamins[4]
   const total = Object.values(merged).reduce((sum, n) => sum + n, 0)
-  expect(total).toBe(VITAMIN_CAP_PER_STARTER)
+  expect(total).toBe(VITAMIN_CAP_PER_SPECIES)
   // speed (tied smallest at 1) is fully trimmed away first.
   expect(merged.speed).toBeUndefined()
 })

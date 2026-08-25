@@ -22,7 +22,7 @@ import { supabase } from './supabase'
 // Vitamin cap (spec §3), imported rather than re-declared so a future change
 // to the cap can't silently drift between metaProfile.js's purchase-time
 // enforcement and this merge-time enforcement.
-import { VITAMIN_CAP_PER_STARTER } from '../game/metaCatalog.js'
+import { VITAMIN_CAP_PER_SPECIES } from '../game/metaCatalog.js'
 
 const LOCAL_KEY = 'speedmon.metaProfile'
 
@@ -165,12 +165,12 @@ export async function migrateMetaProfile(signedInUser) {
  *    first region free exactly once per profile; if EITHER side already
  *    claimed it, the merged profile must stay claimed, or the merge itself
  *    becomes a way to launder a second free region.
- *  - vitamins: union per starter per stat, but the cap from Task 1
- *    (VITAMIN_CAP_PER_STARTER, 3 total per starter across all six stats)
+ *  - vitamins: union per species per stat, but the cap
+ *    (VITAMIN_CAP_PER_SPECIES, 3 total per species across all six stats)
  *    still applies to the MERGED result. Two independent purchase histories
  *    (guest device + account) can each be legally at-or-under cap on their
  *    own and still sum past it (e.g. guest bought 2 Protein, account bought
- *    2 Iron on the same starter — 2+2=4 > 3). Summing blindly would produce
+ *    2 Iron on the same species — 2+2=4 > 3). Summing blindly would produce
  *    a profile applyPurchase() would never have allowed to exist, and every
  *    later reader (metaModifiers.js, the shop's "2/3" badge) trusts the cap
  *    as an invariant. Per stat we take max(guestCount, accountCount) rather
@@ -240,9 +240,9 @@ function union(a = [], b = []) {
   return [...new Set([...a, ...b])]
 }
 
-// Per-starter, per-stat: take the higher of the two recorded counts (not the
-// sum — see migrateGuestProfile's doc comment), then clamp the starter's
-// total down to VITAMIN_CAP_PER_STARTER if the combination of per-stat
+// Per-species, per-stat: take the higher of the two recorded counts (not the
+// sum — see migrateGuestProfile's doc comment), then clamp the species'
+// total down to VITAMIN_CAP_PER_SPECIES if the combination of per-stat
 // maxima still exceeds it.
 function mergeVitamins(accountVitamins = {}, localVitamins = {}) {
   const speciesIds = new Set([...Object.keys(accountVitamins), ...Object.keys(localVitamins)])
@@ -264,23 +264,23 @@ function mergeVitamins(accountVitamins = {}, localVitamins = {}) {
   return result
 }
 
-// Trim a { stat: count } map down to VITAMIN_CAP_PER_STARTER total, removing
+// Trim a { stat: count } map down to VITAMIN_CAP_PER_SPECIES total, removing
 // from the smallest counts first (stat order already deterministic from the
 // sorted keys above) so the trim is reproducible regardless of which side
 // (account/local) supplied which value.
 function clampVitaminTotal(statCounts) {
   let total = Object.values(statCounts).reduce((sum, n) => sum + n, 0)
-  if (total <= VITAMIN_CAP_PER_STARTER) return statCounts
+  if (total <= VITAMIN_CAP_PER_SPECIES) return statCounts
 
   const next = { ...statCounts }
   const statsBySizeAsc = Object.keys(next).sort((s1, s2) => next[s1] - next[s2])
 
   for (const stat of statsBySizeAsc) {
-    while (total > VITAMIN_CAP_PER_STARTER && next[stat] > 0) {
+    while (total > VITAMIN_CAP_PER_SPECIES && next[stat] > 0) {
       next[stat] -= 1
       total -= 1
     }
-    if (total <= VITAMIN_CAP_PER_STARTER) break
+    if (total <= VITAMIN_CAP_PER_SPECIES) break
   }
 
   // Drop stats that trimmed to zero so the map matches what applyPurchase
